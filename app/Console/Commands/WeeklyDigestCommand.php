@@ -71,6 +71,7 @@ class WeeklyDigestCommand extends Command
     private function buildRecap(Race $race): array
     {
         return $race->results()
+            ->where('session_type', 'race')
             ->with('driver')
             ->whereNotNull('position')
             ->whereBetween('position', [1, 3])

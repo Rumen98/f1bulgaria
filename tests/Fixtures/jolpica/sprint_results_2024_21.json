@@ -1,0 +1,67 @@
+{
+  "MRData": {
+    "xmlns": "http://ergast.com/mrd/1.5",
+    "series": "f1",
+    "limit": "100",
+    "offset": "0",
+    "total": "2",
+    "RaceTable": {
+      "season": "2024",
+      "round": "21",
+      "Races": [
+        {
+          "season": "2024",
+          "round": "21",
+          "raceName": "São Paulo Grand Prix",
+          "Circuit": {
+            "circuitId": "interlagos",
+            "circuitName": "Autódromo José Carlos Pace",
+            "Location": {"locality": "São Paulo", "country": "Brazil"}
+          },
+          "date": "2024-11-02",
+          "time": "14:00:00Z",
+          "SprintResults": [
+            {
+              "number": "4",
+              "position": "1",
+              "positionText": "1",
+              "points": "8",
+              "Driver": {
+                "driverId": "norris",
+                "permanentNumber": "4",
+                "code": "NOR",
+                "givenName": "Lando",
+                "familyName": "Norris",
+                "nationality": "British"
+              },
+              "Constructor": {"constructorId": "mclaren", "name": "McLaren", "nationality": "British"},
+              "grid": "1",
+              "laps": "24",
+              "status": "Finished",
+              "FastestLap": {"rank": "2", "lap": "20", "Time": {"time": "1:12.900"}}
+            },
+            {
+              "number": "1",
+              "position": "2",
+              "positionText": "2",
+              "points": "7",
+              "Driver": {
+                "driverId": "max_verstappen",
+                "permanentNumber": "33",
+                "code": "VER",
+                "givenName": "Max",
+                "familyName": "Verstappen",
+                "nationality": "Dutch"
+              },
+              "Constructor": {"constructorId": "red_bull", "name": "Red Bull", "nationality": "Austrian"},
+              "grid": "3",
+              "laps": "24",
+              "status": "Finished",
+              "FastestLap": {"rank": "1", "lap": "19", "Time": {"time": "1:12.500"}}
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

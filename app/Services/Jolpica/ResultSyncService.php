@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Jolpica;
 
+use App\Enums\ResultSessionType;
 use App\Models\Constructor;
 use App\Models\Driver;
 use App\Models\Race;
@@ -15,8 +16,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Синхрон на резултатите от едно състезание + определяне на pole от
- * квалификацията. След успешен синхрон задейства точкуването на прогнозите.
+ * Синхрон на резултатите от едно състезание (главно + спринт, ако е спринт
+ * уикенд) + определяне на pole от квалификацията. След успешен синхрон задейства
+ * точкуването на прогнозите. Идемпотентен.
  */
 class ResultSyncService
 {
@@ -26,7 +28,7 @@ class ResultSyncService
     ) {}
 
     /**
-     * @return array{results:int, scored:int}
+     * @return array{results:int, sprint:int, scored:int}
      */
     public function sync(Race $race): array
     {
@@ -34,47 +36,65 @@ class ResultSyncService
         $year = $season->year;
         $round = $race->round;
 
-        $rows = $this->client->results($year, $round);
+        // Всички HTTP заявки преди транзакцията, за да не я държим по време на мрежа.
+        $mainRows = $this->client->results($year, $round);
+        $sprintRows = $race->has_sprint ? $this->client->sprintResults($year, $round) : [];
+        $qualifying = $this->client->qualifying($year, $round);
 
-        $synced = DB::transaction(function () use ($race, $season, $rows) {
-            $count = 0;
+        $counts = DB::transaction(function () use ($race, $season, $mainRows, $sprintRows, $qualifying) {
+            $main = $this->upsertResults($race, $season, $mainRows, ResultSessionType::Race);
+            $sprint = $this->upsertResults($race, $season, $sprintRows, ResultSessionType::Sprint);
+            $this->syncPole($race, $season, $qualifying);
 
-            foreach ($rows as $row) {
-                $driver = $this->resolveDriver($season, $row['Driver'], $row['Constructor'] ?? null);
-
-                Result::query()->updateOrCreate(
-                    ['race_id' => $race->id, 'driver_id' => $driver->id],
-                    [
-                        'jolpica_id' => $row['Driver']['driverId'].'@'.$race->round,
-                        'position' => $this->parsePosition($row['positionText'] ?? null),
-                        'points' => (float) ($row['points'] ?? 0),
-                        'dnf' => $this->isDnf($row['status'] ?? ''),
-                        'fastest_lap' => ($row['FastestLap']['rank'] ?? null) === '1',
-                        'grid_position' => isset($row['grid']) ? (int) $row['grid'] : null,
-                    ],
-                );
-
-                $count++;
-            }
-
-            $this->syncPole($race, $season);
-
-            return $count;
+            return ['results' => $main, 'sprint' => $sprint];
         });
 
         $scored = 0;
 
-        if ($synced > 0) {
+        if ($counts['results'] > 0 || $counts['sprint'] > 0) {
             $scored = $this->scoring->scoreRace($race->fresh());
         }
 
-        return ['results' => $synced, 'scored' => $scored];
+        return [...$counts, 'scored' => $scored];
     }
 
-    private function syncPole(Race $race, Season $season): void
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function upsertResults(Race $race, Season $season, array $rows, ResultSessionType $type): int
     {
-        $qualifying = $this->client->qualifying($season->year, $race->round);
+        $count = 0;
 
+        foreach ($rows as $row) {
+            $driver = $this->resolveDriver($season, $row['Driver'], $row['Constructor'] ?? null);
+
+            Result::query()->updateOrCreate(
+                [
+                    'race_id' => $race->id,
+                    'driver_id' => $driver->id,
+                    'session_type' => $type->value,
+                ],
+                [
+                    'jolpica_id' => $row['Driver']['driverId'].'@'.$race->round.'@'.$type->value,
+                    'position' => $this->parsePosition($row['positionText'] ?? null),
+                    'points' => (float) ($row['points'] ?? 0),
+                    'dnf' => $this->isDnf($row['status'] ?? ''),
+                    'fastest_lap' => ($row['FastestLap']['rank'] ?? null) === '1',
+                    'grid_position' => isset($row['grid']) ? (int) $row['grid'] : null,
+                ],
+            );
+
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $qualifying
+     */
+    private function syncPole(Race $race, Season $season, array $qualifying): void
+    {
         foreach ($qualifying as $row) {
             if (($row['position'] ?? null) === '1') {
                 $poleDriver = $this->resolveDriver($season, $row['Driver'], $row['Constructor'] ?? null);

@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services\Jolpica;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Тънък клиент за Jolpica (Ergast-съвместим) F1 API.
  *
  * Връща винаги съдържанието на `MRData` като асоциативен масив и се грижи за
  * pagination-а (limit/offset) на endpoint-ите, които го изискват.
+ *
+ * Retry политика: 4xx = наша грешка (не повтаряме); 5xx и мрежови грешки =
+ * техен проблем → повтаряме с exponential backoff; 429 = по-дълга пауза.
  *
  * @see https://api.jolpi.ca/ergast/f1/
  */
@@ -21,33 +26,87 @@ class JolpicaClient
 
     private function request(): PendingRequest
     {
-        /** @var array{base_url:string,timeout:int,retry_times:int,retry_sleep_ms:int} $config */
+        /** @var array{base_url:string,timeout:int} $config */
         $config = config('services.jolpica');
 
         return Http::baseUrl($config['base_url'])
             ->acceptJson()
-            ->timeout($config['timeout'])
-            ->retry($config['retry_times'], $config['retry_sleep_ms']);
+            ->timeout($config['timeout']);
     }
 
     /**
-     * Изпълнява GET и връща `MRData` масива.
+     * Изпълнява GET и връща `MRData` масива, с retry при 5xx/429/мрежа.
      *
      * @return array<string, mixed>
+     *
+     * @throws JolpicaException
      */
     public function get(string $path, int $offset = 0): array
     {
-        $response = $this->request()->get(ltrim($path, '/').'.json', [
-            'limit' => self::PAGE_SIZE,
-            'offset' => $offset,
-        ]);
+        $url = ltrim($path, '/').'.json';
+        $query = ['limit' => self::PAGE_SIZE, 'offset' => $offset];
 
-        $response->throw();
+        $maxAttempts = max(1, (int) config('services.jolpica.retry_times', 3));
+        $baseSleepMs = (int) config('services.jolpica.retry_sleep_ms', 500);
 
-        /** @var array<string, mixed> $data */
-        $data = $response->json('MRData', []);
+        $lastStatus = null;
 
-        return $data;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $response = $this->request()->get($url, $query);
+            } catch (ConnectionException $e) {
+                // Мрежова грешка (timeout, connection refused) — третира се като 5xx.
+                $lastStatus = 'network';
+                $this->backoff($attempt, $maxAttempts, $baseSleepMs, $url, 'мрежова грешка', false);
+
+                continue;
+            }
+
+            if ($response->successful()) {
+                /** @var array<string, mixed> $data */
+                $data = $response->json('MRData', []);
+
+                return $data;
+            }
+
+            $lastStatus = $response->status();
+
+            // 4xx (без 429) = наша грешка — няма смисъл да повтаряме.
+            if ($response->clientError() && $response->status() !== 429) {
+                throw new JolpicaException("Jolpica върна {$response->status()} за {$url} — заявката е невалидна.");
+            }
+
+            // 5xx или 429 — техен проблем, повтаряме.
+            $this->backoff($attempt, $maxAttempts, $baseSleepMs, $url, (string) $response->status(), $response->status() === 429);
+        }
+
+        throw new JolpicaException(
+            "Jolpica API недостъпен след {$maxAttempts} опита за {$url} (последен статус: {$lastStatus}). Опитай по-късно.",
+        );
+    }
+
+    /**
+     * Изчаква с exponential backoff преди следващия опит (логва причината).
+     * 429 (rate limit) изчаква по-дълго.
+     */
+    private function backoff(int $attempt, int $maxAttempts, int $baseSleepMs, string $url, string $reason, bool $rateLimited): void
+    {
+        if ($attempt >= $maxAttempts) {
+            return;
+        }
+
+        // При rate limit (429) изчакваме по-дълго — 4x базата.
+        $base = $rateLimited ? $baseSleepMs * 4 : $baseSleepMs;
+        $delayMs = $base * (2 ** ($attempt - 1));
+
+        Log::warning(sprintf(
+            'Jolpica returned %s for %s, retrying in %.1fs (опит %d/%d)',
+            $reason, $url, $delayMs / 1000, $attempt, $maxAttempts,
+        ));
+
+        if ($delayMs > 0) {
+            usleep($delayMs * 1000);
+        }
     }
 
     /**
@@ -129,6 +188,19 @@ class JolpicaClient
         $races = $data['RaceTable']['Races'] ?? [];
 
         return $races[0]['Results'] ?? [];
+    }
+
+    /**
+     * Резултати от спринта (само за спринт уикенди). Носят отделни точки.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function sprintResults(int $year, int $round): array
+    {
+        $data = $this->get("{$year}/{$round}/sprint");
+        $races = $data['RaceTable']['Races'] ?? [];
+
+        return $races[0]['SprintResults'] ?? [];
     }
 
     /**

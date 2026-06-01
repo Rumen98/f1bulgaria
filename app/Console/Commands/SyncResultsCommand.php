@@ -38,8 +38,8 @@ class SyncResultsCommand extends Command
         $newBadges = $badges->evaluateForRace($race->fresh());
 
         $this->table(
-            ['Резултати', 'Точкувани прогнози', 'Нови значки'],
-            [[$stats['results'], $stats['scored'], $newBadges]],
+            ['Резултати', 'Спринт', 'Точкувани прогнози', 'Нови значки'],
+            [[$stats['results'], $stats['sprint'], $stats['scored'], $newBadges]],
         );
 
         $this->info('Готово.');

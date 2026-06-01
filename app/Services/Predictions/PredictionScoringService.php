@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Predictions;
 
+use App\Enums\ResultSessionType;
 use App\Models\Prediction;
 use App\Models\Race;
 use Illuminate\Support\Facades\DB;
@@ -106,7 +107,10 @@ class PredictionScoringService
      */
     private function resolveActuals(Race $race): ?array
     {
-        $results = $race->results()->get();
+        // Прогнозите се отнасят за ГЛАВНОТО състезание, не за спринта.
+        $results = $race->results()
+            ->where('session_type', ResultSessionType::Race->value)
+            ->get();
 
         if ($results->isEmpty()) {
             return null;

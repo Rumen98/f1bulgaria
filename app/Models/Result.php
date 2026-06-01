@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ResultSessionType;
 use Database\Factories\ResultFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,7 @@ class Result extends Model
     protected $fillable = [
         'race_id',
         'driver_id',
+        'session_type',
         'jolpica_id',
         'position',
         'points',
@@ -28,6 +30,7 @@ class Result extends Model
     protected function casts(): array
     {
         return [
+            'session_type' => ResultSessionType::class,
             'position' => 'integer',
             'points' => 'decimal:2',
             'dnf' => 'boolean',

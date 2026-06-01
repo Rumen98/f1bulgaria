@@ -19,7 +19,9 @@ class RaceController extends Controller
         $race->load([
             'sessions',
             'poleDriver',
-            'results' => fn ($q) => $q->with('driver.constructor')->orderByRaw('position is null, position'),
+            'results' => fn ($q) => $q->where('session_type', 'race')
+                ->with('driver.constructor')
+                ->orderByRaw('position is null, position'),
         ]);
 
         $userPrediction = null;

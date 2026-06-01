@@ -23,6 +23,7 @@ class ResultFactory extends Factory
         return [
             'race_id' => Race::factory(),
             'driver_id' => Driver::factory(),
+            'session_type' => 'race',
             'jolpica_id' => fake()->uuid(),
             'position' => $position,
             'points' => max(0, 26 - $position),
@@ -30,6 +31,11 @@ class ResultFactory extends Factory
             'fastest_lap' => false,
             'grid_position' => fake()->numberBetween(1, 20),
         ];
+    }
+
+    public function sprint(): static
+    {
+        return $this->state(fn () => ['session_type' => 'sprint']);
     }
 
     public function dnf(): static
