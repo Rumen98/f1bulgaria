@@ -34,4 +34,16 @@ class Constructor extends Model
     {
         return $this->hasMany(Driver::class);
     }
+
+    /** @return HasMany<TeamNewsSource, $this> */
+    public function newsSources(): HasMany
+    {
+        return $this->hasMany(TeamNewsSource::class);
+    }
+
+    /** @return HasMany<TeamNewsItem, $this> */
+    public function newsItems(): HasMany
+    {
+        return $this->hasMany(TeamNewsItem::class);
+    }
 }

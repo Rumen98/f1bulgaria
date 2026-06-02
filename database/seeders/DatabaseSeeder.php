@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(BadgeSeeder::class);
+        $this->call(TeamNewsSourceSeeder::class);
 
         // Администраторски акаунт (Румен) за достъп до Filament панела.
         User::query()->updateOrCreate(
