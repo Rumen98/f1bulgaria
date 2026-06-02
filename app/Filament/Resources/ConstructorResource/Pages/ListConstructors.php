@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\ConstructorResource\Pages;
 
 use App\Filament\Resources\ConstructorResource;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListConstructors extends ListRecords
@@ -13,7 +13,7 @@ class ListConstructors extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            CreateAction::make(),
         ];
     }
 }

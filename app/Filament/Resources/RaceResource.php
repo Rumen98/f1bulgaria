@@ -4,21 +4,29 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\RaceResource\Pages;
+use App\Filament\Resources\RaceResource\Pages\CreateRace;
+use App\Filament\Resources\RaceResource\Pages\EditRace;
+use App\Filament\Resources\RaceResource\Pages\ListRaces;
 use App\Models\Race;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class RaceResource extends Resource
 {
     protected static ?string $model = Race::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-flag';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-flag';
 
-    protected static ?string $navigationGroup = 'F1 данни';
+    protected static string|\UnitEnum|null $navigationGroup = 'F1 данни';
 
     protected static ?string $navigationLabel = 'Състезания';
 
@@ -26,28 +34,28 @@ class RaceResource extends Resource
 
     protected static ?string $pluralModelLabel = 'състезания';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\Select::make('season_id')
+        return $schema->components([
+            Select::make('season_id')
                 ->label('Сезон')
                 ->relationship('season', 'year')
                 ->required(),
-            Forms\Components\TextInput::make('round')->label('Кръг')->numeric()->required(),
-            Forms\Components\TextInput::make('name')->label('Име')->required(),
-            Forms\Components\TextInput::make('circuit')->label('Писта')->required(),
-            Forms\Components\TextInput::make('country')->label('Държава')->required(),
-            Forms\Components\DateTimePicker::make('race_datetime_utc')->label('Старт (UTC)'),
-            Forms\Components\DateTimePicker::make('qualifying_datetime_utc')->label('Квалификация (UTC)'),
-            Forms\Components\DateTimePicker::make('sprint_datetime_utc')->label('Спринт (UTC)'),
-            Forms\Components\Toggle::make('has_sprint')->label('Спринт уикенд'),
-            Forms\Components\Select::make('pole_driver_id')
+            TextInput::make('round')->label('Кръг')->numeric()->required(),
+            TextInput::make('name')->label('Име')->required(),
+            TextInput::make('circuit')->label('Писта')->required(),
+            TextInput::make('country')->label('Държава')->required(),
+            DateTimePicker::make('race_datetime_utc')->label('Старт (UTC)'),
+            DateTimePicker::make('qualifying_datetime_utc')->label('Квалификация (UTC)'),
+            DateTimePicker::make('sprint_datetime_utc')->label('Спринт (UTC)'),
+            Toggle::make('has_sprint')->label('Спринт уикенд'),
+            Select::make('pole_driver_id')
                 ->label('Pole пилот')
                 ->relationship('poleDriver', 'last_name')
                 ->getOptionLabelFromRecordUsing(fn ($record) => $record->fullName())
                 ->searchable(),
             // Ръчно поле — Ergast не дава safety car. null = неизвестно (не се точкува).
-            Forms\Components\Select::make('had_safety_car')
+            Select::make('had_safety_car')
                 ->label('Имаше ли safety car?')
                 ->options([1 => 'Да', 0 => 'Не'])
                 ->placeholder('Неизвестно')
@@ -59,35 +67,35 @@ class RaceResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('round')->label('Кръг')->sortable(),
-                Tables\Columns\TextColumn::make('name')->label('Име')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('season.year')->label('Сезон')->sortable(),
-                Tables\Columns\IconColumn::make('has_sprint')->label('Спринт')->boolean(),
-                Tables\Columns\TextColumn::make('race_datetime_utc')
+                TextColumn::make('round')->label('Кръг')->sortable(),
+                TextColumn::make('name')->label('Име')->searchable()->sortable(),
+                TextColumn::make('season.year')->label('Сезон')->sortable(),
+                IconColumn::make('has_sprint')->label('Спринт')->boolean(),
+                TextColumn::make('race_datetime_utc')
                     ->label('Старт')
                     ->dateTime('d.m.Y H:i')
                     ->timezone('Europe/Sofia')
                     ->sortable(),
-                Tables\Columns\IconColumn::make('had_safety_car')
+                IconColumn::make('had_safety_car')
                     ->label('SC')
                     ->boolean()
                     ->placeholder('?'),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('season')->relationship('season', 'year'),
+                SelectFilter::make('season')->relationship('season', 'year'),
             ])
             ->defaultSort('round')
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
             ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListRaces::route('/'),
-            'create' => Pages\CreateRace::route('/create'),
-            'edit' => Pages\EditRace::route('/{record}/edit'),
+            'index' => ListRaces::route('/'),
+            'create' => CreateRace::route('/create'),
+            'edit' => EditRace::route('/{record}/edit'),
         ];
     }
 }

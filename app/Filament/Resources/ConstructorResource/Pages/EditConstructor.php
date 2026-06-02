@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\ConstructorResource\Pages;
 
 use App\Filament\Resources\ConstructorResource;
-use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditConstructor extends EditRecord
@@ -13,7 +13,7 @@ class EditConstructor extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 }

@@ -4,12 +4,25 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\PostResource\Pages;
+use App\Filament\Resources\PostResource\Pages\CreatePost;
+use App\Filament\Resources\PostResource\Pages\EditPost;
+use App\Filament\Resources\PostResource\Pages\ListPosts;
 use App\Models\Post;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\MarkdownEditor;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
 
@@ -17,9 +30,9 @@ class PostResource extends Resource
 {
     protected static ?string $model = Post::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-newspaper';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-newspaper';
 
-    protected static ?string $navigationGroup = 'Съдържание';
+    protected static string|\UnitEnum|null $navigationGroup = 'Съдържание';
 
     protected static ?string $navigationLabel = 'Постове';
 
@@ -27,45 +40,45 @@ class PostResource extends Resource
 
     protected static ?string $pluralModelLabel = 'постове';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\TextInput::make('title')
+        return $schema->components([
+            TextInput::make('title')
                 ->label('Заглавие')
                 ->required()
                 ->maxLength(255)
                 ->live(onBlur: true)
-                ->afterStateUpdated(function (string $operation, $state, Forms\Set $set) {
+                ->afterStateUpdated(function (string $operation, $state, Set $set) {
                     if ($operation === 'create') {
                         $set('slug', Str::slug($state));
                     }
                 }),
 
-            Forms\Components\TextInput::make('slug')
+            TextInput::make('slug')
                 ->label('URL slug')
                 ->required()
                 ->maxLength(255)
                 ->unique(ignoreRecord: true),
 
-            Forms\Components\MarkdownEditor::make('body_md')
+            MarkdownEditor::make('body_md')
                 ->label('Съдържание (Markdown)')
                 ->required()
                 ->columnSpanFull(),
 
-            Forms\Components\FileUpload::make('cover_image_path')
+            FileUpload::make('cover_image_path')
                 ->label('Корица')
                 ->image()
                 ->directory('posts')
                 ->imageEditor(),
 
-            Forms\Components\Select::make('author_id')
+            Select::make('author_id')
                 ->label('Автор')
                 ->relationship('author', 'name')
                 ->default(fn () => auth()->id())
                 ->searchable()
                 ->preload(),
 
-            Forms\Components\DateTimePicker::make('published_at')
+            DateTimePicker::make('published_at')
                 ->label('Публикувано на')
                 ->helperText('Празно = чернова. Бъдеща дата = насрочена публикация.'),
         ]);
@@ -75,25 +88,25 @@ class PostResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('title')
+                TextColumn::make('title')
                     ->label('Заглавие')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('author.name')
+                TextColumn::make('author.name')
                     ->label('Автор')
                     ->sortable(),
-                Tables\Columns\IconColumn::make('published')
+                IconColumn::make('published')
                     ->label('Публикуван')
                     ->state(fn (Post $record) => $record->isPublished())
                     ->boolean(),
-                Tables\Columns\TextColumn::make('published_at')
+                TextColumn::make('published_at')
                     ->label('Дата')
                     ->dateTime('d.m.Y H:i')
                     ->timezone('Europe/Sofia')
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('published')
+                TernaryFilter::make('published')
                     ->label('Само публикувани')
                     ->queries(
                         true: fn ($query) => $query->published(),
@@ -101,13 +114,13 @@ class PostResource extends Resource
                     ),
             ])
             ->defaultSort('published_at', 'desc')
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -115,9 +128,9 @@ class PostResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPosts::route('/'),
-            'create' => Pages\CreatePost::route('/create'),
-            'edit' => Pages\EditPost::route('/{record}/edit'),
+            'index' => ListPosts::route('/'),
+            'create' => CreatePost::route('/create'),
+            'edit' => EditPost::route('/{record}/edit'),
         ];
     }
 }

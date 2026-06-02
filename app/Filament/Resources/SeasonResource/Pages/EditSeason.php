@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\SeasonResource\Pages;
 
 use App\Filament\Resources\SeasonResource;
-use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditSeason extends EditRecord
@@ -13,7 +13,7 @@ class EditSeason extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 }

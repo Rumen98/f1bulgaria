@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\Season;
 use App\Services\Jolpica\SeasonSyncService;
 use Illuminate\Console\Command;
+use Throwable;
 
 class SyncSeasonCommand extends Command
 {
@@ -22,7 +23,7 @@ class SyncSeasonCommand extends Command
 
         try {
             $stats = $service->sync($year);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->error("Синхронът се провали: {$e->getMessage()}");
 
             return self::FAILURE;

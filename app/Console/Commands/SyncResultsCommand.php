@@ -8,6 +8,7 @@ use App\Models\Race;
 use App\Services\Badges\BadgeService;
 use App\Services\Jolpica\ResultSyncService;
 use Illuminate\Console\Command;
+use Throwable;
 
 class SyncResultsCommand extends Command
 {
@@ -29,7 +30,7 @@ class SyncResultsCommand extends Command
 
         try {
             $stats = $sync->sync($race);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->error("Синхронът се провали: {$e->getMessage()}");
 
             return self::FAILURE;

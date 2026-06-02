@@ -4,21 +4,26 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\DriverResource\Pages;
+use App\Filament\Resources\DriverResource\Pages\CreateDriver;
+use App\Filament\Resources\DriverResource\Pages\EditDriver;
+use App\Filament\Resources\DriverResource\Pages\ListDrivers;
 use App\Models\Driver;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class DriverResource extends Resource
 {
     protected static ?string $model = Driver::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-user-circle';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user-circle';
 
-    protected static ?string $navigationGroup = 'F1 данни';
+    protected static string|\UnitEnum|null $navigationGroup = 'F1 данни';
 
     protected static ?string $navigationLabel = 'Пилоти';
 
@@ -26,23 +31,23 @@ class DriverResource extends Resource
 
     protected static ?string $pluralModelLabel = 'пилоти';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\Select::make('season_id')
+        return $schema->components([
+            Select::make('season_id')
                 ->label('Сезон')
                 ->relationship('season', 'year')
                 ->required(),
-            Forms\Components\Select::make('constructor_id')
+            Select::make('constructor_id')
                 ->label('Конструктор')
                 ->relationship('constructor', 'name'),
-            Forms\Components\TextInput::make('first_name')->label('Име')->required(),
-            Forms\Components\TextInput::make('last_name')->label('Фамилия')->required(),
-            Forms\Components\TextInput::make('slug')->label('Slug')->required(),
-            Forms\Components\TextInput::make('driver_code')->label('Код (напр. HAM)')->maxLength(3),
-            Forms\Components\TextInput::make('permanent_number')->label('Номер')->numeric(),
-            Forms\Components\TextInput::make('country_code')->label('Държава (ISO3)')->maxLength(3),
-            Forms\Components\TextInput::make('jolpica_id')
+            TextInput::make('first_name')->label('Име')->required(),
+            TextInput::make('last_name')->label('Фамилия')->required(),
+            TextInput::make('slug')->label('Slug')->required(),
+            TextInput::make('driver_code')->label('Код (напр. HAM)')->maxLength(3),
+            TextInput::make('permanent_number')->label('Номер')->numeric(),
+            TextInput::make('country_code')->label('Държава (ISO3)')->maxLength(3),
+            TextInput::make('jolpica_id')
                 ->label('Jolpica ID')
                 ->helperText('Идентификатор за синхрона — променяй с внимание.'),
         ]);
@@ -52,31 +57,31 @@ class DriverResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('last_name')
+                TextColumn::make('last_name')
                     ->label('Пилот')
                     ->formatStateUsing(fn (Driver $r) => $r->fullName())
                     ->searchable(['first_name', 'last_name'])
                     ->sortable(),
-                Tables\Columns\TextColumn::make('driver_code')->label('Код'),
-                Tables\Columns\TextColumn::make('constructor.name')->label('Отбор'),
-                Tables\Columns\TextColumn::make('season.year')->label('Сезон')->sortable(),
-                Tables\Columns\TextColumn::make('permanent_number')->label('№'),
+                TextColumn::make('driver_code')->label('Код'),
+                TextColumn::make('constructor.name')->label('Отбор'),
+                TextColumn::make('season.year')->label('Сезон')->sortable(),
+                TextColumn::make('permanent_number')->label('№'),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('season')->relationship('season', 'year'),
-                Tables\Filters\SelectFilter::make('constructor')->relationship('constructor', 'name'),
+                SelectFilter::make('season')->relationship('season', 'year'),
+                SelectFilter::make('constructor')->relationship('constructor', 'name'),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
             ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListDrivers::route('/'),
-            'create' => Pages\CreateDriver::route('/create'),
-            'edit' => Pages\EditDriver::route('/{record}/edit'),
+            'index' => ListDrivers::route('/'),
+            'create' => CreateDriver::route('/create'),
+            'edit' => EditDriver::route('/{record}/edit'),
         ];
     }
 }

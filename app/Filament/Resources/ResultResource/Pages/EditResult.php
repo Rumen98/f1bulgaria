@@ -6,7 +6,7 @@ namespace App\Filament\Resources\ResultResource\Pages;
 
 use App\Filament\Resources\ResultResource;
 use App\Services\Predictions\PredictionScoringService;
-use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditResult extends EditRecord
@@ -16,7 +16,7 @@ class EditResult extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 

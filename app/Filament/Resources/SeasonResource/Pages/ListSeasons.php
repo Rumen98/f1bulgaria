@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\SeasonResource\Pages;
 
 use App\Filament\Resources\SeasonResource;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListSeasons extends ListRecords
@@ -13,7 +13,7 @@ class ListSeasons extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            CreateAction::make(),
         ];
     }
 }

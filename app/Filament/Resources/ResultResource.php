@@ -4,21 +4,28 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ResultResource\Pages;
+use App\Filament\Resources\ResultResource\Pages\CreateResult;
+use App\Filament\Resources\ResultResource\Pages\EditResult;
+use App\Filament\Resources\ResultResource\Pages\ListResults;
 use App\Models\Result;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class ResultResource extends Resource
 {
     protected static ?string $model = Result::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-trophy';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-trophy';
 
-    protected static ?string $navigationGroup = 'F1 данни';
+    protected static string|\UnitEnum|null $navigationGroup = 'F1 данни';
 
     protected static ?string $navigationLabel = 'Резултати';
 
@@ -26,25 +33,25 @@ class ResultResource extends Resource
 
     protected static ?string $pluralModelLabel = 'резултати';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\Select::make('race_id')
+        return $schema->components([
+            Select::make('race_id')
                 ->label('Състезание')
                 ->relationship('race', 'name')
                 ->searchable()
                 ->required(),
-            Forms\Components\Select::make('driver_id')
+            Select::make('driver_id')
                 ->label('Пилот')
                 ->relationship('driver', 'last_name')
                 ->getOptionLabelFromRecordUsing(fn ($record) => $record->fullName())
                 ->searchable()
                 ->required(),
-            Forms\Components\TextInput::make('position')->label('Позиция')->numeric(),
-            Forms\Components\TextInput::make('points')->label('Точки')->numeric()->required()->default(0),
-            Forms\Components\TextInput::make('grid_position')->label('Стартова позиция')->numeric(),
-            Forms\Components\Toggle::make('dnf')->label('DNF (отпаднал)'),
-            Forms\Components\Toggle::make('fastest_lap')->label('Най-бърза обиколка'),
+            TextInput::make('position')->label('Позиция')->numeric(),
+            TextInput::make('points')->label('Точки')->numeric()->required()->default(0),
+            TextInput::make('grid_position')->label('Стартова позиция')->numeric(),
+            Toggle::make('dnf')->label('DNF (отпаднал)'),
+            Toggle::make('fastest_lap')->label('Най-бърза обиколка'),
         ]);
     }
 
@@ -52,31 +59,31 @@ class ResultResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('race.name')->label('Състезание')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('position')->label('Поз.')->placeholder('DNF')->sortable(),
-                Tables\Columns\TextColumn::make('driver.last_name')
+                TextColumn::make('race.name')->label('Състезание')->searchable()->sortable(),
+                TextColumn::make('position')->label('Поз.')->placeholder('DNF')->sortable(),
+                TextColumn::make('driver.last_name')
                     ->label('Пилот')
                     ->formatStateUsing(fn (Result $r) => $r->driver?->fullName())
                     ->searchable(),
-                Tables\Columns\TextColumn::make('points')->label('Точки'),
-                Tables\Columns\IconColumn::make('dnf')->label('DNF')->boolean(),
-                Tables\Columns\IconColumn::make('fastest_lap')->label('FL')->boolean(),
+                TextColumn::make('points')->label('Точки'),
+                IconColumn::make('dnf')->label('DNF')->boolean(),
+                IconColumn::make('fastest_lap')->label('FL')->boolean(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('race')->relationship('race', 'name'),
+                SelectFilter::make('race')->relationship('race', 'name'),
             ])
             ->defaultSort('position')
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
             ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListResults::route('/'),
-            'create' => Pages\CreateResult::route('/create'),
-            'edit' => Pages\EditResult::route('/{record}/edit'),
+            'index' => ListResults::route('/'),
+            'create' => CreateResult::route('/create'),
+            'edit' => EditResult::route('/{record}/edit'),
         ];
     }
 }

@@ -6,7 +6,7 @@ namespace App\Filament\Resources\RaceResource\Pages;
 
 use App\Filament\Resources\RaceResource;
 use App\Services\Predictions\PredictionScoringService;
-use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditRace extends EditRecord
@@ -16,7 +16,7 @@ class EditRace extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 

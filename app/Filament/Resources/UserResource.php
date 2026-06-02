@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\UserResource\Pages;
+use App\Filament\Resources\UserResource\Pages\CreateUser;
+use App\Filament\Resources\UserResource\Pages\EditUser;
+use App\Filament\Resources\UserResource\Pages\ListUsers;
 use App\Models\User;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\Action;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Hash;
 
@@ -17,9 +25,9 @@ class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $navigationGroup = 'Общност';
+    protected static string|\UnitEnum|null $navigationGroup = 'Общност';
 
     protected static ?string $navigationLabel = 'Потребители';
 
@@ -27,26 +35,26 @@ class UserResource extends Resource
 
     protected static ?string $pluralModelLabel = 'потребители';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\TextInput::make('name')
+        return $schema->components([
+            TextInput::make('name')
                 ->label('Име')
                 ->required(),
-            Forms\Components\TextInput::make('email')
+            TextInput::make('email')
                 ->label('Имейл')
                 ->email()
                 ->required()
                 ->unique(ignoreRecord: true),
-            Forms\Components\TextInput::make('password')
+            TextInput::make('password')
                 ->label('Парола')
                 ->password()
                 ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null)
                 ->dehydrated(fn (?string $state) => filled($state))
                 ->required(fn (string $operation) => $operation === 'create'),
-            Forms\Components\Toggle::make('is_admin')
+            Toggle::make('is_admin')
                 ->label('Администратор'),
-            Forms\Components\DateTimePicker::make('banned_at')
+            DateTimePicker::make('banned_at')
                 ->label('Блокиран на')
                 ->helperText('Попълнено = потребителят е блокиран и не може да влиза.'),
         ]);
@@ -56,28 +64,28 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')->label('Име')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('email')->label('Имейл')->searchable(),
-                Tables\Columns\IconColumn::make('is_admin')->label('Админ')->boolean(),
-                Tables\Columns\IconColumn::make('banned_at')
+                TextColumn::make('name')->label('Име')->searchable()->sortable(),
+                TextColumn::make('email')->label('Имейл')->searchable(),
+                IconColumn::make('is_admin')->label('Админ')->boolean(),
+                IconColumn::make('banned_at')
                     ->label('Блокиран')
                     ->state(fn (User $record) => $record->isBanned())
                     ->boolean()
                     ->trueColor('danger')
                     ->falseColor('success'),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Регистриран')
                     ->date('d.m.Y')
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('banned_at')
+                TernaryFilter::make('banned_at')
                     ->label('Блокирани')
                     ->nullable(),
             ])
-            ->actions([
+            ->recordActions([
                 // Бърза модерация без отваряне на формата.
-                Tables\Actions\Action::make('toggleBan')
+                Action::make('toggleBan')
                     ->label(fn (User $record) => $record->isBanned() ? 'Отблокирай' : 'Блокирай')
                     ->icon('heroicon-o-no-symbol')
                     ->color(fn (User $record) => $record->isBanned() ? 'success' : 'danger')
@@ -85,16 +93,16 @@ class UserResource extends Resource
                     ->action(fn (User $record) => $record->update([
                         'banned_at' => $record->isBanned() ? null : now(),
                     ])),
-                Tables\Actions\EditAction::make(),
+                EditAction::make(),
             ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListUsers::route('/'),
-            'create' => Pages\CreateUser::route('/create'),
-            'edit' => Pages\EditUser::route('/{record}/edit'),
+            'index' => ListUsers::route('/'),
+            'create' => CreateUser::route('/create'),
+            'edit' => EditUser::route('/{record}/edit'),
         ];
     }
 }
