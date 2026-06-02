@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>The Race - Formula 1</title>
+  <link href="https://the-race.com/formula-1/"/>
+  <updated>2024-11-03T19:00:00Z</updated>
+  <id>https://the-race.com/formula-1/</id>
+  <entry>
+    <title>How Verstappen mastered the Interlagos rain</title>
+    <link rel="alternate" type="text/html" href="https://the-race.com/formula-1/verstappen-interlagos-rain/"/>
+    <id>the-race-f1-200001</id>
+    <updated>2024-11-03T18:45:00Z</updated>
+    <published>2024-11-03T18:45:00Z</published>
+    <summary type="html">&lt;p&gt;A look at the racecraft behind Max Verstappen's drive from 17th to victory.&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <title>McLaren's title lead under threat after Brazil</title>
+    <link rel="alternate" type="text/html" href="https://the-race.com/formula-1/mclaren-title-lead-threat/"/>
+    <id>the-race-f1-200002</id>
+    <updated>2024-11-03T20:30:00Z</updated>
+    <published>2024-11-03T20:30:00Z</published>
+    <summary type="html">&lt;p&gt;McLaren still leads the constructors' standings, but Ferrari is closing fast.&lt;/p&gt;</summary>
+  </entry>
+</feed>

@@ -48,3 +48,11 @@ function something()
 {
     // ..
 }
+
+/**
+ * Чете съдържанието на news fixture файл (RSS/Atom snapshot).
+ */
+function newsFixture(string $name): string
+{
+    return file_get_contents(base_path("tests/Fixtures/news/{$name}"));
+}

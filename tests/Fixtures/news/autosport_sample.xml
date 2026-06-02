@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Autosport - F1 News</title>
+    <link>https://www.autosport.com/f1/</link>
+    <description>The latest Formula 1 news from Autosport</description>
+    <language>en-gb</language>
+    <item>
+      <title>Verstappen wins chaotic São Paulo Grand Prix from 17th</title>
+      <link>https://www.autosport.com/f1/news/verstappen-wins-sao-paulo/</link>
+      <description><![CDATA[<p>Max Verstappen produced a stunning drive in the wet to win the <strong>São Paulo Grand Prix</strong> from 17th on the grid.</p>]]></description>
+      <guid isPermaLink="false">autosport-f1-100001</guid>
+      <pubDate>Sun, 03 Nov 2024 18:30:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Norris takes pole as qualifying delayed to Sunday</title>
+      <link>https://www.autosport.com/f1/news/norris-pole-sao-paulo/</link>
+      <description><![CDATA[<p>Lando Norris secured pole position after qualifying was postponed to Sunday morning due to heavy rain.</p>]]></description>
+      <guid isPermaLink="false">autosport-f1-100002</guid>
+      <pubDate>Sun, 03 Nov 2024 13:15:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Ferrari closes on McLaren in constructors' battle</title>
+      <link>https://www.autosport.com/f1/news/ferrari-closes-mclaren/</link>
+      <description><![CDATA[<p>Ferrari has cut the gap to McLaren in the constructors' championship after a strong double points finish.</p>]]></description>
+      <guid isPermaLink="false">autosport-f1-100003</guid>
+      <pubDate>Sun, 03 Nov 2024 20:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>
