@@ -9,6 +9,7 @@ use App\Models\TeamNewsItem;
 use App\Services\News\Llm\AnthropicClient;
 use App\Services\News\Llm\LlmException;
 use App\Services\News\Llm\NewsClassifier;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     $this->season = Season::factory()->current()->create();
@@ -109,4 +110,52 @@ it('хвърля LlmException при importance извън 1-5', function () {
 
     expect(fn () => app(NewsClassifier::class)->classify($this->item))
         ->toThrow(LlmException::class);
+});
+
+it('парсва JSON с преамбюл текст преди него', function () {
+    $json = json_encode([
+        'title_bg' => 'Заглавие',
+        'summary_bg' => 'Кратко резюме на новината.',
+        'classification' => 'race',
+        'constructor_id' => null,
+        'importance_score' => 3,
+    ]);
+    mockClaude("Ето моя отговор:\n\n{$json}");
+
+    $result = app(NewsClassifier::class)->classify($this->item);
+
+    expect($result->classification)->toBe(NewsClassification::Race)
+        ->and($result->titleBg)->toBe('Заглавие');
+});
+
+it('парсва JSON с епилог текст след него', function () {
+    $json = json_encode([
+        'title_bg' => 'Заглавие',
+        'summary_bg' => 'Кратко резюме на новината.',
+        'classification' => 'business',
+        'constructor_id' => null,
+        'importance_score' => 2,
+    ]);
+    mockClaude("{$json}\n\nНадявам се това е полезно.");
+
+    $result = app(NewsClassifier::class)->classify($this->item);
+
+    expect($result->classification)->toBe(NewsClassification::Business);
+});
+
+it('логва суровия отговор при provален parse', function () {
+    Log::spy();
+    mockClaude('Съжалявам, не мога да помогна с това.');
+
+    expect(fn () => app(NewsClassifier::class)->classify($this->item))
+        ->toThrow(LlmException::class);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(function (string $message, array $context) {
+            return $message === 'LLM parse failure'
+                && $context['item_id'] === $this->item->id
+                && $context['raw_response'] === 'Съжалявам, не мога да помогна с това.'
+                && array_key_exists('parse_error', $context);
+        });
 });

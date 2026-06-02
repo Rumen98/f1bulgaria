@@ -9,6 +9,8 @@ use App\Models\Constructor;
 use App\Models\Driver;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
+use Illuminate\Support\Facades\Log;
+use JsonException;
 
 /**
  * Класифицира и превежда една новина чрез Claude: заглавие/резюме на български,
@@ -28,9 +30,10 @@ class NewsClassifier
         $response = $this->client->complete(
             (string) config('news.classifier_system_prompt'),
             $this->buildUserPrompt($item, $season),
+            2048,
         );
 
-        $data = $this->decode($response['content']);
+        $data = $this->decode($response['content'], $item);
 
         return $this->validate($data, $response);
     }
@@ -61,25 +64,62 @@ class NewsClassifier
     }
 
     /**
-     * Декодира JSON, толерирайки ```json ... ``` обвивка.
+     * Декодира JSON от отговора. Толерира преамбюл/епилог и ```json``` обвивка.
+     * При неуспех логва суровия отговор за диагностика и хвърля LlmException.
      *
      * @return array<string, mixed>
      *
      * @throws LlmException
      */
-    private function decode(string $content): array
+    private function decode(string $content, TeamNewsItem $item): array
     {
-        $raw = trim($content);
-        $raw = preg_replace('/^```(?:json)?\s*/i', '', $raw);
-        $raw = preg_replace('/\s*```$/', '', (string) $raw);
+        $json = $this->extractJson($content);
 
-        $decoded = json_decode((string) $raw, true);
+        try {
+            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            $this->logParseFailure($item, $content, $e->getMessage());
+
+            throw new LlmException('LLM не върна валиден JSON.', previous: $e);
+        }
 
         if (! is_array($decoded)) {
+            $this->logParseFailure($item, $content, 'Декодираната стойност не е JSON обект.');
+
             throw new LlmException('LLM не върна валиден JSON.');
         }
 
         return $decoded;
+    }
+
+    /**
+     * Изважда JSON обекта от суров LLM отговор. Първо опитва най-агресивно —
+     * substring-а между първото "{" и последното "}" (така отпадат преамбюл,
+     * епилог и ```json``` огради). Ако няма скоби — пада до изчистване на огради.
+     */
+    private function extractJson(string $content): string
+    {
+        $start = strpos($content, '{');
+        $end = strrpos($content, '}');
+
+        if ($start !== false && $end !== false && $end >= $start) {
+            return substr($content, $start, $end - $start + 1);
+        }
+
+        // Fallback: изчистване на code fences.
+        $raw = trim($content);
+        $raw = preg_replace('/^```(?:json)?\s*/i', '', $raw);
+
+        return (string) preg_replace('/\s*```$/', '', (string) $raw);
+    }
+
+    private function logParseFailure(TeamNewsItem $item, string $rawResponse, string $parseError): void
+    {
+        Log::warning('LLM parse failure', [
+            'item_id' => $item->id,
+            'raw_response' => $rawResponse,
+            'parse_error' => $parseError,
+        ]);
     }
 
     /**
