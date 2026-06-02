@@ -18,6 +18,8 @@ use JsonException;
  */
 class NewsClassifier
 {
+    private const TOOL_NAME = 'classify_f1_news';
+
     public function __construct(private readonly AnthropicClient $client) {}
 
     /**
@@ -27,15 +29,45 @@ class NewsClassifier
     {
         $season = Season::current();
 
-        $response = $this->client->complete(
+        // Forced tool use → API-то гарантира структуриран input спрямо схемата,
+        // което елиминира JSON parsing проблемите при свободен текст.
+        $response = $this->client->completeWithTool(
             (string) config('news.classifier_system_prompt'),
             $this->buildUserPrompt($item, $season),
+            self::TOOL_NAME,
+            $this->toolSchema(),
             2048,
         );
 
-        $data = $this->decode($response['content'], $item);
+        // Схемата гарантира типовете; валидираме само бизнес правилата.
+        return $this->validate($response['input'], $response);
+    }
 
-        return $this->validate($data, $response);
+    /**
+     * JSON Schema за tool input-а. Изброените типове се гарантират от API-то;
+     * бизнес валидността (реален constructor_id) се проверява в validate().
+     *
+     * @return array<string, mixed>
+     */
+    private function toolSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'title_bg' => ['type' => 'string', 'maxLength' => 120, 'description' => 'Заглавие на български'],
+                'summary_bg' => ['type' => 'string', 'maxLength' => 400, 'description' => 'Резюме на български, 2-3 изречения'],
+                'classification' => [
+                    'type' => 'string',
+                    'enum' => ['race', 'driver', 'technical', 'rumor', 'business', 'other'],
+                ],
+                'constructor_id' => [
+                    'type' => ['integer', 'null'],
+                    'description' => 'ID на конкретен отбор или null',
+                ],
+                'importance_score' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 5],
+            ],
+            'required' => ['title_bg', 'summary_bg', 'classification', 'importance_score'],
+        ];
     }
 
     private function buildUserPrompt(TeamNewsItem $item, ?Season $season): string
@@ -124,7 +156,7 @@ class NewsClassifier
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array{content: string, input_tokens: int, output_tokens: int}  $response
+     * @param  array{input: array<string, mixed>, input_tokens: int, output_tokens: int}  $response
      *
      * @throws LlmException
      */
@@ -165,7 +197,7 @@ class NewsClassifier
             classification: $classification,
             constructorId: $constructorId,
             importanceScore: $importance,
-            rawResponse: $response['content'],
+            rawResponse: json_encode($data, JSON_UNESCAPED_UNICODE) ?: '',
             tokenUsage: [
                 'input_tokens' => $response['input_tokens'],
                 'output_tokens' => $response['output_tokens'],

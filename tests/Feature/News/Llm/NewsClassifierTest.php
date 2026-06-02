@@ -9,7 +9,6 @@ use App\Models\TeamNewsItem;
 use App\Services\News\Llm\AnthropicClient;
 use App\Services\News\Llm\LlmException;
 use App\Services\News\Llm\NewsClassifier;
-use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     $this->season = Season::factory()->current()->create();
@@ -21,25 +20,28 @@ beforeEach(function () {
 });
 
 /**
- * Връзва mock AnthropicClient, който отговаря със зададения суров текст.
+ * Връзва mock AnthropicClient, който връща подадения tool input (както при
+ * forced tool use — вече структуриран, без JSON parsing).
+ *
+ * @param  array<string, mixed>  $input
  */
-function mockClaude(string $content): void
+function mockTool(array $input): void
 {
-    test()->mock(AnthropicClient::class, function ($mock) use ($content) {
-        $mock->shouldReceive('complete')
+    test()->mock(AnthropicClient::class, function ($mock) use ($input) {
+        $mock->shouldReceive('completeWithTool')
             ->once()
-            ->andReturn(['content' => $content, 'input_tokens' => 15, 'output_tokens' => 40]);
+            ->andReturn(['input' => $input, 'input_tokens' => 15, 'output_tokens' => 40]);
     });
 }
 
-it('парсва валиден JSON отговор', function () {
-    mockClaude(json_encode([
+it('връща структуриран резултат от tool input', function () {
+    mockTool([
         'title_bg' => 'Верстапен триумфира в Бразилия',
         'summary_bg' => 'Макс Верстапен спечели състезанието в Бразилия. Победата го доближава до титлата.',
         'classification' => 'race',
         'constructor_id' => $this->constructor->id,
         'importance_score' => 4,
-    ]));
+    ]);
 
     $result = app(NewsClassifier::class)->classify($this->item);
 
@@ -50,112 +52,69 @@ it('парсва валиден JSON отговор', function () {
         ->and($result->tokenUsage)->toBe(['input_tokens' => 15, 'output_tokens' => 40]);
 });
 
-it('strip-ва code fences и парсва', function () {
-    $json = json_encode([
-        'title_bg' => 'Заглавие',
-        'summary_bg' => 'Кратко резюме на новината тук.',
+it('приема constructor_id = null (обща новина)', function () {
+    mockTool([
+        'title_bg' => 'Промени в правилника за 2026',
+        'summary_bg' => 'FIA обяви нови технически регулации. Те засягат всички отбори.',
         'classification' => 'technical',
         'constructor_id' => null,
-        'importance_score' => 2,
+        'importance_score' => 3,
     ]);
-    mockClaude("```json\n{$json}\n```");
 
     $result = app(NewsClassifier::class)->classify($this->item);
 
-    expect($result->classification)->toBe(NewsClassification::Technical)
-        ->and($result->constructorId)->toBeNull();
-});
-
-it('хвърля LlmException при невалиден JSON', function () {
-    mockClaude('това определено не е json');
-
-    expect(fn () => app(NewsClassifier::class)->classify($this->item))
-        ->toThrow(LlmException::class);
+    expect($result->constructorId)->toBeNull()
+        ->and($result->classification)->toBe(NewsClassification::Technical);
 });
 
 it('хвърля LlmException при невалидна класификация', function () {
-    mockClaude(json_encode([
+    mockTool([
         'title_bg' => 'Заглавие',
         'summary_bg' => 'Резюме.',
         'classification' => 'gossip',
         'constructor_id' => null,
         'importance_score' => 3,
-    ]));
+    ]);
 
     expect(fn () => app(NewsClassifier::class)->classify($this->item))
         ->toThrow(LlmException::class);
 });
 
 it('хвърля LlmException при несъществуващ constructor_id', function () {
-    mockClaude(json_encode([
+    mockTool([
         'title_bg' => 'Заглавие',
         'summary_bg' => 'Резюме.',
         'classification' => 'race',
         'constructor_id' => 999999,
         'importance_score' => 3,
-    ]));
+    ]);
 
     expect(fn () => app(NewsClassifier::class)->classify($this->item))
         ->toThrow(LlmException::class);
 });
 
 it('хвърля LlmException при importance извън 1-5', function () {
-    mockClaude(json_encode([
+    mockTool([
         'title_bg' => 'Заглавие',
         'summary_bg' => 'Резюме.',
         'classification' => 'race',
         'constructor_id' => null,
         'importance_score' => 9,
-    ]));
+    ]);
 
     expect(fn () => app(NewsClassifier::class)->classify($this->item))
         ->toThrow(LlmException::class);
 });
 
-it('парсва JSON с преамбюл текст преди него', function () {
-    $json = json_encode([
-        'title_bg' => 'Заглавие',
-        'summary_bg' => 'Кратко резюме на новината.',
+it('хвърля LlmException при празно заглавие или резюме', function () {
+    mockTool([
+        'title_bg' => '',
+        'summary_bg' => '',
         'classification' => 'race',
         'constructor_id' => null,
         'importance_score' => 3,
     ]);
-    mockClaude("Ето моя отговор:\n\n{$json}");
-
-    $result = app(NewsClassifier::class)->classify($this->item);
-
-    expect($result->classification)->toBe(NewsClassification::Race)
-        ->and($result->titleBg)->toBe('Заглавие');
-});
-
-it('парсва JSON с епилог текст след него', function () {
-    $json = json_encode([
-        'title_bg' => 'Заглавие',
-        'summary_bg' => 'Кратко резюме на новината.',
-        'classification' => 'business',
-        'constructor_id' => null,
-        'importance_score' => 2,
-    ]);
-    mockClaude("{$json}\n\nНадявам се това е полезно.");
-
-    $result = app(NewsClassifier::class)->classify($this->item);
-
-    expect($result->classification)->toBe(NewsClassification::Business);
-});
-
-it('логва суровия отговор при provален parse', function () {
-    Log::spy();
-    mockClaude('Съжалявам, не мога да помогна с това.');
 
     expect(fn () => app(NewsClassifier::class)->classify($this->item))
         ->toThrow(LlmException::class);
-
-    Log::shouldHaveReceived('warning')
-        ->once()
-        ->withArgs(function (string $message, array $context) {
-            return $message === 'LLM parse failure'
-                && $context['item_id'] === $this->item->id
-                && $context['raw_response'] === 'Съжалявам, не мога да помогна с това.'
-                && array_key_exists('parse_error', $context);
-        });
 });

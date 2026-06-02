@@ -17,6 +17,7 @@ use Throwable;
  * включва в съобщения за грешки.
  *
  * @see https://docs.anthropic.com/en/api/messages
+ * @see https://docs.anthropic.com/en/docs/build-with-claude/tool-use
  */
 class AnthropicClient
 {
@@ -27,11 +28,88 @@ class AnthropicClient
     private const ANTHROPIC_VERSION = '2023-06-01';
 
     /**
+     * Свободен текстов отговор.
+     *
      * @return array{content: string, input_tokens: int, output_tokens: int}
      *
      * @throws LlmException
      */
     public function complete(string $systemPrompt, string $userPrompt, int $maxTokens = 1024): array
+    {
+        $data = $this->dispatch([
+            'max_tokens' => $maxTokens,
+            'system' => $systemPrompt,
+            'messages' => [
+                ['role' => 'user', 'content' => $userPrompt],
+            ],
+        ]);
+
+        $content = data_get($data, 'content.0.text');
+
+        if (! is_string($content) || $content === '') {
+            throw new LlmException('Неочакван отговор от Anthropic API (липсва текстово съдържание).');
+        }
+
+        return [
+            'content' => $content,
+            'input_tokens' => (int) data_get($data, 'usage.input_tokens', 0),
+            'output_tokens' => (int) data_get($data, 'usage.output_tokens', 0),
+        ];
+    }
+
+    /**
+     * Структуриран отговор чрез forced tool use — API-то гарантирано връща
+     * tool_use блок с `input`, валиден спрямо подадената JSON Schema. Това
+     * елиминира JSON parsing проблемите при свободен текст.
+     *
+     * @param  array<string, mixed>  $toolSchema  JSON Schema за input-а
+     * @return array{input: array<string, mixed>, input_tokens: int, output_tokens: int}
+     *
+     * @throws LlmException
+     */
+    public function completeWithTool(
+        string $systemPrompt,
+        string $userPrompt,
+        string $toolName,
+        array $toolSchema,
+        int $maxTokens = 2048,
+    ): array {
+        $data = $this->dispatch([
+            'max_tokens' => $maxTokens,
+            'system' => $systemPrompt,
+            'messages' => [
+                ['role' => 'user', 'content' => $userPrompt],
+            ],
+            'tools' => [[
+                'name' => $toolName,
+                'description' => 'Връща структуриран резултат според схемата.',
+                'input_schema' => $toolSchema,
+            ]],
+            'tool_choice' => ['type' => 'tool', 'name' => $toolName],
+        ]);
+
+        foreach (data_get($data, 'content', []) as $block) {
+            if (($block['type'] ?? null) === 'tool_use' && ($block['name'] ?? null) === $toolName) {
+                return [
+                    'input' => (array) ($block['input'] ?? []),
+                    'input_tokens' => (int) data_get($data, 'usage.input_tokens', 0),
+                    'output_tokens' => (int) data_get($data, 'usage.output_tokens', 0),
+                ];
+            }
+        }
+
+        throw new LlmException("Anthropic API не върна tool_use блок за '{$toolName}'.");
+    }
+
+    /**
+     * Изпраща заявка към /messages с retry/backoff и връща декодирания JSON.
+     *
+     * @param  array<string, mixed>  $payload  тяло без `model` (добавя се тук)
+     * @return array<string, mixed>
+     *
+     * @throws LlmException
+     */
+    private function dispatch(array $payload): array
     {
         /** @var array{key:?string, model:string, base_url:string} $config */
         $config = config('services.anthropic');
@@ -49,43 +127,15 @@ class AnthropicClient
                 ])
                 ->timeout(self::TIMEOUT_SECONDS)
                 ->retry(self::MAX_ATTEMPTS, $this->backoff(...), $this->shouldRetry(...), throw: true)
-                ->post('/messages', [
-                    'model' => $config['model'],
-                    'max_tokens' => $maxTokens,
-                    'system' => $systemPrompt,
-                    'messages' => [
-                        ['role' => 'user', 'content' => $userPrompt],
-                    ],
-                ]);
+                ->post('/messages', [...$payload, 'model' => $config['model']]);
         } catch (RequestException $e) {
-            // Само статусът + тялото на отговора — без ключа/хедърите.
+            // Само статусът — без ключа/хедърите.
             throw new LlmException("Anthropic API върна {$e->response->status()}.", previous: $e);
         } catch (ConnectionException) {
             throw new LlmException('Мрежова грешка при връзка с Anthropic API.');
         }
 
-        return $this->parse($response->json());
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $data
-     * @return array{content: string, input_tokens: int, output_tokens: int}
-     *
-     * @throws LlmException
-     */
-    private function parse(?array $data): array
-    {
-        $content = data_get($data, 'content.0.text');
-
-        if (! is_string($content) || $content === '') {
-            throw new LlmException('Неочакван отговор от Anthropic API (липсва текстово съдържание).');
-        }
-
-        return [
-            'content' => $content,
-            'input_tokens' => (int) data_get($data, 'usage.input_tokens', 0),
-            'output_tokens' => (int) data_get($data, 'usage.output_tokens', 0),
-        ];
+        return (array) $response->json();
     }
 
     /**

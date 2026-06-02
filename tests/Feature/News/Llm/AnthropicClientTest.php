@@ -87,3 +87,37 @@ it('не включва API ключа в съобщението за грешк
         expect($e->getMessage())->not->toContain(TEST_API_KEY);
     }
 });
+
+it('completeWithTool връща input от tool_use блока', function () {
+    Http::fake([ANTHROPIC_URL => Http::response([
+        'content' => [
+            ['type' => 'text', 'text' => 'Ще ползвам инструмента.'],
+            ['type' => 'tool_use', 'id' => 'toolu_1', 'name' => 'classify_f1_news', 'input' => [
+                'title_bg' => 'Заглавие',
+                'classification' => 'race',
+                'importance_score' => 4,
+            ]],
+        ],
+        'usage' => ['input_tokens' => 50, 'output_tokens' => 25],
+    ], 200)]);
+
+    $result = app(AnthropicClient::class)->completeWithTool('система', 'въпрос', 'classify_f1_news', ['type' => 'object']);
+
+    expect($result['input'])->toBe([
+        'title_bg' => 'Заглавие',
+        'classification' => 'race',
+        'importance_score' => 4,
+    ])
+        ->and($result['input_tokens'])->toBe(50)
+        ->and($result['output_tokens'])->toBe(25);
+});
+
+it('completeWithTool хвърля LlmException ако няма tool_use блок', function () {
+    Http::fake([ANTHROPIC_URL => Http::response([
+        'content' => [['type' => 'text', 'text' => 'Само текст, без tool_use.']],
+        'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+    ], 200)]);
+
+    expect(fn () => app(AnthropicClient::class)->completeWithTool('s', 'u', 'classify_f1_news', ['type' => 'object']))
+        ->toThrow(LlmException::class);
+});
