@@ -24,3 +24,16 @@ Schedule::command('f1:sync-results')
 Schedule::command('f1:weekly-digest')
     ->weeklyOn(0, '20:00')
     ->timezone('Europe/Sofia');
+
+// News pipeline — вземане сутрин, после LLM обогатяване.
+Schedule::command('news:fetch')
+    ->dailyAt('06:00')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+Schedule::command('news:enrich --limit=50')
+    ->dailyAt('06:30')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
