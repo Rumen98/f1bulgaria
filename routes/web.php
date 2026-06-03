@@ -7,6 +7,7 @@ use App\Http\Controllers\CircuitsController;
 use App\Http\Controllers\DriversController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
+use App\Http\Controllers\NewsController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicProfileController;
@@ -27,6 +28,7 @@ Route::get('/drivers', [DriversController::class, 'index'])->name('drivers.index
 Route::get('/drivers/{slug}', [DriversController::class, 'show'])->name('drivers.show');
 Route::get('/circuits', [CircuitsController::class, 'index'])->name('circuits.index');
 Route::get('/circuits/{slug}', [CircuitsController::class, 'show'])->name('circuits.show');
+Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');
 
 Route::get('/dashboard', [CalendarController::class, 'index'])
