@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\ProfileController;
@@ -12,7 +13,7 @@ use App\Http\Controllers\StandingsController;
 use Illuminate\Support\Facades\Route;
 
 // Публични страници.
-Route::get('/', [CalendarController::class, 'index'])->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
 Route::get('/standings', [StandingsController::class, 'index'])->name('standings');
 Route::get('/leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard');
