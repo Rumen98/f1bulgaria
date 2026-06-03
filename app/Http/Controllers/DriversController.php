@@ -81,6 +81,7 @@ class DriversController extends Controller
                 'name' => $driver->fullName(),
                 'number' => $driver->permanent_number,
                 'code' => $driver->driver_code,
+                'photo' => $driver->photo_url,
                 'flag' => CountryFlag::emoji($driver->country_code),
                 'team' => $driver->constructor?->name,
                 'team_slug' => $driver->constructor?->slug,

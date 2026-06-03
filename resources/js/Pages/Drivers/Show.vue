@@ -30,7 +30,18 @@ const props = defineProps({
             :style="{ background: `linear-gradient(110deg, ${driver.color_hex}33, #0a0a0a 60%)` }"
         >
             <div class="flex items-center gap-5 sm:gap-8">
+                <!-- Снимка от Wikimedia (ако има), иначе голям номер -->
+                <img
+                    v-if="driver.photo"
+                    :src="driver.photo"
+                    :alt="driver.name"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    class="h-28 w-28 flex-shrink-0 rounded-2xl object-cover object-top shadow-xl ring-2 sm:h-40 sm:w-40"
+                    :style="{ '--tw-ring-color': driver.color_hex, boxShadow: '0 0 40px ' + driver.color_hex + '40' }"
+                />
                 <div
+                    v-else
                     class="select-none text-6xl font-black leading-none tabular-nums sm:text-8xl"
                     :style="{ color: driver.color_hex, textShadow: '0 2px 0 rgba(0,0,0,0.4), 0 0 24px ' + driver.color_hex + '55' }"
                 >

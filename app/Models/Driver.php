@@ -25,6 +25,7 @@ class Driver extends Model
         'slug',
         'permanent_number',
         'country_code',
+        'photo_url',
     ];
 
     protected function casts(): array
