@@ -16,8 +16,12 @@ class SeasonFactory extends Factory
 
     public function definition(): array
     {
+        // Детерминистичен, уникален в рамките на процеса — избягва flaky
+        // unique колизии в пълния suite (за разлика от fake()->unique()).
+        static $year = 1990;
+
         return [
-            'year' => fake()->unique()->numberBetween(1990, 2030),
+            'year' => $year++,
             'is_current' => false,
         ];
     }
