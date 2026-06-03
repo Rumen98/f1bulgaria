@@ -1,15 +1,34 @@
 <script setup>
-defineProps({
+import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
+const props = defineProps({
     item: { type: Object, required: true },
     featured: { type: Boolean, default: false },
 });
+
+// Картата води към собствената ни article страница; към източника се отива
+// само през малката икона долу.
+const hasInternal = computed(() => {
+    if (!props.item.slug) {
+        return false;
+    }
+    try {
+        return route().has('news.show');
+    } catch (e) {
+        return false;
+    }
+});
+
+const href = computed(() => (hasInternal.value ? route('news.show', props.item.slug) : props.item.url));
 </script>
 
 <template>
-    <a
-        :href="item.url"
-        target="_blank"
-        rel="noopener"
+    <component
+        :is="hasInternal ? Link : 'a'"
+        :href="href"
+        :target="hasInternal ? undefined : '_blank'"
+        :rel="hasInternal ? undefined : 'noopener'"
         class="group flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 transition duration-200 hover:border-red-600/50 hover:bg-zinc-900"
         :class="featured ? 'p-6' : 'p-4'"
     >
@@ -36,6 +55,18 @@ defineProps({
         <div class="mt-3 flex items-center gap-1 text-xs text-zinc-600">
             <span v-for="n in 5" :key="n" :class="n <= (item.importance ?? 0) ? 'text-red-500' : 'text-zinc-700'">●</span>
             <span class="ml-2">важност</span>
+            <a
+                v-if="item.url"
+                :href="item.url"
+                target="_blank"
+                rel="noopener nofollow"
+                class="ml-auto inline-flex items-center gap-1 text-zinc-500 transition hover:text-zinc-300"
+                title="Към оригиналния източник"
+                aria-label="Към оригиналния източник"
+                @click.stop
+            >
+                източник ↗
+            </a>
         </div>
-    </a>
+    </component>
 </template>

@@ -9,6 +9,7 @@ use App\Enums\NewsStatus;
 use App\Models\TeamNewsItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -43,6 +44,52 @@ class NewsController extends Controller
             'categories' => $this->categories(),
             'activeCat' => $cat,
         ]);
+    }
+
+    /**
+     * Собствена article страница — оригинален бг превод/резюме + ясно посочен източник.
+     */
+    public function show(string $slug): Response
+    {
+        $item = $this->visible()->where('slug', $slug)->first();
+
+        abort_if($item === null, 404);
+
+        return Inertia::render('News/Show', [
+            'article' => [
+                ...$this->card($item),
+                'source' => $item->source?->name,
+                'external_url' => $item->external_url,
+                'canonical' => route('news.show', $item->slug),
+            ],
+            'related' => $this->related($item),
+        ]);
+    }
+
+    /**
+     * Свързани новини — от същия отбор или категория, най-нови първо.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function related(TeamNewsItem $item)
+    {
+        $query = $this->visible()->where('id', '!=', $item->id);
+
+        if ($item->constructor_id !== null || $item->classification !== null) {
+            $query->where(function (Builder $q) use ($item) {
+                if ($item->constructor_id !== null) {
+                    $q->where('constructor_id', $item->constructor_id);
+                }
+                if ($item->classification !== null) {
+                    $q->orWhere('classification', $item->classification->value);
+                }
+            });
+        }
+
+        return $query->orderByDesc('published_at')
+            ->limit(3)
+            ->get()
+            ->map(fn (TeamNewsItem $i) => $this->card($i));
     }
 
     /**
@@ -102,6 +149,7 @@ class NewsController extends Controller
     private function card(TeamNewsItem $item): array
     {
         return [
+            'slug' => $item->slug,
             'title' => $item->title_bg ?? $item->title_original,
             'summary' => $item->summary_bg,
             'classification' => $item->classification?->label(),

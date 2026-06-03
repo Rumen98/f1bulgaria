@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\NewsStatus;
 use App\Models\TeamNewsItem;
+use App\Models\TeamNewsSource;
 use Inertia\Testing\AssertableInertia as Assert;
 
 function approvedNews(string $classification, int $importance = 3): TeamNewsItem
@@ -64,4 +65,56 @@ it('началната страница показва само одобрени
     $this->get('/')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->has('topNews', 2));
+});
+
+it('показва собствена article страница за одобрена новина', function () {
+    $item = approvedNews('race', 4);
+    approvedNews('race', 2); // свързана новина
+
+    $this->get("/news/{$item->slug}")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('News/Show')
+            ->where('article.title', 'Заглавие на български')
+            ->where('article.slug', $item->slug)
+            ->has('related'));
+});
+
+it('връща 404 за несъществуващ slug', function () {
+    $this->get('/news/nyama-takava-novina')->assertNotFound();
+});
+
+it('връща 404 за непубликувана (pending) новина', function () {
+    $item = TeamNewsItem::factory()->create([
+        'status' => NewsStatus::Pending->value,
+        'title_bg' => 'Чакаща новина',
+    ]);
+
+    expect($item->slug)->not->toBeNull();
+    $this->get("/news/{$item->slug}")->assertNotFound();
+});
+
+it('article страницата сочи към оригиналния източник', function () {
+    $source = TeamNewsSource::factory()->create(['name' => 'Autosport']);
+    $item = TeamNewsItem::factory()->create([
+        'status' => NewsStatus::Approved->value,
+        'title_bg' => 'Новина за източника',
+        'summary_bg' => 'Резюме.',
+        'classification' => 'race',
+        'source_id' => $source->id,
+        'external_url' => 'https://autosport.com/article-123',
+    ]);
+
+    $this->get("/news/{$item->slug}")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('article.external_url', 'https://autosport.com/article-123')
+            ->where('article.source', 'Autosport'));
+});
+
+it('генерира уникален slug при еднакви заглавия', function () {
+    $a = approvedNews('race');
+    $b = approvedNews('race');
+
+    expect($a->slug)->not->toBe($b->slug);
 });

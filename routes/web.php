@@ -29,6 +29,7 @@ Route::get('/drivers/{slug}', [DriversController::class, 'show'])->name('drivers
 Route::get('/circuits', [CircuitsController::class, 'index'])->name('circuits.index');
 Route::get('/circuits/{slug}', [CircuitsController::class, 'show'])->name('circuits.show');
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
+Route::get('/news/{slug}', [NewsController::class, 'show'])->name('news.show');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');
 
 Route::get('/dashboard', [CalendarController::class, 'index'])

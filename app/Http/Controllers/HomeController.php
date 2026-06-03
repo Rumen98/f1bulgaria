@@ -38,6 +38,7 @@ class HomeController extends Controller
             ->limit(6)
             ->get()
             ->map(fn (TeamNewsItem $i) => [
+                'slug' => $i->slug,
                 'title' => $i->title_bg,
                 'summary' => $i->summary_bg,
                 'classification' => $i->classification?->label(),
