@@ -1,7 +1,5 @@
 <script setup>
 import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
 import { useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -29,6 +27,8 @@ const driverFields = [
     { key: 'fastest_lap_driver_id', label: '🔥 Най-бърза обиколка' },
 ];
 
+const fieldClass = 'mt-1 block w-full rounded-md border-zinc-700 bg-zinc-800 text-sm text-zinc-100 shadow-sm transition focus:border-red-500 focus:ring-red-500 disabled:opacity-50';
+
 const submit = () => {
     form.post(route('predictions.store', props.raceId), {
         preserveScroll: true,
@@ -37,15 +37,10 @@ const submit = () => {
 </script>
 
 <template>
-    <form class="space-y-5" @submit.prevent="submit">
+    <form class="space-y-4" @submit.prevent="submit">
         <div v-for="field in driverFields" :key="field.key">
-            <InputLabel :for="field.key" :value="field.label" />
-            <select
-                :id="field.key"
-                v-model="form[field.key]"
-                :disabled="locked"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 disabled:bg-gray-100"
-            >
+            <label :for="field.key" class="text-sm font-medium text-zinc-400">{{ field.label }}</label>
+            <select :id="field.key" v-model="form[field.key]" :disabled="locked" :class="fieldClass">
                 <option :value="null">— избери пилот —</option>
                 <option v-for="driver in drivers" :key="driver.id" :value="driver.id">
                     {{ driver.name }}
@@ -55,7 +50,7 @@ const submit = () => {
         </div>
 
         <div>
-            <InputLabel for="dnf_count" value="Брой отпаднали (DNF)" />
+            <label for="dnf_count" class="text-sm font-medium text-zinc-400">Брой отпаднали (DNF)</label>
             <input
                 id="dnf_count"
                 v-model.number="form.dnf_count"
@@ -63,7 +58,7 @@ const submit = () => {
                 min="0"
                 max="20"
                 :disabled="locked"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 disabled:bg-gray-100"
+                :class="fieldClass"
             />
             <InputError class="mt-1" :message="form.errors.dnf_count" />
         </div>
@@ -73,15 +68,19 @@ const submit = () => {
                 v-model="form.safety_car"
                 type="checkbox"
                 :disabled="locked"
-                class="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                class="rounded border-zinc-600 bg-zinc-800 text-red-600 focus:ring-red-500"
             />
-            <span class="text-sm font-medium text-gray-700">Ще има ли safety car?</span>
+            <span class="text-sm font-medium text-zinc-300">Ще има ли safety car?</span>
         </label>
 
         <InputError :message="form.errors.prediction" />
 
-        <PrimaryButton :disabled="locked || form.processing" :class="{ 'opacity-50': form.processing }">
+        <button
+            type="submit"
+            :disabled="locked || form.processing"
+            class="w-full rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white transition duration-200 hover:bg-red-500 disabled:opacity-50"
+        >
             {{ prediction ? 'Обнови прогнозата' : 'Запази прогнозата' }}
-        </PrimaryButton>
+        </button>
     </form>
 </template>

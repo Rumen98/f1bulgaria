@@ -13,14 +13,14 @@ defineProps({
 
     <PublicLayout>
         <div class="mb-6 flex items-baseline justify-between">
-            <h1 class="text-2xl font-bold">Календар {{ season }}</h1>
-            <Link :href="route('standings')" class="text-sm font-medium text-red-600 hover:underline">
-                Виж класирането →
+            <h1 class="text-2xl font-black sm:text-3xl">Календар <span class="text-red-600">{{ season }}</span></h1>
+            <Link :href="route('standings')" class="text-sm font-medium text-red-500 transition hover:text-red-400">
+                Класиране →
             </Link>
         </div>
 
-        <div v-if="races.length === 0" class="rounded-lg border border-dashed border-gray-300 p-12 text-center text-gray-500">
-            Все още няма синхронизиран календар. Стартирай <code>php artisan f1:sync-season</code>.
+        <div v-if="races.length === 0" class="rounded-xl border border-dashed border-zinc-800 p-12 text-center text-zinc-500">
+            Все още няма синхронизиран календар.
         </div>
 
         <div class="grid gap-3">
@@ -28,26 +28,26 @@ defineProps({
                 v-for="race in races"
                 :key="race.id"
                 :href="route('races.show', race.id)"
-                class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 transition hover:border-red-300 hover:shadow-sm"
+                class="group flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 transition duration-200 hover:border-red-600/50 hover:bg-zinc-900"
             >
                 <div class="flex items-center gap-4">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900 text-sm font-bold text-white">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-sm font-bold tabular-nums text-zinc-300 transition group-hover:bg-red-600 group-hover:text-white">
                         {{ race.round }}
                     </span>
                     <div>
-                        <div class="font-semibold">
+                        <div class="font-semibold text-white">
                             {{ race.name }}
-                            <span v-if="race.has_sprint" class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                            <span v-if="race.has_sprint" class="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-400">
                                 Спринт
                             </span>
                         </div>
-                        <div class="text-sm text-gray-500">{{ race.circuit }}, {{ race.country }}</div>
+                        <div class="text-sm text-zinc-500">{{ race.circuit }}, {{ race.country }}</div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm font-medium text-gray-900">{{ race.race_at_sofia ?? 'TBC' }}</div>
-                    <div v-if="race.finished" class="text-xs font-medium text-green-600">Завършено</div>
-                    <div v-else class="text-xs text-gray-400">Предстои</div>
+                    <div class="text-sm font-medium tabular-nums text-zinc-200">{{ race.race_at_sofia ?? 'TBC' }}</div>
+                    <div v-if="race.finished" class="text-xs font-medium text-green-500">Завършено</div>
+                    <div v-else class="text-xs text-zinc-500">Предстои</div>
                 </div>
             </Link>
         </div>

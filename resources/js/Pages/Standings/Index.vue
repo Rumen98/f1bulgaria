@@ -16,87 +16,80 @@ const tab = ref('drivers');
     <Head title="Класиране" />
 
     <PublicLayout>
-        <h1 class="mb-6 text-2xl font-bold">Класиране {{ season }}</h1>
+        <h1 class="mb-6 text-2xl font-black sm:text-3xl">Класиране <span class="text-red-600">{{ season }}</span></h1>
 
-        <div class="mb-6 inline-flex rounded-lg border border-gray-200 bg-white p-1">
+        <div class="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/60 p-1">
             <button
-                class="rounded-md px-4 py-1.5 text-sm font-medium transition"
-                :class="tab === 'drivers' ? 'bg-gray-900 text-white' : 'text-gray-600'"
+                class="rounded-md px-4 py-1.5 text-sm font-medium transition duration-200"
+                :class="tab === 'drivers' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white'"
                 @click="tab = 'drivers'"
             >
                 Пилоти
             </button>
             <button
-                class="rounded-md px-4 py-1.5 text-sm font-medium transition"
-                :class="tab === 'constructors' ? 'bg-gray-900 text-white' : 'text-gray-600'"
+                class="rounded-md px-4 py-1.5 text-sm font-medium transition duration-200"
+                :class="tab === 'constructors' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white'"
                 @click="tab = 'constructors'"
             >
                 Конструктори
             </button>
         </div>
 
-        <div v-if="tab === 'drivers'" class="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div v-if="tab === 'drivers'" class="overflow-hidden rounded-xl border border-zinc-800">
             <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                <thead class="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
-                        <th class="px-4 py-3">#</th>
+                        <th class="px-4 py-3 w-12">#</th>
                         <th class="px-4 py-3">Пилот</th>
                         <th class="px-4 py-3">Отбор</th>
                         <th class="px-4 py-3 text-center">Победи</th>
                         <th class="px-4 py-3 text-right">Точки</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                    <tr v-for="row in drivers" :key="row.driver.id">
-                        <td class="px-4 py-3 font-medium text-gray-500">{{ row.position }}</td>
-                        <td class="px-4 py-3 font-semibold">
+                <tbody class="divide-y divide-zinc-800">
+                    <tr v-for="row in drivers" :key="row.driver.id" class="bg-zinc-900/40 transition duration-200 hover:bg-zinc-800/50">
+                        <td class="px-4 py-3 font-bold tabular-nums text-zinc-500">{{ row.position }}</td>
+                        <td class="px-4 py-3 font-semibold text-white">
                             {{ row.driver.full_name }}
-                            <span class="ml-1 text-xs text-gray-400">{{ row.driver.code }}</span>
+                            <span class="ml-1 text-xs font-normal text-zinc-500">{{ row.driver.code }}</span>
                         </td>
-                        <td class="px-4 py-3">
-                            <span
-                                class="inline-flex items-center gap-2"
-                            >
+                        <td class="px-4 py-3 text-zinc-300">
+                            <span class="inline-flex items-center gap-2">
                                 <span
-                                    v-if="row.driver.constructor?.color_hex"
                                     class="h-3 w-3 rounded-full"
-                                    :style="{ backgroundColor: row.driver.constructor.color_hex }"
+                                    :style="{ backgroundColor: row.driver.constructor?.color_hex ?? '#52525b' }"
                                 />
                                 {{ row.driver.constructor?.name ?? '—' }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-center">{{ row.wins }}</td>
-                        <td class="px-4 py-3 text-right font-bold">{{ row.points }}</td>
+                        <td class="px-4 py-3 text-center tabular-nums text-zinc-300">{{ row.wins }}</td>
+                        <td class="px-4 py-3 text-right font-bold tabular-nums text-white">{{ row.points }}</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <div v-else class="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div v-else class="overflow-hidden rounded-xl border border-zinc-800">
             <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                <thead class="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
-                        <th class="px-4 py-3">#</th>
+                        <th class="px-4 py-3 w-12">#</th>
                         <th class="px-4 py-3">Конструктор</th>
                         <th class="px-4 py-3 text-center">Победи</th>
                         <th class="px-4 py-3 text-right">Точки</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                    <tr v-for="row in constructors" :key="row.constructor.id">
-                        <td class="px-4 py-3 font-medium text-gray-500">{{ row.position }}</td>
-                        <td class="px-4 py-3 font-semibold">
+                <tbody class="divide-y divide-zinc-800">
+                    <tr v-for="row in constructors" :key="row.constructor.id" class="bg-zinc-900/40 transition duration-200 hover:bg-zinc-800/50">
+                        <td class="px-4 py-3 font-bold tabular-nums text-zinc-500">{{ row.position }}</td>
+                        <td class="px-4 py-3 font-semibold text-white">
                             <span class="inline-flex items-center gap-2">
-                                <span
-                                    v-if="row.constructor.color_hex"
-                                    class="h-3 w-3 rounded-full"
-                                    :style="{ backgroundColor: row.constructor.color_hex }"
-                                />
+                                <span class="h-3 w-6 rounded-sm" :style="{ backgroundColor: row.constructor.color_hex ?? '#52525b' }" />
                                 {{ row.constructor.name }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-center">{{ row.wins }}</td>
-                        <td class="px-4 py-3 text-right font-bold">{{ row.points }}</td>
+                        <td class="px-4 py-3 text-center tabular-nums text-zinc-300">{{ row.wins }}</td>
+                        <td class="px-4 py-3 text-right font-bold tabular-nums text-white">{{ row.points }}</td>
                     </tr>
                 </tbody>
             </table>
