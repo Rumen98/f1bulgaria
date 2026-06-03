@@ -95,3 +95,32 @@ it('countdown_label е според следващата сесия', function (
 
     expect(heroContext()->countdownLabel)->toBe('До FP1');
 });
+
+it('показва "До квалификацията" когато няма FP сесии и квалификацията е следваща', function () {
+    Carbon::setTestNow('2024-06-07 09:00:00');
+    raceWithSessions([
+        // само quali + race (без FP timings — какъвто е случаят при някои источници)
+        SessionType::Qualifying->value => '2024-06-08 14:00:00',
+        SessionType::Race->value => '2024-06-09 13:00:00',
+    ]);
+
+    $ctx = heroContext();
+
+    expect($ctx->countdownLabel)->toBe('До квалификацията')
+        ->and($ctx->nextSession->type)->toBe(SessionType::Qualifying)
+        ->and($ctx->countdownTo->toIso8601String())->toContain('2024-06-08T14:00');
+});
+
+it('показва "До състезанието" когато квалификацията е минала', function () {
+    Carbon::setTestNow('2024-06-08 18:00:00'); // след квалификацията
+    raceWithSessions([
+        SessionType::Qualifying->value => '2024-06-08 14:00:00',
+        SessionType::Race->value => '2024-06-09 13:00:00',
+    ]);
+
+    $ctx = heroContext();
+
+    expect($ctx->countdownLabel)->toBe('До състезанието')
+        ->and($ctx->nextSession->type)->toBe(SessionType::Race)
+        ->and($ctx->countdownTo->toIso8601String())->toContain('2024-06-09T13:00');
+});

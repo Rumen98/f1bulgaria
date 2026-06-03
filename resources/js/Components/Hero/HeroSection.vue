@@ -82,13 +82,16 @@ const countdownText = computed(() => {
                     <p v-if="hero.race" class="mt-1 text-zinc-400">
                         {{ hero.race.circuit }}<span v-if="hero.race.country"> · {{ hero.race.country }}</span>
                     </p>
+                    <p v-if="hero.race?.race_at_sofia" class="mt-1 text-sm text-zinc-500">
+                        🏁 Състезание: {{ hero.race.race_at_sofia }} (Sofia)
+                    </p>
                 </div>
 
                 <div v-if="hero.countdown_to" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
                     <div class="text-xs uppercase tracking-wide text-zinc-400">{{ hero.countdown_label }}</div>
                     <div class="mt-1 font-mono text-2xl font-bold sm:text-3xl">{{ countdownText }}</div>
-                    <div v-if="hero.race?.race_at_sofia" class="mt-1 text-xs text-zinc-500">
-                        Старт: {{ hero.race.race_at_sofia }} (Sofia)
+                    <div v-if="hero.countdown_at_sofia" class="mt-1 text-xs text-zinc-500">
+                        {{ hero.countdown_at_sofia }} (Sofia)
                     </div>
                 </div>
 

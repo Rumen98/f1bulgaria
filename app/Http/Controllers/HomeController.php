@@ -28,6 +28,9 @@ class HomeController extends Controller
             'state' => $ctx->state->value,
             'circuit_slug' => $ctx->circuitSlug,
             'countdown_to' => $ctx->countdownTo?->toIso8601String(),
+            // Времето на сесията, към която броим (а НЕ времето на състезанието).
+            'countdown_at_sofia' => $ctx->countdownTo
+                ?->copy()->setTimezone('Europe/Sofia')->format('d.m.Y H:i'),
             'countdown_label' => $ctx->countdownLabel,
             'race' => $ctx->race ? [
                 'id' => $ctx->race->id,
