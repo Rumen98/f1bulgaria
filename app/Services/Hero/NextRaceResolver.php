@@ -17,9 +17,14 @@ use Carbon\CarbonImmutable;
  */
 class NextRaceResolver
 {
-    private const WEEKEND_LOOKBACK_HOURS = 2;
+    /** Уикендът става „active" едва когато следваща сесия е в този прозорец (чет. вечер → нед.). */
+    private const WEEKEND_LOOKAHEAD_HOURS = 36;
 
-    private const WEEKEND_LOOKAHEAD_DAYS = 7;
+    /**
+     * Колко часа след старта на състезанието още показваме post-race интерфейса.
+     * ~5ч покрива ~2-часово състезание + ~3ч след финала.
+     */
+    private const POST_RACE_HOURS = 5;
 
     public function resolve(): HeroRaceContext
     {
@@ -57,19 +62,29 @@ class NextRaceResolver
     }
 
     /**
-     * Състезанието с най-ранна сесия в прозореца [now-2h, now+7d].
+     * Уикендът е „active" само ако:
+     *  - следваща сесия предстои в близките 36 часа (чет. вечер → нед. вечер), ИЛИ
+     *  - състезанието е стартирало в последните ~5ч (post-race интерфейс).
+     * Иначе → null (минаваме към upcoming).
      */
     private function activeWeekendRace(CarbonImmutable $now): ?Race
     {
-        $raceId = RaceSession::query()
-            ->whereBetween('scheduled_at_utc', [
-                $now->subHours(self::WEEKEND_LOOKBACK_HOURS),
-                $now->addDays(self::WEEKEND_LOOKAHEAD_DAYS),
-            ])
+        $upcomingRaceId = RaceSession::query()
+            ->whereBetween('scheduled_at_utc', [$now, $now->addHours(self::WEEKEND_LOOKAHEAD_HOURS)])
             ->orderBy('scheduled_at_utc')
             ->value('race_id');
 
-        return $raceId ? Race::find($raceId) : null;
+        if ($upcomingRaceId !== null) {
+            return Race::find($upcomingRaceId);
+        }
+
+        $recentRaceId = RaceSession::query()
+            ->where('type', SessionType::Race->value)
+            ->whereBetween('scheduled_at_utc', [$now->subHours(self::POST_RACE_HOURS), $now])
+            ->orderByDesc('scheduled_at_utc')
+            ->value('race_id');
+
+        return $recentRaceId !== null ? Race::find($recentRaceId) : null;
     }
 
     private function activeContext(Race $race, CarbonImmutable $now): HeroRaceContext

@@ -63,6 +63,76 @@ it('връща upcoming извън уикенда', function () {
         ->and($ctx->countdownLabel)->toBe('До състезанието');
 });
 
+it('понеделник същата седмица показва upcoming, а не active', function () {
+    Carbon::setTestNow('2024-06-03 09:00:00'); // понеделник, ~4 дни преди FP1
+    raceWithSessions([
+        SessionType::FP1->value => '2024-06-07 11:30:00',
+        SessionType::Race->value => '2024-06-09 13:00:00',
+    ]);
+
+    expect(heroContext()->state)->toBe(HeroState::Upcoming);
+});
+
+it('сряда (>36ч преди FP1) показва upcoming, а не active', function () {
+    Carbon::setTestNow('2024-06-05 09:00:00'); // сряда, ~2 дни преди FP1 — точно бъгът
+    $race = raceWithSessions([
+        SessionType::FP1->value => '2024-06-07 11:30:00',
+        SessionType::Qualifying->value => '2024-06-08 14:00:00',
+        SessionType::Race->value => '2024-06-09 13:00:00',
+    ]);
+
+    $ctx = heroContext();
+
+    expect($ctx->state)->toBe(HeroState::Upcoming)
+        ->and($ctx->race->id)->toBe($race->id);
+});
+
+it('четвъртък вечер преди FP1 показва active', function () {
+    Carbon::setTestNow('2024-06-06 20:00:00'); // ~15ч преди FP1 → в прозореца от 36ч
+    $race = raceWithSessions([
+        SessionType::FP1->value => '2024-06-07 11:30:00',
+        SessionType::Qualifying->value => '2024-06-08 14:00:00',
+        SessionType::Race->value => '2024-06-09 13:00:00',
+    ]);
+
+    $ctx = heroContext();
+
+    expect($ctx->state)->toBe(HeroState::Active)
+        ->and($ctx->race->id)->toBe($race->id);
+});
+
+it('малко след старта на състезанието показва active (post-race)', function () {
+    Carbon::setTestNow('2024-06-09 16:00:00'); // ~3ч след старта (13:00)
+    $race = raceWithSessions([
+        SessionType::FP1->value => '2024-06-07 11:30:00',
+        SessionType::Race->value => '2024-06-09 13:00:00',
+    ]);
+
+    $ctx = heroContext();
+
+    expect($ctx->state)->toBe(HeroState::Active)
+        ->and($ctx->race->id)->toBe($race->id)
+        ->and($ctx->nextSession)->toBeNull(); // всички сесии са минали
+});
+
+it('24 часа след състезанието показва следващото (upcoming)', function () {
+    Carbon::setTestNow('2024-06-10 13:00:00'); // 24ч след състезанието
+    raceWithSessions([
+        SessionType::FP1->value => '2024-06-07 11:30:00',
+        SessionType::Race->value => '2024-06-09 13:00:00',
+    ], raceAt: '2024-06-09 13:00:00');
+
+    $next = raceWithSessions([
+        SessionType::FP1->value => '2024-06-14 11:30:00',
+        SessionType::Race->value => '2024-06-16 13:00:00',
+    ], raceAt: '2024-06-16 13:00:00');
+
+    $ctx = heroContext();
+
+    expect($ctx->state)->toBe(HeroState::Upcoming)
+        ->and($ctx->race->id)->toBe($next->id);
+});
+
 it('връща off_season при липса на бъдещи състезания', function () {
     Carbon::setTestNow('2024-12-31 09:00:00');
     raceWithSessions([
