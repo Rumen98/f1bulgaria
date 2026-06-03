@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\CircuitsController;
 use App\Http\Controllers\DriversController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
@@ -24,6 +25,8 @@ Route::get('/teams', [TeamsController::class, 'index'])->name('teams.index');
 Route::get('/teams/{slug}', [TeamsController::class, 'show'])->name('teams.show');
 Route::get('/drivers', [DriversController::class, 'index'])->name('drivers.index');
 Route::get('/drivers/{slug}', [DriversController::class, 'show'])->name('drivers.show');
+Route::get('/circuits', [CircuitsController::class, 'index'])->name('circuits.index');
+Route::get('/circuits/{slug}', [CircuitsController::class, 'show'])->name('circuits.show');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');
 
 Route::get('/dashboard', [CalendarController::class, 'index'])
