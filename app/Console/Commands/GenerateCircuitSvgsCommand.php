@@ -55,6 +55,14 @@ class GenerateCircuitSvgsCommand extends Command
         'madring' => 'es-2026',
     ];
 
+    /**
+     * Писти от 2026 календара, които НЯМАТ outline в bacinger GeoJSON.
+     * Hero-то им показва fallback (име на пистата вместо track анимация).
+     *
+     * @var array<int, string>
+     */
+    private const UNAVAILABLE = ['baku', 'vegas'];
+
     public function handle(): int
     {
         $source = $this->option('source') ?: storage_path('app/bacinger-circuits.geojson');
@@ -101,6 +109,8 @@ class GenerateCircuitSvgsCommand extends Command
         if ($missing !== []) {
             $this->warn('Липсват в GeoJSON (ще ползват fallback): '.implode(', ', $missing));
         }
+
+        $this->line('Без outline в източника (fallback с име): '.implode(', ', self::UNAVAILABLE));
 
         return self::SUCCESS;
     }
