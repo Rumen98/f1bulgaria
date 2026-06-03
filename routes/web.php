@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\DriversController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\PredictionController;
@@ -21,6 +22,8 @@ Route::get('/leaderboard', [LeaderboardController::class, 'index'])->name('leade
 Route::get('/races/{race}', [RaceController::class, 'show'])->name('races.show');
 Route::get('/teams', [TeamsController::class, 'index'])->name('teams.index');
 Route::get('/teams/{slug}', [TeamsController::class, 'show'])->name('teams.show');
+Route::get('/drivers', [DriversController::class, 'index'])->name('drivers.index');
+Route::get('/drivers/{slug}', [DriversController::class, 'show'])->name('drivers.show');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');
 
 Route::get('/dashboard', [CalendarController::class, 'index'])
