@@ -49,7 +49,7 @@ class DriverStatsService
     /**
      * All-time статистика чрез driver_code (един пилот = няколко записа по сезони).
      *
-     * @return array{points:float, wins:int, podiums:int, races:int, seasons:int}
+     * @return array{points:float, wins:int, podiums:int, poles:int, races:int, seasons:int}
      */
     public function getAllTimeStats(Driver $driver): array
     {
@@ -64,6 +64,7 @@ class DriverStatsService
                 'points' => (float) Result::query()->whereIn('driver_id', $ids)->sum('points'),
                 'wins' => $race()->where('position', 1)->count(),
                 'podiums' => $race()->whereBetween('position', [1, 3])->count(),
+                'poles' => Race::query()->whereIn('pole_driver_id', $ids)->count(),
                 'races' => $race()->distinct()->count('race_id'),
                 'seasons' => Driver::query()->whereIn('id', $ids)->distinct()->count('season_id'),
             ];

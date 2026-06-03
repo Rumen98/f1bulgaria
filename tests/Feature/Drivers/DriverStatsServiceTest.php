@@ -40,9 +40,10 @@ it('сумира all-time статистика по driver_code през сез�
     $ham2024 = Driver::factory()->create(['season_id' => $s2024->id, 'driver_code' => 'HAM', 'slug' => 'hamilton-2024']);
     $ham2026 = Driver::factory()->create(['season_id' => $s2026->id, 'driver_code' => 'HAM', 'slug' => 'hamilton']);
 
-    $r24 = Race::factory()->create(['season_id' => $s2024->id]);
+    // Pole в двата сезона → all-time poles = 2 (по driver_code, различни Driver записи).
+    $r24 = Race::factory()->create(['season_id' => $s2024->id, 'pole_driver_id' => $ham2024->id]);
     Result::factory()->position(1)->create(['race_id' => $r24->id, 'driver_id' => $ham2024->id, 'points' => 25]);
-    $r26 = Race::factory()->create(['season_id' => $s2026->id]);
+    $r26 = Race::factory()->create(['season_id' => $s2026->id, 'pole_driver_id' => $ham2026->id]);
     Result::factory()->position(2)->create(['race_id' => $r26->id, 'driver_id' => $ham2026->id, 'points' => 18]);
 
     $stats = service()->getAllTimeStats($ham2026);
@@ -50,6 +51,7 @@ it('сумира all-time статистика по driver_code през сез�
     expect($stats['points'])->toBe(43.0)   // 25 + 18 (двата сезона)
         ->and($stats['wins'])->toBe(1)
         ->and($stats['podiums'])->toBe(2)
+        ->and($stats['poles'])->toBe(2)
         ->and($stats['races'])->toBe(2)
         ->and($stats['seasons'])->toBe(2);
 });

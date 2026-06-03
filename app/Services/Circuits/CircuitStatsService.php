@@ -18,7 +18,7 @@ class CircuitStatsService
      * All-time класиране на пилотите за дадена писта — групирано по driver_code
      * (един пилот = няколко записа по сезони, но един код).
      *
-     * @return Collection<int, array{position:int, code:string, name:string, points:float, races:int, wins:int}>
+     * @return Collection<int, array{position:int, code:string, name:string, points:float, races:int, wins:int, poles:int}>
      */
     public function getAllTimeDriverStandings(string $circuitSlug): Collection
     {
@@ -38,6 +38,7 @@ class CircuitStatsService
                 ->get();
 
             $names = $this->latestNamesByCode($rows->pluck('code'));
+            $poles = $this->polesByCode($circuitSlug);
 
             return $rows->values()->map(fn ($r, $i) => [
                 'position' => $i + 1,
@@ -46,6 +47,7 @@ class CircuitStatsService
                 'points' => (float) $r->points,
                 'races' => (int) $r->races,
                 'wins' => (int) $r->wins,
+                'poles' => (int) ($poles[$r->code] ?? 0),
             ]);
         });
     }
@@ -80,8 +82,31 @@ class CircuitStatsService
         return [
             'most_wins' => $this->topByRace($circuitSlug, fn ($q) => $q->where('results.position', 1)->where('results.session_type', ResultSessionType::Race->value)),
             'most_fastest_laps' => $this->topByRace($circuitSlug, fn ($q) => $q->where('results.fastest_lap', true)),
-            'most_poles' => $this->topPoles($circuitSlug),
+            'most_poles' => $this->getMostPolePosDriver($circuitSlug),
         ];
+    }
+
+    /**
+     * Пилотът с най-много pole позиции на тази писта (групирано по driver_code).
+     *
+     * @return array{name:string, count:int}|null
+     */
+    public function getMostPolePosDriver(string $circuitSlug): ?array
+    {
+        $row = DB::table('races')
+            ->selectRaw('drivers.driver_code as code, COUNT(*) as cnt')
+            ->join('drivers', 'drivers.id', '=', 'races.pole_driver_id')
+            ->where('races.jolpica_id', $circuitSlug)
+            ->whereNotNull('drivers.driver_code')
+            ->groupBy('drivers.driver_code')
+            ->orderByDesc('cnt')
+            ->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        return ['name' => $this->latestNamesByCode(collect([$row->code]))[$row->code] ?? $row->code, 'count' => (int) $row->cnt];
     }
 
     /**
@@ -155,23 +180,20 @@ class CircuitStatsService
     }
 
     /**
-     * @return array{name:string, count:int}|null
+     * Pole позиции по driver_code за дадена писта.
+     *
+     * @return array<string, int>
      */
-    private function topPoles(string $circuitSlug): ?array
+    private function polesByCode(string $circuitSlug): array
     {
-        $row = DB::table('races')
+        return DB::table('races')
             ->selectRaw('drivers.driver_code as code, COUNT(*) as cnt')
             ->join('drivers', 'drivers.id', '=', 'races.pole_driver_id')
             ->where('races.jolpica_id', $circuitSlug)
             ->whereNotNull('drivers.driver_code')
             ->groupBy('drivers.driver_code')
-            ->orderByDesc('cnt')
-            ->first();
-
-        if ($row === null) {
-            return null;
-        }
-
-        return ['name' => $this->latestNamesByCode(collect([$row->code]))[$row->code] ?? $row->code, 'count' => (int) $row->cnt];
+            ->pluck('cnt', 'code')
+            ->map(fn ($c) => (int) $c)
+            ->all();
     }
 }

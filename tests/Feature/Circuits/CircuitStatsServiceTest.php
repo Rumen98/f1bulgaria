@@ -17,8 +17,9 @@ it('връща all-time класиране, групирано по driver_code 
     $ham26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'HAM', 'slug' => 'ham-26', 'first_name' => 'Lewis', 'last_name' => 'Hamilton']);
     $ver26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'VER', 'slug' => 'ver-26']);
 
-    $monaco24 = Race::factory()->create(['season_id' => $s24->id, 'jolpica_id' => 'monaco']);
-    $monaco26 = Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'monaco']);
+    // Pole за Hamilton в двата сезона → 2 pole позиции (групирани по driver_code).
+    $monaco24 = Race::factory()->create(['season_id' => $s24->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $ham24->id]);
+    $monaco26 = Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $ham26->id]);
 
     Result::factory()->position(1)->create(['race_id' => $monaco24->id, 'driver_id' => $ham24->id, 'points' => 25]);
     Result::factory()->position(2)->create(['race_id' => $monaco26->id, 'driver_id' => $ham26->id, 'points' => 18]);
@@ -35,9 +36,34 @@ it('връща all-time класиране, групирано по driver_code 
         ->and($top['points'])->toBe(43.0)  // 25 + 18 през двата сезона
         ->and($top['races'])->toBe(2)
         ->and($top['wins'])->toBe(1)
+        ->and($top['poles'])->toBe(2)
         ->and($top['position'])->toBe(1);
 
-    expect($standings->last()['code'])->toBe('VER');
+    expect($standings->last()['code'])->toBe('VER')
+        ->and($standings->last()['poles'])->toBe(0);
+});
+
+it('връща пилота с най-много pole позиции на пистата', function () {
+    $s24 = Season::factory()->create(['year' => 2024]);
+    $s26 = Season::factory()->current()->create(['year' => 2026]);
+
+    $ham24 = Driver::factory()->create(['season_id' => $s24->id, 'driver_code' => 'HAM', 'slug' => 'ham-24', 'first_name' => 'Lewis', 'last_name' => 'Hamilton']);
+    $ham26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'HAM', 'slug' => 'ham-26', 'first_name' => 'Lewis', 'last_name' => 'Hamilton']);
+    $ver26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'VER', 'slug' => 'ver-26']);
+
+    // HAM с 2 pole (по сезон), VER с 1 → HAM води.
+    Race::factory()->create(['season_id' => $s24->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $ham24->id]);
+    Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $ham26->id]);
+    Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'spa', 'pole_driver_id' => $ver26->id]);
+
+    $most = app(CircuitStatsService::class)->getMostPolePosDriver('monaco');
+
+    expect($most)->not->toBeNull()
+        ->and($most['name'])->toBe('Lewis Hamilton')
+        ->and($most['count'])->toBe(2);
+
+    // Писта без pole данни → null.
+    expect(app(CircuitStatsService::class)->getMostPolePosDriver('silverstone'))->toBeNull();
 });
 
 it('връща рекорди и последни победители', function () {
