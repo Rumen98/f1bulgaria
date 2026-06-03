@@ -1,4 +1,5 @@
 <script setup>
+import DriverAchievements from '@/Components/Driver/DriverAchievements.vue';
 import DriverRecentResults from '@/Components/Driver/DriverRecentResults.vue';
 import DriverStatsGrid from '@/Components/Driver/DriverStatsGrid.vue';
 import HeadToHeadBars from '@/Components/Driver/HeadToHeadBars.vue';
@@ -10,6 +11,8 @@ const props = defineProps({
     season: Number,
     seasonStats: Object,
     allTimeStats: Object,
+    achievements: Object,
+    circuitWins: { type: Array, default: () => [] },
     headToHead: Object,
     recentResults: Array,
 });
@@ -60,6 +63,10 @@ const props = defineProps({
         <div class="mt-8 grid gap-8 lg:grid-cols-2">
             <DriverRecentResults :results="recentResults" />
             <HeadToHeadBars :h2h="headToHead" :driver-name="driver.name" :color="driver.color_hex" />
+        </div>
+
+        <div class="mt-10">
+            <DriverAchievements :achievements="achievements" :circuit-wins="circuitWins" />
         </div>
     </PublicLayout>
 </template>

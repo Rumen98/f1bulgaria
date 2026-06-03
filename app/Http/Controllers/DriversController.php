@@ -89,6 +89,8 @@ class DriversController extends Controller
             'season' => $season->year,
             'seasonStats' => $this->stats->getSeasonStats($driver, $season),
             'allTimeStats' => $this->stats->getAllTimeStats($driver),
+            'achievements' => $this->stats->getAchievements($driver),
+            'circuitWins' => $this->stats->getCircuitWins($driver),
             'headToHead' => $this->stats->getHeadToHeadVsTeammate($driver, $season),
             'recentResults' => $recent,
         ]);

@@ -72,6 +72,62 @@ class DriverStatsService
     }
 
     /**
+     * Кариерни постижения (all-time по driver_code) за секцията „Постижения".
+     *
+     * @return array{wins:int, podiums:int, poles:int, fastest_laps:int, races:int, win_rate:float}
+     */
+    public function getAchievements(Driver $driver): array
+    {
+        return Cache::remember("driver-achievements:{$driver->driver_code}:{$driver->id}", now()->addDay(), function () use ($driver) {
+            $ids = $this->sameDriverIds($driver);
+
+            $race = fn () => Result::query()
+                ->whereIn('driver_id', $ids)
+                ->where('session_type', ResultSessionType::Race->value);
+
+            $races = $race()->distinct()->count('race_id');
+            $wins = $race()->where('position', 1)->count();
+
+            return [
+                'wins' => $wins,
+                'podiums' => $race()->whereBetween('position', [1, 3])->count(),
+                'poles' => Race::query()->whereIn('pole_driver_id', $ids)->count(),
+                'fastest_laps' => $race()->where('fastest_lap', true)->count(),
+                'races' => $races,
+                'win_rate' => $races > 0 ? round($wins / $races * 100, 1) : 0.0,
+            ];
+        });
+    }
+
+    /**
+     * Победите на пилота групирани по писта (jolpica_id), подредени по брой.
+     *
+     * @return Collection<int, array{circuit_slug:string, circuit:string, wins:int}>
+     */
+    public function getCircuitWins(Driver $driver): Collection
+    {
+        return Cache::remember("driver-circuit-wins:{$driver->driver_code}:{$driver->id}", now()->addDay(), function () use ($driver) {
+            $ids = $this->sameDriverIds($driver);
+
+            return Result::query()
+                ->selectRaw('races.jolpica_id as circuit_slug, MIN(races.circuit) as circuit, COUNT(*) as wins')
+                ->join('races', 'races.id', '=', 'results.race_id')
+                ->whereIn('results.driver_id', $ids)
+                ->where('results.session_type', ResultSessionType::Race->value)
+                ->where('results.position', 1)
+                ->whereNotNull('races.jolpica_id')
+                ->groupBy('races.jolpica_id')
+                ->orderByDesc('wins')
+                ->get()
+                ->map(fn ($r) => [
+                    'circuit_slug' => $r->circuit_slug,
+                    'circuit' => $r->circuit,
+                    'wins' => (int) $r->wins,
+                ]);
+        });
+    }
+
+    /**
      * Head-to-head срещу съотборника за сезона. Квалификацията се сравнява по
      * стартова позиция (grid_position), тъй като не пазим пълни quali класирания.
      *

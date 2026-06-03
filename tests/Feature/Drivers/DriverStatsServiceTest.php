@@ -56,6 +56,48 @@ it('сумира all-time статистика по driver_code през сез�
         ->and($stats['seasons'])->toBe(2);
 });
 
+it('изчислява кариерни постижения с win rate', function () {
+    $season = Season::factory()->current()->create();
+    $driver = Driver::factory()->create(['season_id' => $season->id, 'driver_code' => 'VER']);
+
+    $r1 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $driver->id]);
+    Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $driver->id, 'fastest_lap' => true]);
+    $r2 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'spa']);
+    Result::factory()->position(1)->create(['race_id' => $r2->id, 'driver_id' => $driver->id]);
+    $r3 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monza']);
+    Result::factory()->position(3)->create(['race_id' => $r3->id, 'driver_id' => $driver->id]);
+
+    $a = service()->getAchievements($driver);
+
+    expect($a['wins'])->toBe(2)
+        ->and($a['podiums'])->toBe(3)       // P1, P1, P3
+        ->and($a['poles'])->toBe(1)
+        ->and($a['fastest_laps'])->toBe(1)
+        ->and($a['races'])->toBe(3)
+        ->and($a['win_rate'])->toBe(66.7);  // 2/3
+});
+
+it('групира победите по писта, подредени по брой', function () {
+    $season = Season::factory()->current()->create();
+    $driver = Driver::factory()->create(['season_id' => $season->id, 'driver_code' => 'VER']);
+
+    // 2 победи в Монако, 1 в Спа, без победа в Силвърстоун.
+    foreach (['monaco', 'monaco', 'spa'] as $i => $slug) {
+        $race = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => $slug, 'round' => $i + 1]);
+        Result::factory()->position(1)->create(['race_id' => $race->id, 'driver_id' => $driver->id]);
+    }
+    $loser = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'silverstone', 'round' => 9]);
+    Result::factory()->position(5)->create(['race_id' => $loser->id, 'driver_id' => $driver->id]);
+
+    $wins = service()->getCircuitWins($driver);
+
+    expect($wins)->toHaveCount(2)
+        ->and($wins->first()['circuit_slug'])->toBe('monaco')
+        ->and($wins->first()['wins'])->toBe(2)
+        ->and($wins->last()['circuit_slug'])->toBe('spa')
+        ->and($wins->last()['wins'])->toBe(1);
+});
+
 it('изчислява head-to-head срещу съотборника (по позиция и стартова позиция)', function () {
     $season = Season::factory()->current()->create();
     $team = Constructor::factory()->create(['season_id' => $season->id]);

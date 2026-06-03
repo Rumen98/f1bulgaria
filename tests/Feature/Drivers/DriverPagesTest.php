@@ -36,6 +36,9 @@ it('показва детайлната страница на пилот', funct
             ->where('driver.name', 'Lewis Hamilton')
             ->has('seasonStats')
             ->has('allTimeStats')
+            ->has('achievements')
+            ->has('achievements.win_rate')
+            ->has('circuitWins')
             ->has('headToHead'));
 });
 
