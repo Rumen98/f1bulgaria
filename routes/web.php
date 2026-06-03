@@ -10,6 +10,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicProfileController;
 use App\Http\Controllers\RaceController;
 use App\Http\Controllers\StandingsController;
+use App\Http\Controllers\TeamsController;
 use Illuminate\Support\Facades\Route;
 
 // Публични страници.
@@ -18,6 +19,8 @@ Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
 Route::get('/standings', [StandingsController::class, 'index'])->name('standings');
 Route::get('/leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard');
 Route::get('/races/{race}', [RaceController::class, 'show'])->name('races.show');
+Route::get('/teams', [TeamsController::class, 'index'])->name('teams.index');
+Route::get('/teams/{slug}', [TeamsController::class, 'show'])->name('teams.show');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');
 
 Route::get('/dashboard', [CalendarController::class, 'index'])

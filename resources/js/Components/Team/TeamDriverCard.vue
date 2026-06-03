@@ -1,0 +1,43 @@
+<script setup>
+import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
+const props = defineProps({
+    driver: { type: Object, required: true },
+    color: { type: String, default: '#e10600' },
+});
+
+// Линк към driver page само ако route-ът съществува (Task 3).
+const href = computed(() => {
+    try {
+        return route().has('drivers.show') ? route('drivers.show', props.driver.slug) : null;
+    } catch (e) {
+        return null;
+    }
+});
+</script>
+
+<template>
+    <component
+        :is="href ? Link : 'div'"
+        :href="href || undefined"
+        class="group flex items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 transition duration-200"
+        :class="href ? 'hover:border-zinc-600 hover:bg-zinc-900' : ''"
+    >
+        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-black text-white" :style="{ backgroundColor: color }">
+            {{ driver.code ?? driver.name.charAt(0) }}
+        </div>
+        <div class="min-w-0 flex-1">
+            <div class="truncate font-semibold text-white">
+                <span v-if="driver.flag">{{ driver.flag }} </span>{{ driver.name }}
+            </div>
+            <div class="text-sm text-zinc-500">
+                <span v-if="driver.number">#{{ driver.number }}</span>
+            </div>
+        </div>
+        <div class="text-right">
+            <div class="font-bold tabular-nums text-white">{{ driver.points }} т.</div>
+            <div v-if="driver.position" class="text-xs text-zinc-500">P{{ driver.position }}</div>
+        </div>
+    </component>
+</template>
