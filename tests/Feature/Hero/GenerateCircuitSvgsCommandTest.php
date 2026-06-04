@@ -35,7 +35,8 @@ it('генерира валиден SVG с path и анимиран болид',
     expect($svg)->toContain('<svg')
         ->and($svg)->toContain('<path')
         ->and($svg)->toContain('id="track-catalunya"')
-        ->and($svg)->toContain('animateMotion')
+        ->and($svg)->toContain('offset-path')          // CSS motion-path вместо SMIL
+        ->and($svg)->toContain('f1-track-dot')
         ->and($svg)->toContain('viewBox');
 
     File::deleteDirectory($dir);
