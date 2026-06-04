@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Болидът на пистата (hero/track SVG) се движи по CSS motion-path.
+ * CSS анимациите рестартират автоматично при mount/remount — за разлика от
+ * SMIL animateMotion, който спира при Inertia SPA навигация.
+ */
+@keyframes f1-track-dot {
+    to {
+        offset-distance: 100%;
+    }
+}

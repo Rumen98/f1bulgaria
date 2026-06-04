@@ -18,7 +18,8 @@ class GenerateCircuitSvgsCommand extends Command
 {
     protected $signature = 'circuits:generate-svgs
         {--source= : Път до geojson (по подразбиране storage/app/bacinger-circuits.geojson, сваля се при липса)}
-        {--output= : Изходна директория (по подразбиране resources/svg/circuits)}';
+        {--output= : Изходна директория (по подразбиране resources/svg/circuits)}
+        {--force : Презаписва вече съществуващите SVG файлове}';
 
     protected $description = 'Генерира SVG outline-и на пистите от bacinger/f1-circuits GeoJSON.';
 
@@ -87,7 +88,7 @@ class GenerateCircuitSvgsCommand extends Command
         foreach (self::MAP as $slug => $featureId) {
             $path = "{$output}/{$slug}.svg";
 
-            if (file_exists($path)) {
+            if (file_exists($path) && ! $this->option('force')) {
                 $skipped[] = $slug;
 
                 continue;
@@ -169,14 +170,15 @@ class GenerateCircuitSvgsCommand extends Command
         $sw = round(max($w, $h) / 110, 1);
         $id = "track-{$slug}";
 
+        // Болидът се движи по CSS motion-path (offset-path) — рестартира се
+        // автоматично при mount/remount (Inertia SPA), за разлика от SMIL.
+        // Кадрите (@keyframes f1-track-dot) са в resources/css/app.css.
+        $dotStyle = "offset-path: path('{$d}'); offset-rotate: auto; animation: f1-track-dot 14s linear infinite;";
+
         return <<<SVG
-            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 {$w} {$h}" fill="none" data-circuit="{$slug}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {$w} {$h}" fill="none" data-circuit="{$slug}">
               <path id="{$id}" d="{$d}" stroke="currentColor" stroke-width="{$sw}" stroke-linejoin="round" stroke-linecap="round" />
-              <circle r="{$sw}" fill="#e10600">
-                <animateMotion dur="14s" repeatCount="indefinite" rotate="auto">
-                  <mpath href="#{$id}" xlink:href="#{$id}" />
-                </animateMotion>
-              </circle>
+              <circle r="{$sw}" fill="#e10600" style="{$dotStyle}"></circle>
             </svg>
 
             SVG;
