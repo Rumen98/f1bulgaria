@@ -12,3 +12,17 @@
         offset-distance: 100%;
     }
 }
+
+/* Лек shake при валидационна грешка (auth/profile форми). */
+@keyframes auth-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+}
+
+/* Чертаене на състезателна линия в loop (auth hero). */
+@keyframes auth-line-draw {
+    0% { stroke-dashoffset: 1600; }
+    60% { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: 0; opacity: 0.15; }
+}

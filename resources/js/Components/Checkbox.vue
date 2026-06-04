@@ -29,6 +29,6 @@ const proxyChecked = computed({
         type="checkbox"
         :value="value"
         v-model="proxyChecked"
-        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+        class="rounded border-zinc-700 bg-zinc-900 text-red-600 shadow-sm focus:ring-red-500 focus:ring-offset-zinc-900"
     />
 </template>
