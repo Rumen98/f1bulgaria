@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Drivers;
 
 use App\Models\Driver;
+use App\Support\Nationality;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -33,18 +34,24 @@ class DriverPhotoFetcher
     }
 
     /**
-     * Заглавия за опит, в ред на предпочитание. Уточнението „(racing driver)"
-     * първо — спасява нееднозначни имена (напр. George Russell).
+     * Заглавия за опит, в ред на предпочитание:
+     *  1. „(racing driver)" — спасява нееднозначни имена (напр. George Russell)
+     *  2. чисто име — работи за повечето
+     *  3. „… Jr." — за синове на пилоти (напр. Carlos Sainz Jr.)
+     *  4. „({демоним} racing driver)" — допълнителна дисамбигуация по националност
      *
      * @return array<int, string>
      */
     private function candidateTitles(Driver $driver): array
     {
         $name = trim("{$driver->first_name} {$driver->last_name}");
+        $demonym = Nationality::demonym($driver->country_code);
 
         return array_values(array_unique(array_filter([
             "{$name} (racing driver)",
             $name,
+            "{$name} Jr.",
+            $demonym !== null ? "{$name} ({$demonym} racing driver)" : null,
         ])));
     }
 
@@ -60,6 +67,12 @@ class DriverPhotoFetcher
         }
 
         if (! $response->successful()) {
+            return null;
+        }
+
+        // Дисамбигуация (напр. „Carlos Sainz" → баща и син) → пропусни и опитай
+        // следващото заглавие, вместо да върнем грешна/липсваща снимка.
+        if ($response->json('type') === 'disambiguation') {
             return null;
         }
 

@@ -50,6 +50,9 @@ final class Nationality
         'Malaysian' => 'MYS',
     ];
 
+    /** @var array<string, string>|null */
+    private static ?array $reverse = null;
+
     public static function toIso3(?string $nationality): ?string
     {
         if ($nationality === null) {
@@ -57,5 +60,20 @@ final class Nationality
         }
 
         return self::MAP[trim($nationality)] ?? null;
+    }
+
+    /**
+     * Обратно: ISO3 → демоним (напр. "ESP" → "Spanish"). За изграждане на
+     * Wikipedia заглавия като „Carlos Sainz (Spanish racing driver)".
+     */
+    public static function demonym(?string $iso3): ?string
+    {
+        if ($iso3 === null) {
+            return null;
+        }
+
+        self::$reverse ??= array_flip(self::MAP);
+
+        return self::$reverse[$iso3] ?? null;
     }
 }

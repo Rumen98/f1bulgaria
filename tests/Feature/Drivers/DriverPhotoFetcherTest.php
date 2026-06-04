@@ -57,6 +57,24 @@ it('пада към обикновеното име, ако „(racing driver)" 
     expect(fetcher()->fetch($driver))->toBe('https://upload.wikimedia.org/plain.jpg');
 });
 
+it('пропуска disambiguation страница и опитва „Jr." заглавието (Carlos Sainz)', function () {
+    Http::fake([
+        // "(racing driver)" → също дисамбигуация (и баща, и син са пилоти)
+        '*%28racing%20driver%29*' => Http::response(['type' => 'disambiguation']),
+        // чисто "Carlos Sainz" → дисамбигуация (баща + син)
+        '*summary/Carlos%20Sainz' => Http::response(['type' => 'disambiguation']),
+        // "Carlos Sainz Jr." → реалната статия на пилота от F1
+        '*Carlos%20Sainz%20Jr.*' => Http::response([
+            'type' => 'standard',
+            'originalimage' => ['source' => 'https://upload.wikimedia.org/sainz_jr.jpg'],
+        ]),
+    ]);
+
+    $driver = Driver::factory()->create(['first_name' => 'Carlos', 'last_name' => 'Sainz', 'country_code' => 'ESP']);
+
+    expect(fetcher()->fetch($driver))->toBe('https://upload.wikimedia.org/sainz_jr.jpg');
+});
+
 it('командата записва photo_url за пилотите от текущия сезон', function () {
     Http::fake(['*/page/summary/*' => Http::response([
         'originalimage' => ['source' => 'https://upload.wikimedia.org/x.jpg'],
