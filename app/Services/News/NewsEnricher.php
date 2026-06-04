@@ -19,7 +19,10 @@ use Throwable;
  */
 class NewsEnricher
 {
-    public function __construct(private readonly NewsClassifier $classifier) {}
+    public function __construct(
+        private readonly NewsClassifier $classifier,
+        private readonly NewsImageResolver $imageResolver,
+    ) {}
 
     /**
      * @return array{processed:int, success:int, failed:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
@@ -60,6 +63,10 @@ class NewsEnricher
                     'importance_score' => $result->importanceScore,
                     // status НЕ се променя — остава pending за човешки review.
                 ]);
+
+                // Визуален header — резолвва се от вече попълнените класификация/отбор.
+                $item->unsetRelation('constructor');
+                $item->update(['featured_image' => $this->imageResolver->resolve($item)]);
 
                 $stats['success']++;
                 $stats['input_tokens'] += $result->tokenUsage['input_tokens'];

@@ -159,6 +159,7 @@ class NewsController extends Controller
             'importance' => $item->importance_score,
             'team' => $item->constructor?->name,
             'color' => $item->constructor?->color_hex,
+            'image' => $item->featured_image,
             'published_at' => $item->published_at?->copy()->setTimezone('Europe/Sofia')->format('d.m.Y H:i'),
             'url' => $item->external_url,
         ];

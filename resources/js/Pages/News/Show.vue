@@ -1,8 +1,8 @@
 <script setup>
 import NewsCard from '@/Components/News/NewsCard.vue';
+import NewsImage from '@/Components/News/NewsImage.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
-
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -34,6 +34,8 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
         <div class="mt-3 grid gap-8 lg:grid-cols-3">
             <!-- Статия -->
             <article class="lg:col-span-2">
+                <NewsImage v-if="article.image" :image="article.image" :title="article.title" class="mb-6 rounded-2xl border border-zinc-800" />
+
                 <header class="border-b border-zinc-800 pb-6">
                     <div class="flex flex-wrap items-center gap-2 text-xs">
                         <span v-if="article.classification" class="rounded bg-red-600/90 px-2 py-0.5 font-semibold text-white">

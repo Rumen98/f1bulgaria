@@ -29,6 +29,7 @@ class TeamNewsItem extends Model
         'full_article_bg',
         'our_analysis_bg',
         'key_facts',
+        'featured_image',
         'content_snippet',
         'published_at',
         'classification',
@@ -75,6 +76,7 @@ class TeamNewsItem extends Model
             'status' => NewsStatus::class,
             'importance_score' => 'integer',
             'key_facts' => 'array',
+            'featured_image' => 'array',
         ];
     }
 

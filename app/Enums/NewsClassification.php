@@ -27,4 +27,19 @@ enum NewsClassification: string
             self::Other => 'Друго',
         };
     }
+
+    /**
+     * Акцентен цвят за категорията (за generic банер на новина).
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Race => '#e10600',
+            self::Driver => '#3b82f6',
+            self::Technical => '#a855f7',
+            self::Rumor => '#f59e0b',
+            self::Business => '#10b981',
+            self::Other => '#71717a',
+        };
+    }
 }

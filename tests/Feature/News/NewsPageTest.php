@@ -148,3 +148,17 @@ it('article страницата пада към резюме когато ня�
             ->where('article.full_article', null)
             ->where('article.summary', 'Резюме.'));
 });
+
+it('article страницата подава featured_image към компонента', function () {
+    $item = TeamNewsItem::factory()->create([
+        'status' => NewsStatus::Approved->value,
+        'title_bg' => 'Заглавие',
+        'summary_bg' => 'Резюме.',
+        'classification' => 'race',
+        'featured_image' => ['type' => 'generic', 'data' => ['color' => '#e10600', 'label' => 'Състезание']],
+    ]);
+
+    $this->get("/news/{$item->slug}")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('article.image.type', 'generic'));
+});
