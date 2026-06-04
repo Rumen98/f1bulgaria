@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Race;
+use App\Models\Season;
 use App\Services\Circuits\CircuitStatsService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,22 +16,47 @@ class CircuitsController extends Controller
 {
     public function __construct(private readonly CircuitStatsService $stats) {}
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $circuits = Race::query()
-            ->whereNotNull('jolpica_id')
-            ->orderBy('circuit')
-            ->get(['jolpica_id', 'circuit', 'country'])
-            ->unique('jolpica_id')
-            ->values()
-            ->map(fn (Race $r) => [
-                'slug' => $r->jolpica_id,
-                'name' => $r->circuit,
-                'country' => $r->country,
-                'has_track' => File::exists(resource_path("svg/circuits/{$r->jolpica_id}.svg")),
-            ]);
+        $filter = (string) $request->query('filter', 'all'); // all|active|historical
+        $currentYear = Season::current()?->year ?? (int) Season::query()->max('year');
+        $activeThreshold = $currentYear - 2; // последни 3 сезона (текущ + 2)
 
-        return Inertia::render('Circuits/Index', ['circuits' => $circuits]);
+        $circuits = Race::query()
+            ->whereNotNull('races.jolpica_id')
+            ->join('seasons', 'seasons.id', '=', 'races.season_id')
+            ->groupBy('races.jolpica_id')
+            ->selectRaw('races.jolpica_id as slug, MAX(races.circuit) as name, MAX(races.country) as country, MAX(seasons.year) as last_year')
+            ->get()
+            ->map(fn ($r) => [
+                'slug' => $r->slug,
+                'name' => $r->name,
+                'country' => $r->country,
+                'last_race_year' => (int) $r->last_year,
+                'is_active' => (int) $r->last_year >= $activeThreshold,
+                'has_track' => File::exists(resource_path("svg/circuits/{$r->slug}.svg")),
+            ])
+            // Активни първо, после по година на последното състезание (низходящо).
+            ->sortByDesc(fn ($c) => ($c['is_active'] ? 1 : 0) * 100000 + $c['last_race_year'])
+            ->values();
+
+        $counts = [
+            'all' => $circuits->count(),
+            'active' => $circuits->where('is_active', true)->count(),
+            'historical' => $circuits->where('is_active', false)->count(),
+        ];
+
+        $filtered = match ($filter) {
+            'active' => $circuits->where('is_active', true)->values(),
+            'historical' => $circuits->where('is_active', false)->values(),
+            default => $circuits,
+        };
+
+        return Inertia::render('Circuits/Index', [
+            'circuits' => $filtered,
+            'activeFilter' => $filter,
+            'counts' => $counts,
+        ]);
     }
 
     public function show(string $slug): Response

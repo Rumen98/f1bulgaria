@@ -8,12 +8,27 @@ use App\Enums\ResultSessionType;
 use App\Models\Driver;
 use App\Models\Race;
 use App\Models\Result;
+use App\Models\Season;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class CircuitStatsService
 {
+    /**
+     * Пистата е „активна", ако има състезание в някой от последните `$yearsBack`
+     * сезона (по подразбиране 3 — текущ + 2 назад).
+     */
+    public function isCircuitActive(string $circuitSlug, int $yearsBack = 3): bool
+    {
+        $currentYear = Season::current()?->year ?? (int) Season::query()->max('year');
+
+        return Race::query()
+            ->where('jolpica_id', $circuitSlug)
+            ->whereHas('season', fn ($q) => $q->where('year', '>=', $currentYear - $yearsBack + 1))
+            ->exists();
+    }
+
     /**
      * All-time класиране на пилотите за дадена писта — групирано по driver_code
      * (един пилот = няколко записа по сезони, но един код).

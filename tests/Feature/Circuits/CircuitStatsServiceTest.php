@@ -66,6 +66,19 @@ it('връща пилота с най-много pole позиции на пис
     expect(app(CircuitStatsService::class)->getMostPolePosDriver('silverstone'))->toBeNull();
 });
 
+it('определя активна писта по последните 3 сезона', function () {
+    $current = Season::factory()->current()->create(['year' => 2026]);
+    $old = Season::factory()->create(['year' => 2000, 'is_current' => false]);
+
+    Race::factory()->create(['season_id' => $current->id, 'jolpica_id' => 'bahrain']);
+    Race::factory()->create(['season_id' => $old->id, 'jolpica_id' => 'estoril']);
+
+    $service = app(CircuitStatsService::class);
+
+    expect($service->isCircuitActive('bahrain'))->toBeTrue()
+        ->and($service->isCircuitActive('estoril'))->toBeFalse();
+});
+
 it('връща рекорди и последни победители', function () {
     $season = Season::factory()->current()->create();
     $driver = Driver::factory()->create(['season_id' => $season->id, 'driver_code' => 'VER', 'first_name' => 'Max', 'last_name' => 'Verstappen']);

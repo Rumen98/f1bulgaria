@@ -21,6 +21,32 @@ it('показва списъка с писти', function () {
         ->assertInertia(fn (Assert $page) => $page->component('Circuits/Index')->has('circuits', 1));
 });
 
+it('подрежда активните писти преди историческите', function () {
+    $old = Season::factory()->create(['year' => 1990, 'is_current' => false]);
+    Race::factory()->create(['season_id' => $old->id, 'jolpica_id' => 'estoril', 'circuit' => 'Estoril']);
+
+    $this->get('/circuits')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('circuits', 2)
+            ->where('circuits.0.slug', 'monaco')      // активната първа
+            ->where('circuits.0.is_active', true)
+            ->where('circuits.1.is_active', false)
+            ->has('counts'));
+});
+
+it('филтрира само активните писти', function () {
+    $old = Season::factory()->create(['year' => 1990, 'is_current' => false]);
+    Race::factory()->create(['season_id' => $old->id, 'jolpica_id' => 'estoril', 'circuit' => 'Estoril']);
+
+    $this->get('/circuits?filter=active')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('activeFilter', 'active')
+            ->has('circuits', 1)
+            ->where('circuits.0.slug', 'monaco'));
+});
+
 it('показва детайлната страница на писта с all-time класиране', function () {
     $this->get('/circuits/monaco')
         ->assertOk()
