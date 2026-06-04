@@ -87,21 +87,28 @@ class SeasonSyncService
                 $jolpicaId = $row['driverId'];
                 $constructorJolpicaId = $constructorByDriver[$jolpicaId] ?? null;
 
+                $attributes = [
+                    'constructor_id' => $constructorJolpicaId
+                        ? $constructors->get($constructorJolpicaId)?->id
+                        : null,
+                    'first_name' => $row['givenName'],
+                    'last_name' => $row['familyName'],
+                    'slug' => Str::slug("{$row['givenName']} {$row['familyName']}"),
+                    'permanent_number' => isset($row['permanentNumber'])
+                        ? (int) $row['permanentNumber']
+                        : null,
+                    'country_code' => Nationality::toIso3($row['nationality'] ?? null),
+                ];
+
+                // Пишем кода само ако Ergast дава такъв — иначе пазим вече зададения
+                // (генериран за исторически пилоти), за да не се изтрива при ре-синхрон.
+                if (filled($row['code'] ?? null)) {
+                    $attributes['driver_code'] = $row['code'];
+                }
+
                 $driver = Driver::query()->updateOrCreate(
                     ['season_id' => $season->id, 'jolpica_id' => $jolpicaId],
-                    [
-                        'constructor_id' => $constructorJolpicaId
-                            ? $constructors->get($constructorJolpicaId)?->id
-                            : null,
-                        'driver_code' => $row['code'] ?? null,
-                        'first_name' => $row['givenName'],
-                        'last_name' => $row['familyName'],
-                        'slug' => Str::slug("{$row['givenName']} {$row['familyName']}"),
-                        'permanent_number' => isset($row['permanentNumber'])
-                            ? (int) $row['permanentNumber']
-                            : null,
-                        'country_code' => Nationality::toIso3($row['nationality'] ?? null),
-                    ],
+                    $attributes,
                 );
 
                 $drivers->push($driver);

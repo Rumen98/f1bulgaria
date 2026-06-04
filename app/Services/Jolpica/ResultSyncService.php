@@ -127,19 +127,26 @@ class ResultSyncService
             $constructorId = $constructor->id;
         }
 
+        $attributes = [
+            'constructor_id' => $constructorId,
+            'first_name' => $driverData['givenName'],
+            'last_name' => $driverData['familyName'],
+            'slug' => Str::slug("{$driverData['givenName']} {$driverData['familyName']}"),
+            'permanent_number' => isset($driverData['permanentNumber'])
+                ? (int) $driverData['permanentNumber']
+                : null,
+            'country_code' => Nationality::toIso3($driverData['nationality'] ?? null),
+        ];
+
+        // Пишем кода само ако Ergast дава такъв — иначе пазим вече зададения
+        // (генериран за исторически пилоти), за да не се изтрива при ре-синхрон.
+        if (filled($driverData['code'] ?? null)) {
+            $attributes['driver_code'] = $driverData['code'];
+        }
+
         return Driver::query()->updateOrCreate(
             ['season_id' => $season->id, 'jolpica_id' => $driverData['driverId']],
-            [
-                'constructor_id' => $constructorId,
-                'driver_code' => $driverData['code'] ?? null,
-                'first_name' => $driverData['givenName'],
-                'last_name' => $driverData['familyName'],
-                'slug' => Str::slug("{$driverData['givenName']} {$driverData['familyName']}"),
-                'permanent_number' => isset($driverData['permanentNumber'])
-                    ? (int) $driverData['permanentNumber']
-                    : null,
-                'country_code' => Nationality::toIso3($driverData['nationality'] ?? null),
-            ],
+            $attributes,
         );
     }
 

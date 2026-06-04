@@ -91,3 +91,32 @@ it('е идемпотентен — повторният синхрон не д�
         ->and(Race::query()->count())->toBe(1)
         ->and(RaceSession::query()->where('type', 'race')->count())->toBe(1);
 });
+
+it('запазва вече зададения driver_code при ре-синхрон, ако Ergast няма код', function () {
+    Http::fake([
+        '*/2023/constructors.json*' => Http::response(['MRData' => [
+            'total' => '1', 'ConstructorTable' => ['Constructors' => [['constructorId' => 'mclaren', 'name' => 'McLaren']]],
+        ]]),
+        '*/2023/driverstandings.json*' => Http::response(['MRData' => [
+            'StandingsTable' => ['StandingsLists' => [['DriverStandings' => [[
+                'Driver' => ['driverId' => 'senna'], 'Constructors' => [['constructorId' => 'mclaren', 'name' => 'McLaren']],
+            ]]]]],
+        ]]),
+        // Историческо API без поле "code".
+        '*/2023/drivers.json*' => Http::response(['MRData' => [
+            'total' => '1', 'DriverTable' => ['Drivers' => [[
+                'driverId' => 'senna', 'givenName' => 'Ayrton', 'familyName' => 'Senna', 'nationality' => 'Brazilian',
+            ]]],
+        ]]),
+        '*/ergast/f1/2023.json*' => Http::response(['MRData' => ['total' => '0', 'RaceTable' => ['Races' => []]]]),
+    ]);
+
+    $service = app(SeasonSyncService::class);
+    $service->sync(2023);
+
+    // Симулираме генериран код, после ре-синхрон.
+    Driver::query()->where('jolpica_id', 'senna')->update(['driver_code' => 'SEN']);
+    $service->sync(2023);
+
+    expect(Driver::query()->where('jolpica_id', 'senna')->first()->driver_code)->toBe('SEN');
+});
