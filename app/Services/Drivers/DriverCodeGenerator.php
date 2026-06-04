@@ -12,10 +12,9 @@ use Illuminate\Support\Str;
  * Генерира driver_code за историческите пилоти (Ergast не е попълвал кодове
  * pre-2006), за да участват в групираните по код all-time класирания.
  *
- * Логика (hybrid):
- *  - един и същ пилот (по нормализирано име) получава ЕДИН код през всички сезони
- *    (вкл. ако вече има код в някой сезон — преходът ~2000-2006);
- *  - иначе генерира от фамилията с разрешаване на колизии.
+ * Идентичността е по ПЪЛНО име (име + фамилия) — различни хора НИКОГА не споделят
+ * код. Един и същ пилот през няколко сезона получава един код. Кодове, идващи от
+ * Ergast (source of truth), не се пренаписват тук.
  * Идемпотентно — повторно изпълнение не променя нищо.
  */
 class DriverCodeGenerator
@@ -26,20 +25,19 @@ class DriverCodeGenerator
     public function assignAll(): array
     {
         return DB::transaction(function () {
-            /** @var array<string, string> $codeOwner  код => нормализирано име на собственика */
-            $codeOwner = [];
-            /** @var array<string, string> $nameToCode  нормализирано име => код */
-            $nameToCode = [];
+            /** @var array<string, true> $taken  кодове, които вече са заети */
+            $taken = [];
+            /** @var array<string, string> $identityToCode  пълно име => код (за същия човек през сезони) */
+            $identityToCode = [];
 
-            // Сеем с вече съществуващите кодове — за reuse и засичане на колизии.
+            // Сеем със съществуващите кодове — за да не ги дублираме (вкл. Ergast).
             Driver::query()
                 ->whereNotNull('driver_code')
                 ->where('driver_code', '!=', '')
                 ->get(['first_name', 'last_name', 'driver_code'])
-                ->each(function (Driver $d) use (&$codeOwner, &$nameToCode): void {
-                    $name = $this->normalizeName($d->first_name, $d->last_name);
-                    $nameToCode[$name] = $d->driver_code;
-                    $codeOwner[$d->driver_code] = $name;
+                ->each(function (Driver $d) use (&$taken, &$identityToCode): void {
+                    $identityToCode[$this->identityKey($d->first_name, $d->last_name)] = $d->driver_code;
+                    $taken[$d->driver_code] = true;
                 });
 
             $stats = ['updated' => 0, 'generated' => 0, 'reused' => 0, 'collisions' => 0, 'samples' => []];
@@ -52,17 +50,19 @@ class DriverCodeGenerator
                 ->get();
 
             foreach ($pending as $driver) {
-                $name = $this->normalizeName($driver->first_name, $driver->last_name);
+                $identity = $this->identityKey($driver->first_name, $driver->last_name);
 
-                if (isset($nameToCode[$name])) {
-                    $code = $nameToCode[$name];
+                // Reuse САМО за същия човек (същото пълно име) — не по фамилия.
+                if (isset($identityToCode[$identity])) {
+                    $code = $identityToCode[$identity];
                     $stats['reused']++;
                 } else {
-                    [$code, $collided] = $this->generateUniqueCode($driver, $codeOwner);
-                    $nameToCode[$name] = $code;
-                    $codeOwner[$code] = $name;
+                    $firstChoice = substr($this->asciiUpper($driver->last_name), 0, 3);
+                    $code = $this->uniqueCodeFor($driver->first_name, $driver->last_name, $taken);
+                    $identityToCode[$identity] = $code;
+                    $taken[$code] = true;
                     $stats['generated']++;
-                    $stats['collisions'] += $collided ? 1 : 0;
+                    $stats['collisions'] += $code === $firstChoice ? 0 : 1;
                     $stats['samples'][trim("{$driver->first_name} {$driver->last_name}")] = $code;
                 }
 
@@ -75,39 +75,41 @@ class DriverCodeGenerator
     }
 
     /**
-     * @param  array<string, string>  $codeOwner
-     * @return array{0:string, 1:bool} [код, имало ли е колизия]
+     * Генерира уникален код за пилот, избягвайки всички подадени заети кодове.
+     *
+     * @param  array<string, mixed>  $taken  карта код => caквото и да е (за O(1) проверка)
      */
-    private function generateUniqueCode(Driver $driver, array $codeOwner): array
+    public function uniqueCodeFor(?string $first, ?string $last, array $taken): string
     {
-        $last = $this->asciiUpper($driver->last_name);
-        $first = $this->asciiUpper($driver->first_name);
+        $l = $this->asciiUpper($last);
+        $f = $this->asciiUpper($first);
 
         $candidates = array_values(array_filter([
-            substr($last, 0, 3),                            // FAN
-            substr($last, 0, 2).substr($first, 0, 1),       // FAJ
-            substr($last, 0, 2).substr($first, 0, 2),       // FAJU
+            substr($l, 0, 3),                          // SEN
+            substr($l, 0, 2).substr($f, 0, 1),         // SEB
+            substr($l, 0, 3).substr($f, 0, 1),         // SENB
+            substr($l, 0, 2).substr($f, 0, 2),         // SEBR
         ], fn ($c) => strlen($c) >= 2));
 
-        $firstChoice = $candidates[0] ?? 'XXX';
-
         foreach ($candidates as $candidate) {
-            if (! isset($codeOwner[$candidate])) {
-                return [$candidate, $candidate !== $firstChoice];
+            if (! isset($taken[$candidate])) {
+                return $candidate;
             }
         }
 
-        // Накрая: първи 3 букви + пореден номер.
-        $base = substr($last.'XXX', 0, 3);
-        $n = 2;
-        while (isset($codeOwner["{$base}{$n}"])) {
+        $base = substr($l.'XXX', 0, 3);
+        $n = 1;
+        while (isset($taken["{$base}{$n}"])) {
             $n++;
         }
 
-        return ["{$base}{$n}", true];
+        return "{$base}{$n}";
     }
 
-    private function normalizeName(?string $first, ?string $last): string
+    /**
+     * Ключ за идентичност — нормализирано пълно име (различни хора → различни ключове).
+     */
+    public function identityKey(?string $first, ?string $last): string
     {
         return Str::lower(Str::ascii(trim("{$first} {$last}")));
     }

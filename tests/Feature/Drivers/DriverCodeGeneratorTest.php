@@ -78,3 +78,36 @@ it('е идемпотентна — втори run не променя нищо'
     expect(codeGen()->assignAll()['updated'])->toBe(1)
         ->and(codeGen()->assignAll()['updated'])->toBe(0);
 });
+
+it('Bruno Senna получава уникален код, без да краде SEN от Ayrton', function () {
+    $s = Season::factory()->create();
+    $ayrton = Driver::factory()->create(['season_id' => $s->id, 'first_name' => 'Ayrton', 'last_name' => 'Senna', 'slug' => 'ayrton-senna', 'driver_code' => 'SEN']);
+    $bruno = Driver::factory()->create(['season_id' => $s->id, 'first_name' => 'Bruno', 'last_name' => 'Senna', 'slug' => 'bruno-senna', 'driver_code' => null]);
+
+    codeGen()->assignAll();
+
+    expect($ayrton->fresh()->driver_code)->toBe('SEN')              // Ergast код запазен
+        ->and($bruno->fresh()->driver_code)->not->toBe('SEN')
+        ->and($bruno->fresh()->driver_code)->not->toBeNull();
+});
+
+it('Vergne получава уникален код, без да взема VER от Verstappen', function () {
+    $s = Season::factory()->create();
+    $max = Driver::factory()->create(['season_id' => $s->id, 'first_name' => 'Max', 'last_name' => 'Verstappen', 'slug' => 'max-verstappen', 'driver_code' => 'VER']);
+    $vergne = Driver::factory()->create(['season_id' => $s->id, 'first_name' => 'Jean-Éric', 'last_name' => 'Vergne', 'slug' => 'jean-eric-vergne', 'driver_code' => null]);
+
+    codeGen()->assignAll();
+
+    expect($max->fresh()->driver_code)->toBe('VER')
+        ->and($vergne->fresh()->driver_code)->not->toBe('VER')
+        ->and($vergne->fresh()->driver_code)->not->toBeNull();
+});
+
+it('запазва съществуващите Ergast кодове непроменени', function () {
+    $s = Season::factory()->create();
+    $ham = Driver::factory()->create(['season_id' => $s->id, 'first_name' => 'Lewis', 'last_name' => 'Hamilton', 'slug' => 'lewis-hamilton', 'driver_code' => 'HAM']);
+
+    codeGen()->assignAll();
+
+    expect($ham->fresh()->driver_code)->toBe('HAM');
+});

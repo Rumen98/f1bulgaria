@@ -51,15 +51,16 @@ class CircuitStatsService
                 ->groupBy('drivers.driver_code')
                 ->get();
 
-            $names = $this->latestNamesByCode($rows->pluck('code'));
-            $slugs = $this->latestSlugsByCode($rows->pluck('code'));
+            // Името/slug-ът е от пилота с НАЙ-МНОГО състезания за този код — за да
+            // не показваме грешен човек при остатъчни колизии (напр. Bruno вместо Ayrton).
+            $canonical = $this->canonicalByCode($rows->pluck('code'));
             $poles = $this->polesByCode($circuitSlug);
 
             return $rows
                 ->map(fn ($r) => [
                     'code' => $r->code,
-                    'name' => $names[$r->code] ?? $r->code,
-                    'slug' => $slugs[$r->code] ?? null,
+                    'name' => $canonical[$r->code]['name'] ?? $r->code,
+                    'slug' => $canonical[$r->code]['slug'] ?? null,
                     'races' => (int) $r->races,
                     'wins' => (int) $r->wins,
                     'poles' => (int) ($poles[$r->code] ?? 0),
@@ -164,6 +165,38 @@ class CircuitStatsService
     }
 
     /**
+     * За всеки код — името и slug-ът на пилота с НАЙ-МНОГО състезателни резултати
+     * (каноничният собственик на кода). Защитава срещу остатъчни колизии.
+     *
+     * @param  Collection<int, string>  $codes
+     * @return array<string, array{name:string, slug:?string}>
+     */
+    private function canonicalByCode(Collection $codes): array
+    {
+        $rows = Result::query()
+            ->selectRaw('drivers.driver_code as code, drivers.first_name, drivers.last_name, drivers.slug, COUNT(*) as cnt')
+            ->join('drivers', 'drivers.id', '=', 'results.driver_id')
+            ->where('results.session_type', ResultSessionType::Race->value)
+            ->whereIn('drivers.driver_code', $codes)
+            ->groupBy('drivers.driver_code', 'drivers.first_name', 'drivers.last_name', 'drivers.slug')
+            ->orderByDesc('cnt')
+            ->get();
+
+        $canonical = [];
+        foreach ($rows as $row) {
+            // Първият срещнат за даден код има най-много резултати (order DESC).
+            if (! isset($canonical[$row->code])) {
+                $canonical[$row->code] = [
+                    'name' => trim("{$row->first_name} {$row->last_name}"),
+                    'slug' => $row->slug,
+                ];
+            }
+        }
+
+        return $canonical;
+    }
+
+    /**
      * @param  Collection<int, string>  $codes
      * @return array<string, string>
      */
@@ -174,22 +207,6 @@ class CircuitStatsService
             ->orderBy('season_id')
             ->get()
             ->mapWithKeys(fn (Driver $d) => [$d->driver_code => $d->fullName()])
-            ->all();
-    }
-
-    /**
-     * Slug на пилота (последен сезон) по код — за линк към /drivers/{slug}.
-     *
-     * @param  Collection<int, string>  $codes
-     * @return array<string, string>
-     */
-    private function latestSlugsByCode(Collection $codes): array
-    {
-        return Driver::query()
-            ->whereIn('driver_code', $codes)
-            ->orderBy('season_id')
-            ->get()
-            ->mapWithKeys(fn (Driver $d) => [$d->driver_code => $d->slug])
             ->all();
     }
 
