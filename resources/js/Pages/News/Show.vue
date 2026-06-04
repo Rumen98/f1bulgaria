@@ -3,12 +3,20 @@ import NewsCard from '@/Components/News/NewsCard.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
+import { computed } from 'vue';
+
 const props = defineProps({
     article: { type: Object, required: true },
     related: { type: Array, default: () => [] },
 });
 
 const metaDescription = (props.article.summary ?? props.article.title ?? '').slice(0, 200);
+
+// Разделя текст на параграфи по празни редове.
+const toParagraphs = (text) => (text ?? '').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+
+const bodyParagraphs = computed(() => toParagraphs(props.article.full_article));
+const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
 </script>
 
 <template>
@@ -46,10 +54,33 @@ const metaDescription = (props.article.summary ?? props.article.title ?? '').sli
                     </div>
                 </header>
 
-                <div v-if="article.summary" class="prose-invert mt-6 text-lg leading-relaxed text-zinc-200">
+                <!-- Пълна статия (ако е генерирана), иначе резюме fallback -->
+                <div v-if="bodyParagraphs.length" class="mt-6 space-y-4 text-lg leading-relaxed text-zinc-200">
+                    <p v-if="article.summary" class="text-xl font-medium text-zinc-100">{{ article.summary }}</p>
+                    <p v-for="(p, i) in bodyParagraphs" :key="i">{{ p }}</p>
+                </div>
+                <div v-else-if="article.summary" class="mt-6 text-lg leading-relaxed text-zinc-200">
                     {{ article.summary }}
                 </div>
                 <p v-else class="mt-6 text-zinc-400">Резюмето на български предстои.</p>
+
+                <!-- Ключови факти -->
+                <div v-if="article.key_facts && article.key_facts.length" class="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+                    <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-red-500">Ключови факти</h2>
+                    <ul class="space-y-2">
+                        <li v-for="(fact, i) in article.key_facts" :key="i" class="flex gap-2 text-zinc-300">
+                            <span class="mt-1 text-red-500">●</span><span>{{ fact }}</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Нашият анализ -->
+                <div v-if="analysisParagraphs.length" class="mt-8 border-l-2 border-red-600 pl-5">
+                    <h2 class="mb-2 text-lg font-black text-white">Нашият анализ</h2>
+                    <div class="space-y-3 leading-relaxed text-zinc-300">
+                        <p v-for="(p, i) in analysisParagraphs" :key="i">{{ p }}</p>
+                    </div>
+                </div>
 
                 <!-- Източник / attribution -->
                 <div class="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">

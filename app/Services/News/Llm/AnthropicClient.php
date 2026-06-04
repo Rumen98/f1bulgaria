@@ -21,7 +21,7 @@ use Throwable;
  */
 class AnthropicClient
 {
-    private const TIMEOUT_SECONDS = 30;
+    private const DEFAULT_TIMEOUT_SECONDS = 120;
 
     private const MAX_ATTEMPTS = 3;
 
@@ -111,7 +111,7 @@ class AnthropicClient
      */
     private function dispatch(array $payload): array
     {
-        /** @var array{key:?string, model:string, base_url:string} $config */
+        /** @var array{key:?string, model:string, base_url:string, timeout?:int} $config */
         $config = config('services.anthropic');
 
         if (blank($config['key'])) {
@@ -125,7 +125,7 @@ class AnthropicClient
                     'anthropic-version' => self::ANTHROPIC_VERSION,
                     'content-type' => 'application/json',
                 ])
-                ->timeout(self::TIMEOUT_SECONDS)
+                ->timeout((int) ($config['timeout'] ?? self::DEFAULT_TIMEOUT_SECONDS))
                 ->retry(self::MAX_ATTEMPTS, $this->backoff(...), $this->shouldRetry(...), throw: true)
                 ->post('/messages', [...$payload, 'model' => $config['model']]);
         } catch (RequestException $e) {

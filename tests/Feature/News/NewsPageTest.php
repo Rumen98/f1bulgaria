@@ -118,3 +118,33 @@ it('генерира уникален slug при еднакви заглави�
 
     expect($a->slug)->not->toBe($b->slug);
 });
+
+it('article страницата показва пълната статия когато е генерирана', function () {
+    $item = TeamNewsItem::factory()->create([
+        'status' => NewsStatus::Approved->value,
+        'title_bg' => 'Заглавие',
+        'summary_bg' => 'Кратко резюме.',
+        'full_article_bg' => "Дълъг първи параграф.\n\nВтори параграф.",
+        'our_analysis_bg' => 'Нашият анализ.',
+        'key_facts' => ['Факт едно', 'Факт две'],
+        'classification' => 'race',
+    ]);
+
+    $this->get("/news/{$item->slug}")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('News/Show')
+            ->where('article.full_article', "Дълъг първи параграф.\n\nВтори параграф.")
+            ->where('article.analysis', 'Нашият анализ.')
+            ->has('article.key_facts', 2));
+});
+
+it('article страницата пада към резюме когато няма пълна статия', function () {
+    $item = approvedNews('race');
+
+    $this->get("/news/{$item->slug}")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('article.full_article', null)
+            ->where('article.summary', 'Резюме.'));
+});

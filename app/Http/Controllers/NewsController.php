@@ -58,6 +58,9 @@ class NewsController extends Controller
         return Inertia::render('News/Show', [
             'article' => [
                 ...$this->card($item),
+                'full_article' => $item->full_article_bg,
+                'analysis' => $item->our_analysis_bg,
+                'key_facts' => $item->key_facts ?? [],
                 'source' => $item->source?->name,
                 'external_url' => $item->external_url,
                 'canonical' => route('news.show', $item->slug),

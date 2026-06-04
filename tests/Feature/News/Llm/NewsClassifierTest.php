@@ -118,3 +118,37 @@ it('хвърля LlmException при празно заглавие или рез
     expect(fn () => app(NewsClassifier::class)->classify($this->item))
         ->toThrow(LlmException::class);
 });
+
+it('генерира разширена статия от tool input', function () {
+    test()->mock(AnthropicClient::class, function ($mock) {
+        $mock->shouldReceive('completeWithTool')->once()->andReturn([
+            'input' => [
+                'full_article_bg' => "Първи параграф на статията.\n\nВтори параграф с детайли.",
+                'key_facts' => ['Победа за Ферари', 'Първа от 2 години', ''],
+                'our_analysis_bg' => 'Нашият анализ за случилото се.',
+            ],
+            'input_tokens' => 120,
+            'output_tokens' => 850,
+        ]);
+    });
+
+    $content = app(NewsClassifier::class)->generateFullArticle($this->item);
+
+    expect($content->fullArticleBg)->toContain('Първи параграф')
+        ->and($content->keyFacts)->toBe(['Победа за Ферари', 'Първа от 2 години']) // празните се махат
+        ->and($content->analysisBg)->toBe('Нашият анализ за случилото се.')
+        ->and($content->tokenUsage)->toBe(['input_tokens' => 120, 'output_tokens' => 850]);
+});
+
+it('хвърля LlmException при празна разширена статия', function () {
+    test()->mock(AnthropicClient::class, function ($mock) {
+        $mock->shouldReceive('completeWithTool')->once()->andReturn([
+            'input' => ['full_article_bg' => '   ', 'key_facts' => [], 'our_analysis_bg' => ''],
+            'input_tokens' => 10,
+            'output_tokens' => 5,
+        ]);
+    });
+
+    expect(fn () => app(NewsClassifier::class)->generateFullArticle($this->item))
+        ->toThrow(LlmException::class);
+});

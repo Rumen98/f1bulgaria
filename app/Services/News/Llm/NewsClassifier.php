@@ -20,7 +20,28 @@ class NewsClassifier
 {
     private const TOOL_NAME = 'classify_f1_news';
 
+    private const ARTICLE_TOOL_NAME = 'write_f1_article';
+
     public function __construct(private readonly AnthropicClient $client) {}
+
+    /**
+     * Генерира НАША оригинална българска статия по фактите от новината
+     * (4-6 параграфа), плюс ключови факти и собствен анализ. Forced tool use.
+     *
+     * @throws LlmException
+     */
+    public function generateFullArticle(TeamNewsItem $item): NewsArticleContent
+    {
+        $response = $this->client->completeWithTool(
+            (string) config('news.full_article_system_prompt'),
+            $this->buildArticlePrompt($item),
+            self::ARTICLE_TOOL_NAME,
+            $this->articleToolSchema(),
+            4096,
+        );
+
+        return $this->validateArticle($response['input'], $response);
+    }
 
     /**
      * @throws LlmException
@@ -93,6 +114,72 @@ class NewsClassifier
             Заглавие: {$item->title_original}
             Описание: {$item->content_snippet}
             PROMPT;
+    }
+
+    /**
+     * JSON Schema за разширената статия. Типовете се гарантират от API-то.
+     *
+     * @return array<string, mixed>
+     */
+    private function articleToolSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'full_article_bg' => ['type' => 'string', 'description' => 'Оригинална българска статия, 4-6 параграфа, разделени с празен ред'],
+                'key_facts' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => '3-5 кратки ключови факта',
+                ],
+                'our_analysis_bg' => ['type' => 'string', 'description' => '2-3 параграфа собствен анализ (добавена стойност)'],
+            ],
+            'required' => ['full_article_bg', 'key_facts', 'our_analysis_bg'],
+        ];
+    }
+
+    private function buildArticlePrompt(TeamNewsItem $item): string
+    {
+        $context = $item->title_bg
+            ? "Вече подготвен български контекст:\nЗаглавие: {$item->title_bg}\nРезюме: {$item->summary_bg}\n\n"
+            : '';
+
+        return <<<PROMPT
+            {$context}Оригинална новина (английски) — ползвай я САМО за фактите, не копирай изреченията:
+            Заглавие: {$item->title_original}
+            Описание: {$item->content_snippet}
+            PROMPT;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array{input: array<string, mixed>, input_tokens: int, output_tokens: int}  $response
+     *
+     * @throws LlmException
+     */
+    private function validateArticle(array $data, array $response): NewsArticleContent
+    {
+        $article = trim((string) ($data['full_article_bg'] ?? ''));
+        $analysis = trim((string) ($data['our_analysis_bg'] ?? ''));
+
+        if ($article === '') {
+            throw new LlmException('LLM върна празна статия.');
+        }
+
+        $keyFacts = array_values(array_filter(array_map(
+            fn ($fact) => trim((string) $fact),
+            (array) ($data['key_facts'] ?? []),
+        )));
+
+        return new NewsArticleContent(
+            fullArticleBg: $article,
+            keyFacts: $keyFacts,
+            analysisBg: $analysis,
+            tokenUsage: [
+                'input_tokens' => $response['input_tokens'],
+                'output_tokens' => $response['output_tokens'],
+            ],
+        );
     }
 
     /**

@@ -47,6 +47,8 @@ return [
         'key' => env('ANTHROPIC_API_KEY'),
         'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-6'),
         'base_url' => env('ANTHROPIC_BASE_URL', 'https://api.anthropic.com/v1'),
+        // По-дълъг таймаут — генерирането на дълги статии (1000+ токена) надхвърля 30s.
+        'timeout' => (int) env('ANTHROPIC_TIMEOUT', 120),
     ],
 
 ];
