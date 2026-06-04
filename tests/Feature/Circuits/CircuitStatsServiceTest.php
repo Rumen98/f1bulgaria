@@ -27,20 +27,42 @@ it('връща all-time класиране, групирано по driver_code 
 
     $standings = app(CircuitStatsService::class)->getAllTimeDriverStandings('monaco');
 
-    // Hamilton е групиран в един ред (2 състезания), води по точки.
+    // Hamilton и Verstappen имат по 1 победа; Hamilton води чрез pole tiebreak (2 vs 0).
     expect($standings)->toHaveCount(2);
 
     $top = $standings->first();
     expect($top['code'])->toBe('HAM')
         ->and($top['name'])->toBe('Lewis Hamilton')
-        ->and($top['points'])->toBe(43.0)  // 25 + 18 през двата сезона
         ->and($top['races'])->toBe(2)
         ->and($top['wins'])->toBe(1)
         ->and($top['poles'])->toBe(2)
-        ->and($top['position'])->toBe(1);
+        ->and($top['position'])->toBe(1)
+        ->and($top)->not->toHaveKey('points'); // точките не се expose-ват вече
 
     expect($standings->last()['code'])->toBe('VER')
         ->and($standings->last()['poles'])->toBe(0);
+});
+
+it('подрежда по победи, не по точки (старите ери дават по-малко точки)', function () {
+    $s = Season::factory()->current()->create();
+    $winner = Driver::factory()->create(['season_id' => $s->id, 'driver_code' => 'SEN', 'first_name' => 'Ayrton', 'last_name' => 'Senna']);
+    $pointsGuy = Driver::factory()->create(['season_id' => $s->id, 'driver_code' => 'XXX', 'first_name' => 'Points', 'last_name' => 'Guy']);
+
+    $r1 = Race::factory()->create(['season_id' => $s->id, 'jolpica_id' => 'monaco']);
+    $r2 = Race::factory()->create(['season_id' => $s->id, 'jolpica_id' => 'monaco']);
+
+    // Senna: 2 победи, но малко точки (стара ера).
+    Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $winner->id, 'points' => 9]);
+    Result::factory()->position(1)->create(['race_id' => $r2->id, 'driver_id' => $winner->id, 'points' => 9]);
+    // Другият: 0 победи, но повече точки.
+    Result::factory()->position(2)->create(['race_id' => $r1->id, 'driver_id' => $pointsGuy->id, 'points' => 25]);
+    Result::factory()->position(2)->create(['race_id' => $r2->id, 'driver_id' => $pointsGuy->id, 'points' => 25]);
+
+    $standings = app(CircuitStatsService::class)->getAllTimeDriverStandings('monaco');
+
+    expect($standings->first()['code'])->toBe('SEN')   // 2 победи водят над 0
+        ->and($standings->first()['wins'])->toBe(2)
+        ->and($standings->last()['code'])->toBe('XXX');
 });
 
 it('връща пилота с най-много pole позиции на пистата', function () {

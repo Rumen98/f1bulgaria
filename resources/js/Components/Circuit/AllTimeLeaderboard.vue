@@ -42,10 +42,9 @@ const posClass = (pos) => ({
                 <tr>
                     <th class="px-5 py-2 w-12">#</th>
                     <th class="px-5 py-2">Пилот</th>
-                    <th class="px-5 py-2 text-center">Старт.</th>
                     <th class="px-5 py-2 text-center">Победи</th>
                     <th class="px-5 py-2 text-center">Pole</th>
-                    <th class="px-5 py-2 text-right">Точки</th>
+                    <th class="px-5 py-2 text-right">Старта</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-zinc-800">
@@ -67,10 +66,9 @@ const posClass = (pos) => ({
                         <span v-else>{{ row.name }}</span>
                         <span class="ml-1 text-xs font-normal text-zinc-500">{{ row.code }}</span>
                     </td>
-                    <td class="px-5 py-2.5 text-center tabular-nums text-zinc-400">{{ row.races }}</td>
-                    <td class="px-5 py-2.5 text-center tabular-nums text-zinc-300">{{ row.wins }}</td>
+                    <td class="px-5 py-2.5 text-center font-bold tabular-nums text-white">{{ row.wins }}</td>
                     <td class="px-5 py-2.5 text-center tabular-nums text-zinc-400">{{ row.poles }}</td>
-                    <td class="px-5 py-2.5 text-right font-bold tabular-nums text-white">{{ row.points }}</td>
+                    <td class="px-5 py-2.5 text-right tabular-nums text-zinc-400">{{ row.races }}</td>
                 </tr>
             </tbody>
         </table>

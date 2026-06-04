@@ -33,13 +33,15 @@ class CircuitStatsService
      * All-time класиране на пилотите за дадена писта — групирано по driver_code
      * (един пилот = няколко записа по сезони, но един код).
      *
-     * @return Collection<int, array{position:int, code:string, name:string, points:float, races:int, wins:int, poles:int}>
+     * @return Collection<int, array{position:int, code:string, name:string, slug:?string, races:int, wins:int, poles:int}>
      */
     public function getAllTimeDriverStandings(string $circuitSlug): Collection
     {
         return Cache::remember("circuit-standings:{$circuitSlug}", now()->addDay(), function () use ($circuitSlug) {
+            // Без limit/order в SQL — подреждаме по победи в PHP (вкл. pole tiebreak,
+            // който се смята отделно), за да изберем правилния топ 20.
             $rows = Result::query()
-                ->selectRaw('drivers.driver_code as code, SUM(results.points) as points, '
+                ->selectRaw('drivers.driver_code as code, '
                     .'COUNT(DISTINCT results.race_id) as races, '
                     ."SUM(CASE WHEN results.position = 1 AND results.session_type = 'race' THEN 1 ELSE 0 END) as wins")
                 ->join('drivers', 'drivers.id', '=', 'results.driver_id')
@@ -47,25 +49,27 @@ class CircuitStatsService
                 ->where('races.jolpica_id', $circuitSlug)
                 ->whereNotNull('drivers.driver_code')
                 ->groupBy('drivers.driver_code')
-                ->orderByDesc('points')
-                ->orderByDesc('wins')
-                ->limit(20)
                 ->get();
 
             $names = $this->latestNamesByCode($rows->pluck('code'));
             $slugs = $this->latestSlugsByCode($rows->pluck('code'));
             $poles = $this->polesByCode($circuitSlug);
 
-            return $rows->values()->map(fn ($r, $i) => [
-                'position' => $i + 1,
-                'code' => $r->code,
-                'name' => $names[$r->code] ?? $r->code,
-                'slug' => $slugs[$r->code] ?? null,
-                'points' => (float) $r->points,
-                'races' => (int) $r->races,
-                'wins' => (int) $r->wins,
-                'poles' => (int) ($poles[$r->code] ?? 0),
-            ]);
+            return $rows
+                ->map(fn ($r) => [
+                    'code' => $r->code,
+                    'name' => $names[$r->code] ?? $r->code,
+                    'slug' => $slugs[$r->code] ?? null,
+                    'races' => (int) $r->races,
+                    'wins' => (int) $r->wins,
+                    'poles' => (int) ($poles[$r->code] ?? 0),
+                ])
+                // Победи (primary) → pole → старта. Точките са подвеждащи между
+                // ерите (9т за победа до 1990 vs 25т сега), затова не ги ползваме.
+                ->sortByDesc(fn ($r) => sprintf('%04d%04d%04d', $r['wins'], $r['poles'], $r['races']))
+                ->take(20)
+                ->values()
+                ->map(fn ($r, $i) => ['position' => $i + 1, ...$r]);
         });
     }
 
