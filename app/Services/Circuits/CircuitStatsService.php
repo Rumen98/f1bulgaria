@@ -38,12 +38,14 @@ class CircuitStatsService
                 ->get();
 
             $names = $this->latestNamesByCode($rows->pluck('code'));
+            $slugs = $this->latestSlugsByCode($rows->pluck('code'));
             $poles = $this->polesByCode($circuitSlug);
 
             return $rows->values()->map(fn ($r, $i) => [
                 'position' => $i + 1,
                 'code' => $r->code,
                 'name' => $names[$r->code] ?? $r->code,
+                'slug' => $slugs[$r->code] ?? null,
                 'points' => (float) $r->points,
                 'races' => (int) $r->races,
                 'wins' => (int) $r->wins,
@@ -153,6 +155,22 @@ class CircuitStatsService
             ->orderBy('season_id')
             ->get()
             ->mapWithKeys(fn (Driver $d) => [$d->driver_code => $d->fullName()])
+            ->all();
+    }
+
+    /**
+     * Slug на пилота (последен сезон) по код — за линк към /drivers/{slug}.
+     *
+     * @param  Collection<int, string>  $codes
+     * @return array<string, string>
+     */
+    private function latestSlugsByCode(Collection $codes): array
+    {
+        return Driver::query()
+            ->whereIn('driver_code', $codes)
+            ->orderBy('season_id')
+            ->get()
+            ->mapWithKeys(fn (Driver $d) => [$d->driver_code => $d->slug])
             ->all();
     }
 

@@ -49,19 +49,28 @@ class DriversController extends Controller
         return Inertia::render('Drivers/Index', [
             'season' => $season->year,
             'drivers' => $drivers,
+            'allTime' => $this->stats->getDriverIndex(),
         ]);
     }
 
     public function show(string $slug): Response
     {
-        $season = Season::current();
-        abort_if($season === null, 404);
+        $current = Season::current();
 
+        // Резолв cross-season: предпочитаме реда от най-новия сезон за този slug
+        // (текущ пилот → текущ сезон; легенда → последния му сезон).
         $driver = Driver::query()
-            ->where('season_id', $season->id)
-            ->where('slug', $slug)
-            ->with('constructor')
-            ->firstOrFail();
+            ->where('drivers.slug', $slug)
+            ->join('seasons', 'seasons.id', '=', 'drivers.season_id')
+            ->orderByDesc('seasons.year')
+            ->select('drivers.*')
+            ->with(['constructor', 'season'])
+            ->first();
+
+        abort_if($driver === null, 404);
+
+        $statsSeason = $driver->season;
+        $isHistorical = $current === null || $driver->season_id !== $current->id;
 
         $recent = $driver->results()
             ->where('session_type', ResultSessionType::Race->value)
@@ -87,12 +96,14 @@ class DriversController extends Controller
                 'team_slug' => $driver->constructor?->slug,
                 'color_hex' => $driver->constructor?->color_hex ?? '#e10600',
             ],
-            'season' => $season->year,
-            'seasonStats' => $this->stats->getSeasonStats($driver, $season),
+            'season' => $statsSeason->year,
+            'isHistorical' => $isHistorical,
+            'seasonStats' => $this->stats->getSeasonStats($driver, $statsSeason),
             'allTimeStats' => $this->stats->getAllTimeStats($driver),
             'achievements' => $this->stats->getAchievements($driver),
             'circuitWins' => $this->stats->getCircuitWins($driver),
-            'headToHead' => $this->stats->getHeadToHeadVsTeammate($driver, $season),
+            'careerTimeline' => $this->stats->getCareerTimeline($driver),
+            'headToHead' => $this->stats->getHeadToHeadVsTeammate($driver, $statsSeason),
             'recentResults' => $recent,
         ]);
     }

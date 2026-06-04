@@ -72,6 +72,91 @@ class DriverStatsService
     }
 
     /**
+     * Кариерна хронология по сезони (групирано по driver_code): година, отбор,
+     * точки и победи за всеки сезон, в който пилотът е карал.
+     *
+     * @return Collection<int, array{year:int, team:?string, color:string, points:float, wins:int}>
+     */
+    public function getCareerTimeline(Driver $driver): Collection
+    {
+        return Cache::remember("driver-timeline:{$driver->driver_code}:{$driver->id}", now()->addDay(), function () use ($driver) {
+            $ids = $this->sameDriverIds($driver);
+
+            return Result::query()
+                ->selectRaw('seasons.year as year, SUM(results.points) as points, '
+                    ."SUM(CASE WHEN results.position = 1 AND results.session_type = 'race' THEN 1 ELSE 0 END) as wins, "
+                    .'MAX(constructors.name) as team, MAX(constructors.color_hex) as color')
+                ->join('drivers', 'drivers.id', '=', 'results.driver_id')
+                ->join('seasons', 'seasons.id', '=', 'drivers.season_id')
+                ->leftJoin('constructors', 'constructors.id', '=', 'drivers.constructor_id')
+                ->whereIn('results.driver_id', $ids)
+                ->groupBy('seasons.year')
+                ->orderBy('seasons.year')
+                ->get()
+                ->map(fn ($r) => [
+                    'year' => (int) $r->year,
+                    'team' => $r->team,
+                    'color' => $r->color ?? '#52525b',
+                    'points' => (float) $r->points,
+                    'wins' => (int) $r->wins,
+                ]);
+        });
+    }
+
+    /**
+     * Индекс на всички пилоти (групирани по код): име, slug, all-time победи,
+     * брой сезони и дали са в текущия сезон — за филтрите на /drivers.
+     *
+     * @return Collection<int, array{code:string, name:string, slug:string, color:string, wins:int, seasons:int, in_current:bool}>
+     */
+    public function getDriverIndex(): Collection
+    {
+        return Cache::remember('driver-index', now()->addHour(), function () {
+            $current = Season::current();
+            $currentCodes = $current
+                ? Driver::query()->where('season_id', $current->id)->whereNotNull('driver_code')->pluck('driver_code')->all()
+                : [];
+
+            $stats = Result::query()
+                ->selectRaw('drivers.driver_code as code, '
+                    ."SUM(CASE WHEN results.position = 1 AND results.session_type = 'race' THEN 1 ELSE 0 END) as wins, "
+                    .'COUNT(DISTINCT drivers.season_id) as seasons')
+                ->join('drivers', 'drivers.id', '=', 'results.driver_id')
+                ->whereNotNull('drivers.driver_code')
+                ->groupBy('drivers.driver_code')
+                ->get()
+                ->keyBy('code');
+
+            // Последен ред на всеки код (име/slug/цвят) — подреден по season_id, последният печели.
+            $latest = [];
+            Driver::query()
+                ->whereNotNull('driver_code')
+                ->orderBy('season_id')
+                ->with('constructor')
+                ->get(['id', 'season_id', 'driver_code', 'first_name', 'last_name', 'slug', 'constructor_id'])
+                ->each(function (Driver $d) use (&$latest) {
+                    $latest[$d->driver_code] = $d;
+                });
+
+            return collect($latest)->map(function (Driver $d) use ($stats) {
+                return [
+                    'code' => $d->driver_code,
+                    'name' => $d->fullName(),
+                    'slug' => $d->slug,
+                    'color' => $d->constructor?->color_hex ?? '#52525b',
+                    'wins' => (int) ($stats->get($d->driver_code)->wins ?? 0),
+                    'seasons' => (int) ($stats->get($d->driver_code)->seasons ?? 0),
+                    'in_current' => false,
+                ];
+            })->map(function (array $row) use ($currentCodes) {
+                $row['in_current'] = in_array($row['code'], $currentCodes, true);
+
+                return $row;
+            })->sortByDesc('wins')->values();
+        });
+    }
+
+    /**
      * Кариерни постижения (all-time по driver_code) за секцията „Постижения".
      *
      * @return array{wins:int, podiums:int, poles:int, fastest_laps:int, races:int, win_rate:float}

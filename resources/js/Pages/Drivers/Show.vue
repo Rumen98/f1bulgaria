@@ -1,4 +1,5 @@
 <script setup>
+import CareerTimeline from '@/Components/Driver/CareerTimeline.vue';
 import DriverAchievements from '@/Components/Driver/DriverAchievements.vue';
 import DriverRecentResults from '@/Components/Driver/DriverRecentResults.vue';
 import DriverStatsGrid from '@/Components/Driver/DriverStatsGrid.vue';
@@ -9,10 +10,12 @@ import { Head, Link } from '@inertiajs/vue3';
 const props = defineProps({
     driver: Object,
     season: Number,
+    isHistorical: { type: Boolean, default: false },
     seasonStats: Object,
     allTimeStats: Object,
     achievements: Object,
     circuitWins: { type: Array, default: () => [] },
+    careerTimeline: { type: Array, default: () => [] },
     headToHead: Object,
     recentResults: Array,
 });
@@ -48,6 +51,9 @@ const props = defineProps({
                     {{ driver.number ?? '' }}
                 </div>
                 <div>
+                    <span v-if="isHistorical" class="mb-2 inline-block rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-400">
+                        Легенда · последен сезон {{ season }}
+                    </span>
                     <h1 class="text-3xl font-black sm:text-4xl">
                         <span v-if="driver.flag">{{ driver.flag }} </span>{{ driver.name }}
                     </h1>
@@ -78,6 +84,10 @@ const props = defineProps({
 
         <div class="mt-10">
             <DriverAchievements :achievements="achievements" :circuit-wins="circuitWins" />
+        </div>
+
+        <div v-if="careerTimeline.length" class="mt-10">
+            <CareerTimeline :timeline="careerTimeline" />
         </div>
     </PublicLayout>
 </template>
