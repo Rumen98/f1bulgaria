@@ -1,5 +1,6 @@
 <script setup>
 import HeroSection from '@/Components/Hero/HeroSection.vue';
+import ThisDayWidget from '@/Components/Homepage/ThisDayWidget.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
@@ -7,6 +8,7 @@ import { computed } from 'vue';
 
 defineProps({
     hero: { type: Object, required: true },
+    thisDay: { type: Array, default: () => [] },
     topNews: { type: Array, default: () => [] },
 });
 
@@ -34,6 +36,9 @@ const links = computed(() => allLinks.filter((l) => has(l.route)));
 
     <PublicLayout>
         <HeroSection :hero="hero" />
+
+        <!-- На този ден във F1 -->
+        <ThisDayWidget :events="thisDay" />
 
         <!-- Топ новини -->
         <section v-if="topNews.length" class="mt-10">

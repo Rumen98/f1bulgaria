@@ -9,16 +9,19 @@ use App\Models\RaceSession;
 use App\Models\TeamNewsItem;
 use App\Services\Hero\HeroRaceContext;
 use App\Services\Hero\NextRaceResolver;
+use App\Services\Homepage\ThisDayInF1Service;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class HomeController extends Controller
 {
-    public function index(NextRaceResolver $resolver): Response
+    public function index(NextRaceResolver $resolver, ThisDayInF1Service $thisDay): Response
     {
         return Inertia::render('Home', [
             'hero' => $this->heroProp($resolver->resolve()),
+            'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
             'topNews' => $this->topNews(),
         ]);
     }
