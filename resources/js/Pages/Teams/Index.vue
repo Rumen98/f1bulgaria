@@ -1,5 +1,5 @@
 <script setup>
-import TeamMonogram from '@/Components/Team/TeamMonogram.vue';
+import TeamBrand from '@/Components/Team/TeamBrand.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -77,7 +77,7 @@ const filtered = computed(() => {
                 <div class="absolute inset-y-0 left-0 w-1" :style="{ backgroundColor: team.color_hex ?? '#e10600' }" />
                 <div class="flex items-center gap-4">
                     <div class="h-14 w-14">
-                        <TeamMonogram :name="team.name" :color="team.color_hex ?? '#e10600'" />
+                        <TeamBrand :name="team.name" :slug="team.slug" :color="team.color_hex ?? '#e10600'" variant="emblem" />
                     </div>
                     <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">

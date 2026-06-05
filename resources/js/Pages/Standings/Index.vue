@@ -1,4 +1,5 @@
 <script setup>
+import TeamBrand from '@/Components/Team/TeamBrand.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head } from '@inertiajs/vue3';
 import { ref } from 'vue';
@@ -84,7 +85,9 @@ const tab = ref('drivers');
                         <td class="px-4 py-3 font-bold tabular-nums text-zinc-500">{{ row.position }}</td>
                         <td class="px-4 py-3 font-semibold text-white">
                             <span class="inline-flex items-center gap-2">
-                                <span class="h-3 w-6 rounded-sm" :style="{ backgroundColor: row.constructor.color_hex ?? '#52525b' }" />
+                                <span class="h-6 w-6 shrink-0">
+                                    <TeamBrand :name="row.constructor.name" :slug="row.constructor.slug" :color="row.constructor.color_hex ?? '#52525b'" variant="emblem" />
+                                </span>
                                 {{ row.constructor.name }}
                             </span>
                         </td>

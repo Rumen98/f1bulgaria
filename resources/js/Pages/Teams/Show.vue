@@ -1,6 +1,6 @@
 <script setup>
+import TeamBrand from '@/Components/Team/TeamBrand.vue';
 import TeamDriverCard from '@/Components/Team/TeamDriverCard.vue';
-import TeamMonogram from '@/Components/Team/TeamMonogram.vue';
 import TeamNewsList from '@/Components/Team/TeamNewsList.vue';
 import TeamStatsBar from '@/Components/Team/TeamStatsBar.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
@@ -29,7 +29,7 @@ const props = defineProps({
         >
             <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <div class="h-20 w-20 shrink-0 sm:h-24 sm:w-24">
-                    <TeamMonogram :name="team.name" :color="team.color_hex" />
+                    <TeamBrand :name="team.name" :slug="team.slug" :color="team.color_hex" variant="emblem" />
                 </div>
                 <div>
                     <div class="flex flex-wrap items-center gap-3">

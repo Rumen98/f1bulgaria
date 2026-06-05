@@ -1,5 +1,5 @@
 <script setup>
-import TeamMonogram from '@/Components/Team/TeamMonogram.vue';
+import TeamBrand from '@/Components/Team/TeamBrand.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -38,9 +38,7 @@ const data = computed(() => props.image?.data ?? {});
             class="flex h-full w-full items-center justify-center"
             :style="{ background: `linear-gradient(135deg, ${data.color ?? '#e10600'}, #0a0a0a 70%)` }"
         >
-            <div class="h-16 w-16 opacity-90 sm:h-20 sm:w-20">
-                <TeamMonogram :name="data.name ?? '?'" :color="data.color ?? '#e10600'" />
-            </div>
+            <TeamBrand :name="data.name ?? '?'" :slug="data.slug ?? ''" :color="data.color ?? '#e10600'" variant="wordmark" size="lg" class="px-6 opacity-95" />
         </div>
 
         <!-- Очертание на писта -->

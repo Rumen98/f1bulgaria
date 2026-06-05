@@ -42,6 +42,7 @@ class NewsImageResolver
         if ($item->constructor_id !== null && $item->constructor !== null) {
             return ['type' => 'team_banner', 'data' => [
                 'name' => $item->constructor->name,
+                'slug' => $item->constructor->slug,
                 'color' => $item->constructor->color_hex ?? '#e10600',
             ]];
         }
