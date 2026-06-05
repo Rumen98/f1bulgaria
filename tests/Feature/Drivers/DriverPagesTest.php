@@ -7,8 +7,14 @@ use App\Models\Driver;
 use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
+use App\Services\Drivers\CanonicalDriverBackfiller;
 use App\Services\Drivers\DriverStatsService;
 use Inertia\Testing\AssertableInertia as Assert;
+
+function backfillDriverCanonical(): void
+{
+    app(CanonicalDriverBackfiller::class)->backfill();
+}
 
 beforeEach(function () {
     $this->season = Season::factory()->current()->create();
@@ -31,6 +37,7 @@ it('показва детайлната страница на пилот', funct
         'last_name' => 'Hamilton',
         'slug' => 'lewis-hamilton',
     ]);
+    backfillDriverCanonical();
 
     $this->get('/drivers/lewis-hamilton')
         ->assertOk()
@@ -60,6 +67,7 @@ it('резолва исторически пилот извън текущия �
     ]);
     $race = Race::factory()->create(['season_id' => $old->id, 'jolpica_id' => 'monaco']);
     Result::factory()->position(1)->create(['race_id' => $race->id, 'driver_id' => $senna->id, 'points' => 10]);
+    backfillDriverCanonical();
 
     $this->get('/drivers/ayrton-senna')
         ->assertOk()
@@ -75,6 +83,7 @@ it('предпочита текущия сезон при cross-season резо�
     $old = Season::factory()->create(['year' => 2024, 'is_current' => false]);
     Driver::factory()->create(['season_id' => $old->id, 'first_name' => 'Lewis', 'last_name' => 'Hamilton', 'slug' => 'lewis-hamilton', 'driver_code' => 'HAM']);
     Driver::factory()->create(['season_id' => $this->season->id, 'constructor_id' => $this->team->id, 'first_name' => 'Lewis', 'last_name' => 'Hamilton', 'slug' => 'lewis-hamilton', 'driver_code' => 'HAM']);
+    backfillDriverCanonical();
 
     $this->get('/drivers/lewis-hamilton')
         ->assertOk()

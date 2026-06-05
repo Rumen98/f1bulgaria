@@ -55,55 +55,59 @@ class DriversController extends Controller
 
     public function show(string $slug): Response
     {
-        $current = Season::current();
+        // Идентичността идва от каноничния модел (един запис на човек).
+        $canonical = $this->stats->getCanonicalBySlug($slug);
 
-        // Резолв cross-season: предпочитаме реда от най-новия сезон за този slug
-        // (текущ пилот → текущ сезон; легенда → последния му сезон).
+        abort_if($canonical === null, 404);
+
+        // Най-новият per-season ред на този човек — за hero отбора и за
+        // сезонно-специфичните секции (head-to-head, последни резултати).
         $driver = Driver::query()
-            ->where('drivers.slug', $slug)
+            ->where('drivers.canonical_id', $canonical->id)
             ->join('seasons', 'seasons.id', '=', 'drivers.season_id')
             ->orderByDesc('seasons.year')
             ->select('drivers.*')
             ->with(['constructor', 'season'])
             ->first();
 
-        abort_if($driver === null, 404);
+        $statsSeason = $driver?->season;
 
-        $statsSeason = $driver->season;
-        $isHistorical = $current === null || $driver->season_id !== $current->id;
-
-        $recent = $driver->results()
-            ->where('session_type', ResultSessionType::Race->value)
-            ->with('race')
-            ->get()
-            ->sortByDesc(fn (Result $r) => $r->race?->race_datetime_utc)
-            ->take(10)
-            ->map(fn (Result $r) => [
-                'race' => $r->race?->name,
-                'position' => $r->position,
-                'points' => (float) $r->points,
-                'fastest_lap' => $r->fastest_lap,
-            ])->values();
+        $recent = $driver
+            ? $driver->results()
+                ->where('session_type', ResultSessionType::Race->value)
+                ->with('race')
+                ->get()
+                ->sortByDesc(fn (Result $r) => $r->race?->race_datetime_utc)
+                ->take(10)
+                ->map(fn (Result $r) => [
+                    'race' => $r->race?->name,
+                    'position' => $r->position,
+                    'points' => (float) $r->points,
+                    'fastest_lap' => $r->fastest_lap,
+                ])->values()
+            : collect();
 
         return Inertia::render('Drivers/Show', [
             'driver' => [
-                'name' => $driver->fullName(),
-                'number' => $driver->permanent_number,
-                'code' => $driver->driver_code,
-                'photo' => $driver->photo_url,
-                'flag' => CountryFlag::emoji($driver->country_code),
-                'team' => $driver->constructor?->name,
-                'team_slug' => $driver->constructor?->slug,
-                'color_hex' => $driver->constructor?->color_hex ?? '#e10600',
+                'name' => $canonical->fullName(),
+                'number' => $canonical->permanent_number ?? $driver?->permanent_number,
+                'code' => $canonical->code,
+                'photo' => $canonical->photo_url ?? $driver?->photo_url,
+                'flag' => CountryFlag::emoji($canonical->country_code),
+                'team' => $driver?->constructor?->name,
+                'team_slug' => $driver?->constructor?->slug,
+                'color_hex' => $driver?->constructor?->color_hex ?? '#e10600',
             ],
-            'season' => $statsSeason->year,
-            'isHistorical' => $isHistorical,
-            'seasonStats' => $this->stats->getSeasonStats($driver, $statsSeason),
-            'allTimeStats' => $this->stats->getAllTimeStats($driver),
-            'achievements' => $this->stats->getAchievements($driver),
-            'circuitWins' => $this->stats->getCircuitWins($driver),
-            'careerTimeline' => $this->stats->getCareerTimeline($driver),
-            'headToHead' => $this->stats->getHeadToHeadVsTeammate($driver, $statsSeason),
+            'season' => $statsSeason?->year,
+            'isHistorical' => ! $canonical->is_active,
+            'seasonStats' => $driver && $statsSeason ? $this->stats->getSeasonStats($driver, $statsSeason) : null,
+            'allTimeStats' => $this->stats->getStatsForCanonical($canonical),
+            'achievements' => $this->stats->getStatsForCanonical($canonical),
+            'circuitWins' => $this->stats->getCircuitWinsForCanonical($canonical),
+            'careerTimeline' => $this->stats->getCareerTimelineForCanonical($canonical),
+            'headToHead' => $driver && $statsSeason
+                ? $this->stats->getHeadToHeadVsTeammate($driver, $statsSeason)
+                : ['teammate' => null, 'race_wins' => 0, 'race_losses' => 0, 'quali_wins' => 0, 'quali_losses' => 0],
             'recentResults' => $recent,
         ]);
     }

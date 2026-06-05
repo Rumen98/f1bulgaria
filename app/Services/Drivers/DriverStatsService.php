@@ -6,6 +6,7 @@ namespace App\Services\Drivers;
 
 use App\Enums\ResultSessionType;
 use App\Models\Driver;
+use App\Models\DriverCanonical;
 use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
@@ -68,6 +69,112 @@ class DriverStatsService
                 'races' => $race()->distinct()->count('race_id'),
                 'seasons' => Driver::query()->whereIn('id', $ids)->distinct()->count('season_id'),
             ];
+        });
+    }
+
+    /**
+     * Резолва каноничен пилот по slug (един запис на човек). null ако липсва.
+     */
+    public function getCanonicalBySlug(string $slug): ?DriverCanonical
+    {
+        return DriverCanonical::query()->where('slug', $slug)->first();
+    }
+
+    /**
+     * All-time статистика за каноничен пилот. Победите/подиумите/полетата/
+     * състезанията идват от предварително изчислените колони; точки, сезони и
+     * най-бързи обиколки се смятат от свързаните per-season записи. Супермножество,
+     * което покрива и „all-time", и „постижения" props на страницата.
+     *
+     * @return array{points:float, wins:int, podiums:int, poles:int, fastest_laps:int, races:int, seasons:int, win_rate:float}
+     */
+    public function getStatsForCanonical(DriverCanonical $canonical): array
+    {
+        return Cache::remember("canon-stats:{$canonical->id}", now()->addDay(), function () use ($canonical) {
+            $driverIds = Driver::query()->where('canonical_id', $canonical->id)->pluck('id');
+
+            $points = (float) Result::query()->whereIn('driver_id', $driverIds)->sum('points');
+            $seasons = (int) Driver::query()->where('canonical_id', $canonical->id)->distinct()->count('season_id');
+            $fastestLaps = Result::query()
+                ->whereIn('driver_id', $driverIds)
+                ->where('session_type', ResultSessionType::Race->value)
+                ->where('fastest_lap', true)
+                ->count();
+
+            $races = $canonical->total_races;
+
+            return [
+                'points' => $points,
+                'wins' => $canonical->total_wins,
+                'podiums' => $canonical->total_podiums,
+                'poles' => $canonical->total_poles,
+                'fastest_laps' => $fastestLaps,
+                'races' => $races,
+                'seasons' => $seasons,
+                'win_rate' => $races > 0 ? round($canonical->total_wins / $races * 100, 1) : 0.0,
+            ];
+        });
+    }
+
+    /**
+     * Кариерна хронология по сезони за каноничен пилот (по canonical_id): година,
+     * отбор, точки, победи и подиуми за всеки сезон. is_champion е placeholder
+     * (шампионските данни не се пазят — изисква стендинг към края на сезона).
+     *
+     * @return Collection<int, array{year:int, team:?string, color:string, team_slug:?string, points:float, wins:int, podiums:int, is_champion:bool}>
+     */
+    public function getCareerTimelineForCanonical(DriverCanonical $canonical): Collection
+    {
+        return Cache::remember("canon-timeline:{$canonical->id}", now()->addDay(), function () use ($canonical) {
+            return Result::query()
+                ->selectRaw('seasons.year as year, SUM(results.points) as points, '
+                    ."SUM(CASE WHEN results.position = 1 AND results.session_type = 'race' THEN 1 ELSE 0 END) as wins, "
+                    ."SUM(CASE WHEN results.position BETWEEN 1 AND 3 AND results.session_type = 'race' THEN 1 ELSE 0 END) as podiums, "
+                    .'MAX(constructors.name) as team, MAX(constructors.color_hex) as color, MAX(constructors.slug) as team_slug')
+                ->join('drivers', 'drivers.id', '=', 'results.driver_id')
+                ->join('seasons', 'seasons.id', '=', 'drivers.season_id')
+                ->leftJoin('constructors', 'constructors.id', '=', 'drivers.constructor_id')
+                ->where('drivers.canonical_id', $canonical->id)
+                ->groupBy('seasons.year')
+                ->orderBy('seasons.year')
+                ->get()
+                ->map(fn ($r) => [
+                    'year' => (int) $r->year,
+                    'team' => $r->team,
+                    'color' => $r->color ?? '#52525b',
+                    'team_slug' => $r->team_slug,
+                    'points' => (float) $r->points,
+                    'wins' => (int) $r->wins,
+                    'podiums' => (int) $r->podiums,
+                    'is_champion' => false,
+                ]);
+        });
+    }
+
+    /**
+     * Победите на каноничния пилот групирани по писта (jolpica_id), подредени по брой.
+     *
+     * @return Collection<int, array{circuit_slug:string, circuit:string, wins:int}>
+     */
+    public function getCircuitWinsForCanonical(DriverCanonical $canonical): Collection
+    {
+        return Cache::remember("canon-circuit-wins:{$canonical->id}", now()->addDay(), function () use ($canonical) {
+            return Result::query()
+                ->selectRaw('races.jolpica_id as circuit_slug, MIN(races.circuit) as circuit, COUNT(*) as wins')
+                ->join('races', 'races.id', '=', 'results.race_id')
+                ->join('drivers', 'drivers.id', '=', 'results.driver_id')
+                ->where('drivers.canonical_id', $canonical->id)
+                ->where('results.session_type', ResultSessionType::Race->value)
+                ->where('results.position', 1)
+                ->whereNotNull('races.jolpica_id')
+                ->groupBy('races.jolpica_id')
+                ->orderByDesc('wins')
+                ->get()
+                ->map(fn ($r) => [
+                    'circuit_slug' => $r->circuit_slug,
+                    'circuit' => $r->circuit,
+                    'wins' => (int) $r->wins,
+                ]);
         });
     }
 

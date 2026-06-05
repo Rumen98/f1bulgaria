@@ -18,12 +18,18 @@ const rows = computed(() => [...props.timeline].reverse());
                 :key="row.year"
                 class="flex items-center gap-4 border-b border-zinc-800/60 px-4 py-2.5 last:border-0 hover:bg-zinc-800/30"
             >
-                <div class="w-14 font-bold tabular-nums text-white">{{ row.year }}</div>
+                <div class="flex w-14 items-center gap-1 font-bold tabular-nums text-white">
+                    {{ row.year }}
+                    <span v-if="row.is_champion" title="Световен шампион">⭐</span>
+                </div>
                 <div class="flex min-w-0 flex-1 items-center gap-2">
                     <span class="h-3 w-3 flex-shrink-0 rounded-full" :style="{ backgroundColor: row.color }" />
                     <span class="truncate text-zinc-300">{{ row.team ?? '—' }}</span>
                 </div>
-                <div v-if="row.wins" class="text-xs font-semibold tabular-nums text-amber-400">{{ row.wins }} 🏆</div>
+                <div v-if="row.wins" class="w-12 text-right text-xs font-semibold tabular-nums text-amber-400">{{ row.wins }} 🏆</div>
+                <div v-else class="w-12" />
+                <div v-if="row.podiums" class="hidden w-16 text-right text-xs tabular-nums text-zinc-500 sm:block">{{ row.podiums }} под.</div>
+                <div v-else class="hidden w-16 sm:block" />
                 <div class="w-20 text-right tabular-nums text-zinc-400">{{ row.points }} т.</div>
             </div>
         </div>
