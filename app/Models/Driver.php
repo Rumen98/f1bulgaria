@@ -16,6 +16,7 @@ class Driver extends Model
     use HasFactory;
 
     protected $fillable = [
+        'canonical_id',
         'season_id',
         'constructor_id',
         'jolpica_id',
@@ -38,6 +39,12 @@ class Driver extends Model
     public function fullName(): string
     {
         return trim("{$this->first_name} {$this->last_name}");
+    }
+
+    /** @return BelongsTo<DriverCanonical, $this> */
+    public function canonical(): BelongsTo
+    {
+        return $this->belongsTo(DriverCanonical::class, 'canonical_id');
     }
 
     /** @return BelongsTo<Season, $this> */
