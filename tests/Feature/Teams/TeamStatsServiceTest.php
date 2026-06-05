@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Constructor;
+use App\Models\ConstructorCanonical;
 use App\Models\Driver;
 use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
+use App\Services\Teams\CanonicalConstructorBackfiller;
 use App\Services\Teams\TeamStatsService;
 
 it('изчислява сезонната статистика на отбора', function () {
@@ -32,4 +34,49 @@ it('изчислява сезонната статистика на отбора
         ->and($stats->fastestLaps)->toBe(1)
         ->and($stats->dnfs)->toBe(1)
         ->and($stats->position)->toBe(1); // единствен отбор
+});
+
+it('изчислява all-time статистика за каноничен конструктор', function () {
+    $s1 = Season::factory()->create(['year' => 2023, 'is_current' => false]);
+    $s2 = Season::factory()->current()->create(['year' => 2024]);
+    $c1 = Constructor::factory()->create(['season_id' => $s1->id, 'name' => 'Ferrari', 'slug' => 'ferrari']);
+    $c2 = Constructor::factory()->create(['season_id' => $s2->id, 'name' => 'Ferrari', 'slug' => 'ferrari']);
+    $d1 = Driver::factory()->create(['season_id' => $s1->id, 'constructor_id' => $c1->id]);
+    $d2 = Driver::factory()->create(['season_id' => $s2->id, 'constructor_id' => $c2->id]);
+
+    $r1 = Race::factory()->create(['season_id' => $s1->id]);
+    Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $d1->id, 'points' => 25, 'grid_position' => 1, 'fastest_lap' => true]);
+    $r2 = Race::factory()->create(['season_id' => $s2->id]);
+    Result::factory()->dnf()->create(['race_id' => $r2->id, 'driver_id' => $d2->id, 'points' => 0, 'grid_position' => 5]);
+
+    app(CanonicalConstructorBackfiller::class)->backfill();
+    $canonical = ConstructorCanonical::where('slug', 'ferrari')->first();
+
+    $stats = app(TeamStatsService::class)->getStatsForCanonical($canonical);
+
+    expect($stats['wins'])->toBe(1)
+        ->and($stats['poles'])->toBe(1)
+        ->and($stats['races'])->toBe(2)
+        ->and($stats['fastest_laps'])->toBe(1)
+        ->and($stats['dnfs'])->toBe(1)
+        ->and($stats['points'])->toBe(25.0)
+        ->and($stats['seasons'])->toBe(2)
+        ->and($stats['position'])->toBeNull()
+        ->and($stats['win_rate'])->toBe(50.0);
+});
+
+it('връща индекс на каноничните отбори с активни/легенди', function () {
+    $current = Season::factory()->current()->create(['year' => 2024]);
+    $old = Season::factory()->create(['year' => 1990, 'is_current' => false]);
+    Constructor::factory()->create(['season_id' => $current->id, 'name' => 'Ferrari', 'slug' => 'ferrari']);
+    Constructor::factory()->create(['season_id' => $old->id, 'name' => 'Team Lotus', 'slug' => 'lotus']);
+
+    app(CanonicalConstructorBackfiller::class)->backfill();
+
+    $index = app(TeamStatsService::class)->getTeamIndex();
+
+    expect($index)->toHaveCount(2)
+        ->and($index->firstWhere('slug', 'ferrari')['is_active'])->toBeTrue()
+        ->and($index->firstWhere('slug', 'lotus')['is_active'])->toBeFalse()
+        ->and($index->firstWhere('slug', 'lotus')['seasons'])->toBe(1);
 });

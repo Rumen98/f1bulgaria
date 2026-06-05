@@ -32,11 +32,19 @@ const props = defineProps({
                     <TeamMonogram :name="team.name" :color="team.color_hex" />
                 </div>
                 <div>
-                    <h1 class="text-3xl font-black sm:text-4xl">{{ team.name }}</h1>
-                    <div class="mt-1 flex items-center gap-3 text-zinc-300">
-                        <span v-if="stats.position" class="font-semibold">{{ stats.position }}-во място</span>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <h1 class="text-3xl font-black sm:text-4xl">{{ team.name }}</h1>
+                        <span
+                            class="rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide"
+                            :class="team.is_active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'"
+                        >{{ team.is_active ? 'Активен отбор' : 'Легенда' }}</span>
+                    </div>
+                    <div class="mt-1 flex flex-wrap items-center gap-3 text-zinc-300">
+                        <span class="tabular-nums">{{ stats.seasons }} сезона</span>
+                        <span v-if="team.first_year" class="text-zinc-600">·</span>
+                        <span v-if="team.first_year" class="tabular-nums">{{ team.first_year }}–{{ team.last_year }}</span>
                         <span class="text-zinc-600">·</span>
-                        <span class="tabular-nums">{{ stats.points }} точки {{ season }}</span>
+                        <span class="tabular-nums">{{ stats.wins }} победи</span>
                     </div>
                     <p class="mt-3 max-w-2xl text-sm text-zinc-400">{{ team.description }}</p>
                 </div>

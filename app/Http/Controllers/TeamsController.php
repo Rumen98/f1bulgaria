@@ -27,55 +27,52 @@ class TeamsController extends Controller
 
     public function index(): Response
     {
-        $season = Season::current();
-
-        if ($season === null) {
-            return Inertia::render('Teams/Index', ['season' => null, 'teams' => []]);
-        }
-
-        $standings = $this->standings->constructors($season)
-            ->keyBy(fn ($row) => $row['constructor']->id);
-
-        // Всички отбори за сезона (дори без резултати), подредени по класиране.
-        $teams = $season->constructors()->orderBy('name')->get()
-            ->map(fn (Constructor $c) => [
-                'slug' => $c->slug,
-                'name' => $c->name,
-                'color_hex' => $c->color_hex,
-                'position' => $standings->get($c->id)['position'] ?? null,
-                'points' => $standings->get($c->id)['points'] ?? 0.0,
-            ])
-            ->sortBy(fn ($t) => $t['position'] ?? 999)
-            ->values();
-
         return Inertia::render('Teams/Index', [
-            'season' => $season->year,
-            'teams' => $teams,
+            'season' => Season::current()?->year,
+            'teams' => $this->stats->getTeamIndex(),
         ]);
     }
 
     public function show(string $slug): Response
     {
-        $season = Season::current();
-        abort_if($season === null, 404);
+        // Идентичността идва от каноничния модел (един запис на отбор, легендите включени).
+        $canonical = $this->stats->getCanonicalBySlug($slug);
+        abort_if($canonical === null, 404);
 
-        $team = Constructor::query()
-            ->where('season_id', $season->id)
-            ->where('slug', $slug)
-            ->firstOrFail();
+        $current = Season::current();
 
-        $drivers = $team->drivers()->orderBy('last_name')->get();
-        $driverStandings = $this->standings->drivers($season)->keyBy(fn ($r) => $r['driver']->id);
+        // Най-новият per-season ред на отбора — за състава и за новините.
+        $latest = Constructor::query()
+            ->where('constructors.canonical_id', $canonical->id)
+            ->join('seasons', 'seasons.id', '=', 'constructors.season_id')
+            ->orderByDesc('seasons.year')
+            ->select('constructors.*')
+            ->with(['season', 'drivers'])
+            ->first();
+
+        $allDriverIds = Driver::query()
+            ->whereIn('constructor_id', Constructor::query()->where('canonical_id', $canonical->id)->pluck('id'))
+            ->pluck('id');
+
+        // Класиране на пилотите — само ако отборът е активен в текущия сезон.
+        $driverStandings = ($latest && $current && $latest->season_id === $current->id)
+            ? $this->standings->drivers($current)->keyBy(fn ($r) => $r['driver']->id)
+            : collect();
+
+        $roster = $latest ? $latest->drivers->sortBy('last_name')->values() : collect();
 
         return Inertia::render('Teams/Show', [
             'team' => [
-                'slug' => $team->slug,
-                'name' => $team->name,
-                'color_hex' => $team->color_hex ?? '#e10600',
-                'description' => $this->description($team->slug),
+                'slug' => $canonical->slug,
+                'name' => $canonical->name,
+                'color_hex' => $canonical->color_hex ?? '#e10600',
+                'description' => $this->description($canonical->slug),
+                'is_active' => $canonical->is_active,
+                'first_year' => $canonical->first_race_at?->year,
+                'last_year' => $canonical->last_race_at?->year,
             ],
-            'stats' => $this->stats->getSeasonStats($team, $season)->toArray(),
-            'drivers' => $drivers->map(fn (Driver $d) => [
+            'stats' => $this->stats->getStatsForCanonical($canonical),
+            'drivers' => $roster->map(fn (Driver $d) => [
                 'slug' => $d->slug,
                 'name' => $d->fullName(),
                 'number' => $d->permanent_number,
@@ -84,9 +81,9 @@ class TeamsController extends Controller
                 'points' => $driverStandings->get($d->id)['points'] ?? 0,
                 'position' => $driverStandings->get($d->id)['position'] ?? null,
             ]),
-            'news' => $this->news($team),
-            'recentResults' => $this->recentResults($team, $season, $drivers->pluck('id')),
-            'season' => $season->year,
+            'news' => $latest ? $this->news($latest) : collect(),
+            'recentResults' => $this->recentResults($allDriverIds),
+            'season' => $latest?->season?->year,
         ]);
     }
 
@@ -112,13 +109,19 @@ class TeamsController extends Controller
     }
 
     /**
+     * Последните 5 състезания (през цялата история на отбора) с резултати на
+     * някой от пилотите му.
+     *
      * @param  Collection<int, int>  $driverIds
      * @return Collection<int, array<string, mixed>>
      */
-    private function recentResults(Constructor $team, Season $season, Collection $driverIds): Collection
+    private function recentResults(Collection $driverIds): Collection
     {
+        if ($driverIds->isEmpty()) {
+            return collect();
+        }
+
         return Race::query()
-            ->where('season_id', $season->id)
             ->whereHas('results', fn ($q) => $q->whereIn('driver_id', $driverIds))
             ->with(['results' => fn ($q) => $q->whereIn('driver_id', $driverIds)->with('driver')])
             ->orderByDesc('race_datetime_utc')

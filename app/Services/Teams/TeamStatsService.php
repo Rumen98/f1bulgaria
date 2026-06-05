@@ -6,9 +6,11 @@ namespace App\Services\Teams;
 
 use App\Enums\ResultSessionType;
 use App\Models\Constructor;
+use App\Models\ConstructorCanonical;
 use App\Models\Result;
 use App\Models\Season;
 use App\Services\Standings\StandingsService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class TeamStatsService
@@ -22,6 +24,84 @@ class TeamStatsService
             now()->addHour(),
             fn () => $this->compute($constructor, $season),
         );
+    }
+
+    /**
+     * Резолва каноничен конструктор по slug (един запис на отбор). null ако липсва.
+     */
+    public function getCanonicalBySlug(string $slug): ?ConstructorCanonical
+    {
+        return ConstructorCanonical::query()->where('slug', $slug)->first();
+    }
+
+    /**
+     * All-time статистика за каноничен конструктор. Победите/подиумите/полетата/
+     * състезанията идват от предварително изчислените колони; точки, най-бързи
+     * обиколки, отпадания и брой сезони се смятат от свързаните per-season записи.
+     * position е null (няма смисъл all-time).
+     *
+     * @return array{position:null, points:float, wins:int, podiums:int, poles:int, fastest_laps:int, dnfs:int, races:int, seasons:int, win_rate:float}
+     */
+    public function getStatsForCanonical(ConstructorCanonical $canonical): array
+    {
+        return Cache::remember("team-canon-stats:{$canonical->id}", now()->addDay(), function () use ($canonical) {
+            $constructorIds = Constructor::query()->where('canonical_id', $canonical->id)->pluck('id');
+
+            $agg = Result::query()
+                ->join('drivers', 'drivers.id', '=', 'results.driver_id')
+                ->whereIn('drivers.constructor_id', $constructorIds)
+                ->selectRaw('SUM(results.points) as points, '
+                    ."SUM(CASE WHEN results.session_type = 'race' AND results.fastest_lap = 1 THEN 1 ELSE 0 END) as fl, "
+                    ."SUM(CASE WHEN results.session_type = 'race' AND results.dnf = 1 THEN 1 ELSE 0 END) as dnfs")
+                ->first();
+
+            $seasons = (int) Constructor::query()->where('canonical_id', $canonical->id)->distinct()->count('season_id');
+            $races = $canonical->total_races;
+
+            return [
+                'position' => null,
+                'points' => (float) ($agg->points ?? 0),
+                'wins' => $canonical->total_wins,
+                'podiums' => $canonical->total_podiums,
+                'poles' => $canonical->total_poles,
+                'fastest_laps' => (int) ($agg->fl ?? 0),
+                'dnfs' => (int) ($agg->dnfs ?? 0),
+                'races' => $races,
+                'seasons' => $seasons,
+                'win_rate' => $races > 0 ? round($canonical->total_wins / $races * 100, 1) : 0.0,
+            ];
+        });
+    }
+
+    /**
+     * Индекс на всички канонични отбори (за филтрите на /teams): име, slug, цвят,
+     * all-time победи/полета, брой сезони и дали са активни в текущия сезон.
+     *
+     * @return Collection<int, array{slug:string, name:string, color_hex:string, wins:int, poles:int, seasons:int, is_active:bool}>
+     */
+    public function getTeamIndex(): Collection
+    {
+        return Cache::remember('team-index', now()->addHour(), function () {
+            $seasonCounts = Constructor::query()
+                ->whereNotNull('canonical_id')
+                ->selectRaw('canonical_id, COUNT(DISTINCT season_id) as c')
+                ->groupBy('canonical_id')
+                ->pluck('c', 'canonical_id');
+
+            return ConstructorCanonical::query()
+                ->orderByDesc('total_wins')
+                ->orderByDesc('total_poles')
+                ->get()
+                ->map(fn (ConstructorCanonical $c) => [
+                    'slug' => $c->slug,
+                    'name' => $c->name,
+                    'color_hex' => $c->color_hex ?? '#e10600',
+                    'wins' => $c->total_wins,
+                    'poles' => $c->total_poles,
+                    'seasons' => (int) ($seasonCounts[$c->id] ?? 0),
+                    'is_active' => $c->is_active,
+                ])->values();
+        });
     }
 
     private function compute(Constructor $constructor, Season $season): TeamSeasonStats
