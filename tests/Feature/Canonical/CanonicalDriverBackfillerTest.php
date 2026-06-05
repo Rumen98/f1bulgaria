@@ -21,7 +21,7 @@ it('създава 1 каноничен запис на човек и свърз
     $d2 = Driver::factory()->create(['season_id' => $s2->id, 'first_name' => 'Lewis', 'last_name' => 'Hamilton', 'slug' => 'lewis-hamilton', 'driver_code' => 'HAM']);
 
     $r1 = Race::factory()->create(['season_id' => $s1->id]);
-    Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $d1->id]);
+    Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $d1->id, 'grid_position' => 5]); // не е pole
     $r2 = Race::factory()->create(['season_id' => $s2->id]);
     Result::factory()->position(1)->create(['race_id' => $r2->id, 'driver_id' => $d2->id, 'grid_position' => 1]); // pole
 

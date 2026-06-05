@@ -56,6 +56,7 @@ it('избира банер на отбора когато новината е �
 
     expect($meta['type'])->toBe('team_banner')
         ->and($meta['data']['name'])->toBe('Ferrari')
+        ->and($meta['data']['slug'])->toBe($team->slug)
         ->and($meta['data']['color'])->toBe('#dc0000');
 });
 
@@ -90,7 +91,9 @@ it('пада към generic банер с цвят по категория', fun
     $meta = imageResolver()->resolve($item);
 
     expect($meta['type'])->toBe('generic')
-        ->and($meta['data']['color'])->toBe(NewsClassification::Rumor->color());
+        ->and($meta['data']['classification'])->toBe('rumor')
+        ->and($meta['data']['color'])->toBe(NewsClassification::Rumor->color())
+        ->and($meta['data']['label'])->toBe(NewsClassification::Rumor->label());
 });
 
 it('driver новина без налична снимка не връща driver_photo', function () {

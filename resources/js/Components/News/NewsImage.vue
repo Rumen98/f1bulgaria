@@ -1,4 +1,5 @@
 <script setup>
+import NewsGenericImage from '@/Components/News/NewsGenericImage.vue';
 import TeamBrand from '@/Components/Team/TeamBrand.vue';
 import { computed } from 'vue';
 
@@ -32,13 +33,21 @@ const data = computed(() => props.image?.data ?? {});
             <span v-if="data.name" class="absolute bottom-2 left-3 text-sm font-bold text-white drop-shadow">{{ data.name }}</span>
         </template>
 
-        <!-- Банер на отбор -->
+        <!-- Банер на отбор: wordmark върху градиент + абстрактни speed lines -->
         <div
             v-else-if="type === 'team_banner'"
-            class="flex h-full w-full items-center justify-center"
+            class="relative flex h-full w-full items-center justify-center overflow-hidden"
             :style="{ background: `linear-gradient(135deg, ${data.color ?? '#e10600'}, #0a0a0a 70%)` }"
         >
-            <TeamBrand :name="data.name ?? '?'" :slug="data.slug ?? ''" :color="data.color ?? '#e10600'" variant="wordmark" size="lg" class="px-6 opacity-95" />
+            <svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" class="absolute inset-0 h-full w-full opacity-20">
+                <g stroke="#ffffff" stroke-width="6" stroke-linecap="round">
+                    <line x1="-40" y1="40" x2="120" y2="40" />
+                    <line x1="-40" y1="80" x2="180" y2="80" />
+                    <line x1="-40" y1="120" x2="90" y2="120" />
+                    <line x1="-40" y1="160" x2="150" y2="160" />
+                </g>
+            </svg>
+            <TeamBrand :name="data.name ?? '?'" :slug="data.slug ?? ''" :color="data.color ?? '#e10600'" variant="wordmark" size="lg" class="relative px-6 opacity-95" />
         </div>
 
         <!-- Очертание на писта -->
@@ -51,13 +60,13 @@ const data = computed(() => props.image?.data ?? {});
             <span v-else class="text-3xl">🏁</span>
         </div>
 
-        <!-- Generic банер по категория -->
-        <div
+        <!-- Premium generic илюстрация по класификация -->
+        <NewsGenericImage
             v-else
-            class="flex h-full w-full items-center justify-center"
-            :style="{ background: `linear-gradient(135deg, ${data.color ?? '#e10600'}, #0a0a0a 70%)` }"
-        >
-            <span class="text-xs font-bold uppercase tracking-[0.25em] text-white/90">{{ data.label ?? 'F1' }}</span>
-        </div>
+            :classification="data.classification ?? 'other'"
+            :color="data.color ?? '#e10600'"
+            :label="data.label ?? 'F1'"
+            :title="title"
+        />
     </div>
 </template>

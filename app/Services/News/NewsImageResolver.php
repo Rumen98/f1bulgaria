@@ -56,6 +56,7 @@ class NewsImageResolver
         $classification = $item->classification ?? NewsClassification::Other;
 
         return ['type' => 'generic', 'data' => [
+            'classification' => $classification->value,
             'color' => $classification->color(),
             'label' => $classification->label(),
         ]];
