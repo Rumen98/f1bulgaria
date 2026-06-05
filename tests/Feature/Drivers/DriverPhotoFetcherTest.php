@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Constructor;
 use App\Models\Driver;
 use App\Models\Season;
 use App\Services\Drivers\DriverPhotoFetcher;
@@ -73,6 +74,42 @@ it('пропуска disambiguation страница и опитва „Jr." з�
     $driver = Driver::factory()->create(['first_name' => 'Carlos', 'last_name' => 'Sainz', 'country_code' => 'ESP']);
 
     expect(fetcher()->fetch($driver))->toBe('https://upload.wikimedia.org/sainz_jr.jpg');
+});
+
+it('опитва заглавие с текущия отбор първо (bias към актуална снимка)', function () {
+    Http::fake([
+        '*Carlos%20Sainz%20Williams*' => Http::response([
+            'type' => 'standard',
+            'originalimage' => ['source' => 'https://upload.wikimedia.org/sainz_williams.jpg'],
+        ]),
+        '*/page/summary/*' => Http::response('', 404),
+    ]);
+
+    $season = Season::factory()->current()->create();
+    $williams = Constructor::factory()->create(['season_id' => $season->id, 'name' => 'Williams']);
+    $sainz = Driver::factory()->create([
+        'season_id' => $season->id, 'constructor_id' => $williams->id,
+        'first_name' => 'Carlos', 'last_name' => 'Sainz', 'country_code' => 'ESP',
+    ]);
+
+    expect(fetcher()->fetch($sainz))->toBe('https://upload.wikimedia.org/sainz_williams.jpg');
+});
+
+it('--refresh презарежда дори пилоти с вече налична снимка', function () {
+    Http::fake(['*/page/summary/*' => Http::response([
+        'originalimage' => ['source' => 'https://upload.wikimedia.org/new.jpg'],
+    ])]);
+
+    $season = Season::factory()->current()->create();
+    Driver::factory()->create(['season_id' => $season->id, 'photo_url' => 'https://old.example/old.jpg']);
+
+    // Без --refresh: пилотът вече има снимка → пропуска се (без презапис).
+    $this->artisan('drivers:fetch-photos', ['--sleep' => 0])->assertSuccessful();
+    expect(Driver::first()->photo_url)->toBe('https://old.example/old.jpg');
+
+    // С --refresh: презаписва.
+    $this->artisan('drivers:fetch-photos', ['--sleep' => 0, '--refresh' => true])->assertSuccessful();
+    expect(Driver::first()->photo_url)->toBe('https://upload.wikimedia.org/new.jpg');
 });
 
 it('командата записва photo_url за пилотите от текущия сезон', function () {

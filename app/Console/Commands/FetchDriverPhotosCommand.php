@@ -14,7 +14,7 @@ use Illuminate\Console\Command;
  */
 class FetchDriverPhotosCommand extends Command
 {
-    protected $signature = 'drivers:fetch-photos {--sleep=1500 : Пауза в милисекунди между заявките (щади Wikipedia)}';
+    protected $signature = 'drivers:fetch-photos {--sleep=1500 : Пауза в милисекунди между заявките (щади Wikipedia)} {--refresh : Презарежда и за пилотите, които вече имат снимка (презаписва — полезно в началото на сезон)}';
 
     protected $description = 'Дърпа CC снимки на пилотите от текущия сезон от Wikipedia (Wikimedia Commons).';
 
@@ -28,7 +28,13 @@ class FetchDriverPhotosCommand extends Command
             return self::SUCCESS;
         }
 
-        $drivers = $season->drivers()->orderBy('last_name')->get();
+        $refresh = (bool) $this->option('refresh');
+
+        $drivers = $season->drivers()
+            ->when(! $refresh, fn ($q) => $q->whereNull('photo_url'))
+            ->with('constructor')
+            ->orderBy('last_name')
+            ->get();
         $sleepMs = max(0, (int) $this->option('sleep'));
         $found = 0;
 

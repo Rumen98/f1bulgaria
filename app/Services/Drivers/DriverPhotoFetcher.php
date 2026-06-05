@@ -35,6 +35,9 @@ class DriverPhotoFetcher
 
     /**
      * Заглавия за опит, в ред на предпочитание:
+     *  0. „{име} {текущ отбор}" — bias към актуални снимки (напр. „Carlos Sainz
+     *     Williams"). Best-effort: summary API рядко има такова заглавие и пада
+     *     към следващите, но дава шанс за по-нова снимка от текущата ера.
      *  1. „(racing driver)" — спасява нееднозначни имена (напр. George Russell)
      *  2. чисто име — работи за повечето
      *  3. „… Jr." — за синове на пилоти (напр. Carlos Sainz Jr.)
@@ -46,8 +49,10 @@ class DriverPhotoFetcher
     {
         $name = trim("{$driver->first_name} {$driver->last_name}");
         $demonym = Nationality::demonym($driver->country_code);
+        $team = $driver->constructor?->name;
 
         return array_values(array_unique(array_filter([
+            $team !== null ? "{$name} {$team}" : null,
             "{$name} (racing driver)",
             $name,
             "{$name} Jr.",
