@@ -8,6 +8,7 @@ use App\Models\Result;
 use App\Models\Season;
 use App\Services\Circuits\CircuitStatsService;
 use App\Services\Drivers\CanonicalDriverBackfiller;
+use Carbon\Carbon;
 
 it('връща all-time класиране, групирано по canonical_id през сезоните', function () {
     $s24 = Season::factory()->create(['year' => 2024]);
@@ -120,4 +121,39 @@ it('връща рекорди и последни победители', functio
     expect($service->getRecords('monaco')['most_wins']['name'])->toBe('Max Verstappen')
         ->and($service->getRecords('monaco')['most_poles']['name'])->toBe('Max Verstappen')
         ->and($service->getLastWinners('monaco')->first()['driver'])->toBe('Max Verstappen');
+});
+
+it('изчислява разширените рекорди (серия, първи/последен, конверсия, средна стартова поз.)', function () {
+    $winners = [
+        1988 => ['Alain', 'Prost', 'alain-prost', 2],
+        1989 => ['Ayrton', 'Senna', 'ayrton-senna', 1],
+        1990 => ['Ayrton', 'Senna', 'ayrton-senna', 1],
+        1991 => ['Ayrton', 'Senna', 'ayrton-senna', 1],
+        1992 => ['Michael', 'Schumacher', 'michael-schumacher', 3],
+    ];
+
+    foreach ($winners as $year => [$first, $last, $slug, $grid]) {
+        $season = Season::factory()->create(['year' => $year, 'is_current' => $year === 1992]);
+        $driver = Driver::factory()->create(['season_id' => $season->id, 'first_name' => $first, 'last_name' => $last, 'slug' => $slug]);
+        $race = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monaco', 'race_datetime_utc' => Carbon::create($year, 5, 25)]);
+        Result::factory()->position(1)->create(['race_id' => $race->id, 'driver_id' => $driver->id, 'grid_position' => $grid]);
+    }
+
+    app(CanonicalDriverBackfiller::class)->backfill();
+    $r = app(CircuitStatsService::class)->getRecords('monaco');
+
+    expect($r['longest_winning_streak'])->toMatchArray(['name' => 'Ayrton Senna', 'count' => 3])
+        ->and($r['first_winner'])->toMatchArray(['year' => 1988, 'driver' => 'Alain Prost'])
+        ->and($r['latest_winner'])->toMatchArray(['year' => 1992, 'driver' => 'Michael Schumacher'])
+        ->and($r['pole_to_win_conversion_rate'])->toBe(60.0)         // 3 от pole / 5 победи
+        ->and($r['avg_winner_starting_position'])->toBe(1.6);        // (2+1+1+1+3)/5
+});
+
+it('връща null за рекордите когато няма победители', function () {
+    $r = app(CircuitStatsService::class)->getRecords('nonexistent');
+
+    expect($r['longest_winning_streak'])->toBeNull()
+        ->and($r['first_winner'])->toBeNull()
+        ->and($r['pole_to_win_conversion_rate'])->toBeNull()
+        ->and($r['avg_winner_starting_position'])->toBeNull();
 });

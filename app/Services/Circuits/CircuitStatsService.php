@@ -91,15 +91,142 @@ class CircuitStatsService
     }
 
     /**
-     * @return array{most_wins:?array{name:string, count:int}, most_poles:?array{name:string, count:int}, most_fastest_laps:?array{name:string, count:int}}
+     * Изчерпателни рекорди за пистата.
+     *
+     * Забележка: `fastest_lap_record` (най-бързо време на обиколка) е пропуснато —
+     * в `results` няма колона за време на обиколка, само boolean `fastest_lap`.
+     *
+     * @return array{
+     *     most_wins:?array{name:string, count:int},
+     *     most_poles:?array{name:string, count:int},
+     *     most_fastest_laps:?array{name:string, count:int},
+     *     longest_winning_streak:?array{name:string, count:int},
+     *     first_winner:?array{year:int, driver:string},
+     *     latest_winner:?array{year:int, driver:string},
+     *     pole_to_win_conversion_rate:?float,
+     *     avg_winner_starting_position:?float
+     * }
      */
     public function getRecords(string $circuitSlug): array
     {
+        $winners = $this->raceWinners($circuitSlug);
+
         return [
             'most_wins' => $this->topByRace($circuitSlug, fn ($q) => $q->where('results.position', 1)->where('results.session_type', ResultSessionType::Race->value)),
             'most_fastest_laps' => $this->topByRace($circuitSlug, fn ($q) => $q->where('results.fastest_lap', true)),
             'most_poles' => $this->getMostPolePosDriver($circuitSlug),
+            'longest_winning_streak' => $this->longestWinningStreak($winners),
+            'first_winner' => $this->edgeWinner($winners->first()),
+            'latest_winner' => $this->edgeWinner($winners->last()),
+            'pole_to_win_conversion_rate' => $this->poleToWinRate($winners),
+            'avg_winner_starting_position' => $this->avgWinnerGrid($winners),
         ];
+    }
+
+    /**
+     * Победителите в състезанията на пистата, хронологично (стар → нов), всеки с
+     * година, canonical_id, име и стартова позиция. Основа за рекордите по-долу.
+     *
+     * @return Collection<int, object{year:int, cid:int, name:string, grid:?int}>
+     */
+    private function raceWinners(string $circuitSlug): Collection
+    {
+        return Result::query()
+            ->selectRaw('seasons.year as year, drivers.canonical_id as cid, dc.first_name, dc.last_name, results.grid_position as grid')
+            ->join('drivers', 'drivers.id', '=', 'results.driver_id')
+            ->join('drivers_canonical as dc', 'dc.id', '=', 'drivers.canonical_id')
+            ->join('races', 'races.id', '=', 'results.race_id')
+            ->join('seasons', 'seasons.id', '=', 'races.season_id')
+            ->where('races.jolpica_id', $circuitSlug)
+            ->where('results.position', 1)
+            ->where('results.session_type', ResultSessionType::Race->value)
+            ->orderBy('races.race_datetime_utc')
+            ->get()
+            ->map(fn ($r) => (object) [
+                'year' => (int) $r->year,
+                'cid' => (int) $r->cid,
+                'name' => trim("{$r->first_name} {$r->last_name}"),
+                'grid' => $r->grid !== null ? (int) $r->grid : null,
+            ]);
+    }
+
+    /**
+     * Най-дългата серия от последователни победи на един и същ пилот на пистата.
+     *
+     * @param  Collection<int, object>  $winners
+     * @return array{name:string, count:int}|null
+     */
+    private function longestWinningStreak(Collection $winners): ?array
+    {
+        if ($winners->isEmpty()) {
+            return null;
+        }
+
+        $bestName = '';
+        $best = 0;
+        $curCid = null;
+        $curName = '';
+        $cur = 0;
+
+        foreach ($winners as $w) {
+            if ($w->cid === $curCid) {
+                $cur++;
+            } else {
+                $curCid = $w->cid;
+                $curName = $w->name;
+                $cur = 1;
+            }
+
+            if ($cur > $best) {
+                $best = $cur;
+                $bestName = $curName;
+            }
+        }
+
+        return ['name' => $bestName, 'count' => $best];
+    }
+
+    /**
+     * @return array{year:int, driver:string}|null
+     */
+    private function edgeWinner(?object $winner): ?array
+    {
+        return $winner === null ? null : ['year' => $winner->year, 'driver' => $winner->name];
+    }
+
+    /**
+     * Процент състезания, спечелени от pole (стартова позиция 1) — измежду тези
+     * с известна стартова позиция на победителя.
+     *
+     * @param  Collection<int, object>  $winners
+     */
+    private function poleToWinRate(Collection $winners): ?float
+    {
+        $known = $winners->filter(fn ($w) => $w->grid !== null);
+
+        if ($known->isEmpty()) {
+            return null;
+        }
+
+        $fromPole = $known->filter(fn ($w) => $w->grid === 1)->count();
+
+        return round($fromPole / $known->count() * 100, 1);
+    }
+
+    /**
+     * Средна стартова позиция на победителите на пистата.
+     *
+     * @param  Collection<int, object>  $winners
+     */
+    private function avgWinnerGrid(Collection $winners): ?float
+    {
+        $grids = $winners->filter(fn ($w) => $w->grid !== null)->map(fn ($w) => $w->grid);
+
+        if ($grids->isEmpty()) {
+            return null;
+        }
+
+        return round($grids->avg(), 1);
     }
 
     /**
