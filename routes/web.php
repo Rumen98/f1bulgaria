@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CircuitsController;
+use App\Http\Controllers\CompareController;
 use App\Http\Controllers\DriversController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
@@ -28,6 +29,8 @@ Route::get('/drivers', [DriversController::class, 'index'])->name('drivers.index
 Route::get('/drivers/{slug}', [DriversController::class, 'show'])->name('drivers.show');
 Route::get('/circuits', [CircuitsController::class, 'index'])->name('circuits.index');
 Route::get('/circuits/{slug}', [CircuitsController::class, 'show'])->name('circuits.show');
+Route::get('/compare', [CompareController::class, 'index'])->name('compare.index');
+Route::get('/compare/{slug1}/{slug2}', [CompareController::class, 'show'])->name('compare.show');
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [NewsController::class, 'show'])->name('news.show');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');

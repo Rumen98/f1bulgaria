@@ -18,6 +18,7 @@ const allLinks = [
     { label: 'Отбори', desc: '10-те отбора с branding и статистика', route: 'teams.index' },
     { label: 'Пилоти', desc: 'Профили, статистика, head-to-head', route: 'drivers.index' },
     { label: 'Писти', desc: 'История и all-time класирания', route: 'circuits.index' },
+    { label: 'Сравни пилоти', desc: 'Двама пилоти един до друг', route: 'compare.index' },
     { label: 'Prediction League', desc: 'Познай и събирай точки', route: 'leaderboard' },
 ];
 
