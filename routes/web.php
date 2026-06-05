@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\Route;
 // Публични страници.
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
+Route::get('/calendar.ics', [CalendarController::class, 'ics'])->name('calendar.ics');
+Route::get('/calendar/team/{slug}.ics', [CalendarController::class, 'teamIcs'])->where('slug', '[a-z0-9_-]+')->name('calendar.team.ics');
+Route::get('/calendar/{slug}.ics', [CalendarController::class, 'driverIcs'])->where('slug', '[a-z0-9_-]+')->name('calendar.driver.ics');
 Route::get('/standings', [StandingsController::class, 'index'])->name('standings');
 Route::get('/leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard');
 Route::get('/races/{race}', [RaceController::class, 'show'])->name('races.show');

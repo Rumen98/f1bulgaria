@@ -1,4 +1,5 @@
 <script setup>
+import CalendarSubscribe from '@/Components/Calendar/CalendarSubscribe.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
@@ -12,11 +13,14 @@ defineProps({
     <Head title="Календар" />
 
     <PublicLayout>
-        <div class="mb-6 flex items-baseline justify-between">
+        <div class="mb-6 flex items-center justify-between gap-3">
             <h1 class="text-2xl font-black sm:text-3xl">Календар <span class="text-red-600">{{ season }}</span></h1>
-            <Link :href="route('standings')" class="text-sm font-medium text-red-500 transition hover:text-red-400">
-                Класиране →
-            </Link>
+            <div class="flex items-center gap-3">
+                <CalendarSubscribe />
+                <Link :href="route('standings')" class="hidden text-sm font-medium text-red-500 transition hover:text-red-400 sm:inline">
+                    Класиране →
+                </Link>
+            </div>
         </div>
 
         <div v-if="races.length === 0" class="rounded-xl border border-dashed border-zinc-800 p-12 text-center text-zinc-500">
