@@ -22,8 +22,8 @@ it('създава 1 каноничен запис на човек и свърз
 
     $r1 = Race::factory()->create(['season_id' => $s1->id]);
     Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $d1->id]);
-    $r2 = Race::factory()->create(['season_id' => $s2->id, 'pole_driver_id' => $d2->id]);
-    Result::factory()->position(1)->create(['race_id' => $r2->id, 'driver_id' => $d2->id]);
+    $r2 = Race::factory()->create(['season_id' => $s2->id]);
+    Result::factory()->position(1)->create(['race_id' => $r2->id, 'driver_id' => $d2->id, 'grid_position' => 1]); // pole
 
     backfillCanonical();
 

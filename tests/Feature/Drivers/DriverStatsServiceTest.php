@@ -19,8 +19,8 @@ it('изчислява сезонна статистика на пилот', fun
     $team = Constructor::factory()->create(['season_id' => $season->id]);
     $a = Driver::factory()->create(['season_id' => $season->id, 'constructor_id' => $team->id]);
 
-    $race = Race::factory()->create(['season_id' => $season->id, 'pole_driver_id' => $a->id]);
-    Result::factory()->position(1)->create(['race_id' => $race->id, 'driver_id' => $a->id, 'points' => 25, 'fastest_lap' => true]);
+    $race = Race::factory()->create(['season_id' => $season->id]);
+    Result::factory()->position(1)->create(['race_id' => $race->id, 'driver_id' => $a->id, 'points' => 25, 'fastest_lap' => true, 'grid_position' => 1]);
 
     $stats = service()->getSeasonStats($a, $season);
 
@@ -40,11 +40,11 @@ it('сумира all-time статистика по driver_code през сез�
     $ham2024 = Driver::factory()->create(['season_id' => $s2024->id, 'driver_code' => 'HAM', 'slug' => 'hamilton-2024']);
     $ham2026 = Driver::factory()->create(['season_id' => $s2026->id, 'driver_code' => 'HAM', 'slug' => 'hamilton']);
 
-    // Pole в двата сезона → all-time poles = 2 (по driver_code, различни Driver записи).
-    $r24 = Race::factory()->create(['season_id' => $s2024->id, 'pole_driver_id' => $ham2024->id]);
-    Result::factory()->position(1)->create(['race_id' => $r24->id, 'driver_id' => $ham2024->id, 'points' => 25]);
-    $r26 = Race::factory()->create(['season_id' => $s2026->id, 'pole_driver_id' => $ham2026->id]);
-    Result::factory()->position(2)->create(['race_id' => $r26->id, 'driver_id' => $ham2026->id, 'points' => 18]);
+    // Pole (старт от P1) в двата сезона → all-time poles = 2.
+    $r24 = Race::factory()->create(['season_id' => $s2024->id]);
+    Result::factory()->position(1)->create(['race_id' => $r24->id, 'driver_id' => $ham2024->id, 'points' => 25, 'grid_position' => 1]);
+    $r26 = Race::factory()->create(['season_id' => $s2026->id]);
+    Result::factory()->position(2)->create(['race_id' => $r26->id, 'driver_id' => $ham2026->id, 'points' => 18, 'grid_position' => 1]);
 
     $stats = service()->getAllTimeStats($ham2026);
 
@@ -60,8 +60,8 @@ it('изчислява кариерни постижения с win rate', funct
     $season = Season::factory()->current()->create();
     $driver = Driver::factory()->create(['season_id' => $season->id, 'driver_code' => 'VER']);
 
-    $r1 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $driver->id]);
-    Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $driver->id, 'fastest_lap' => true]);
+    $r1 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monaco']);
+    Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $driver->id, 'fastest_lap' => true, 'grid_position' => 1]);
     $r2 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'spa']);
     Result::factory()->position(1)->create(['race_id' => $r2->id, 'driver_id' => $driver->id]);
     $r3 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monza']);

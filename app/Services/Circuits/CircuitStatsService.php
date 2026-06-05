@@ -11,7 +11,6 @@ use App\Models\Result;
 use App\Models\Season;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 class CircuitStatsService
 {
@@ -41,7 +40,8 @@ class CircuitStatsService
             $rows = Result::query()
                 ->selectRaw('drivers.canonical_id as cid, dc.code as code, dc.first_name, dc.last_name, dc.slug, '
                     .'COUNT(DISTINCT results.race_id) as races, '
-                    ."SUM(CASE WHEN results.position = 1 AND results.session_type = 'race' THEN 1 ELSE 0 END) as wins")
+                    ."SUM(CASE WHEN results.position = 1 AND results.session_type = 'race' THEN 1 ELSE 0 END) as wins, "
+                    ."SUM(CASE WHEN results.grid_position = 1 AND results.session_type = 'race' THEN 1 ELSE 0 END) as poles")
                 ->join('drivers', 'drivers.id', '=', 'results.driver_id')
                 ->join('drivers_canonical as dc', 'dc.id', '=', 'drivers.canonical_id')
                 ->join('races', 'races.id', '=', 'results.race_id')
@@ -50,8 +50,6 @@ class CircuitStatsService
                 ->groupBy('drivers.canonical_id', 'dc.code', 'dc.first_name', 'dc.last_name', 'dc.slug')
                 ->get();
 
-            $poles = $this->polesByCanonical($circuitSlug);
-
             return $rows
                 ->map(fn ($r) => [
                     'code' => $r->code,
@@ -59,7 +57,7 @@ class CircuitStatsService
                     'slug' => $r->slug,
                     'races' => (int) $r->races,
                     'wins' => (int) $r->wins,
-                    'poles' => (int) ($poles[$r->cid] ?? 0),
+                    'poles' => (int) $r->poles,
                 ])
                 // Победи (primary) → pole → старта. Точките са подвеждащи между
                 // ерите (9т за победа до 1990 vs 25т сега), затова не ги ползваме.
@@ -68,24 +66,6 @@ class CircuitStatsService
                 ->values()
                 ->map(fn ($r, $i) => ['position' => $i + 1, ...$r]);
         });
-    }
-
-    /**
-     * Pole позиции по canonical_id за дадена писта.
-     *
-     * @return array<int, int>
-     */
-    private function polesByCanonical(string $circuitSlug): array
-    {
-        return DB::table('races')
-            ->selectRaw('drivers.canonical_id as cid, COUNT(*) as cnt')
-            ->join('drivers', 'drivers.id', '=', 'races.pole_driver_id')
-            ->where('races.jolpica_id', $circuitSlug)
-            ->whereNotNull('drivers.canonical_id')
-            ->groupBy('drivers.canonical_id')
-            ->pluck('cnt', 'cid')
-            ->map(fn ($c) => (int) $c)
-            ->all();
     }
 
     /**
@@ -123,18 +103,22 @@ class CircuitStatsService
     }
 
     /**
-     * Пилотът с най-много pole позиции на тази писта (групирано по driver_code).
+     * Пилотът с най-много pole позиции на тази писта — групирано по canonical_id,
+     * pole = старт от 1-ва позиция (results.grid_position=1).
      *
      * @return array{name:string, count:int}|null
      */
     public function getMostPolePosDriver(string $circuitSlug): ?array
     {
-        $row = DB::table('races')
-            ->selectRaw('drivers.driver_code as code, COUNT(*) as cnt')
-            ->join('drivers', 'drivers.id', '=', 'races.pole_driver_id')
+        $row = Result::query()
+            ->selectRaw('dc.first_name, dc.last_name, COUNT(*) as cnt')
+            ->join('drivers', 'drivers.id', '=', 'results.driver_id')
+            ->join('drivers_canonical as dc', 'dc.id', '=', 'drivers.canonical_id')
+            ->join('races', 'races.id', '=', 'results.race_id')
             ->where('races.jolpica_id', $circuitSlug)
-            ->whereNotNull('drivers.driver_code')
-            ->groupBy('drivers.driver_code')
+            ->where('results.grid_position', 1)
+            ->where('results.session_type', ResultSessionType::Race->value)
+            ->groupBy('drivers.canonical_id', 'dc.first_name', 'dc.last_name')
             ->orderByDesc('cnt')
             ->first();
 
@@ -142,7 +126,7 @@ class CircuitStatsService
             return null;
         }
 
-        return ['name' => $this->latestNamesByCode(collect([$row->code]))[$row->code] ?? $row->code, 'count' => (int) $row->cnt];
+        return ['name' => trim("{$row->first_name} {$row->last_name}"), 'count' => (int) $row->cnt];
     }
 
     /**

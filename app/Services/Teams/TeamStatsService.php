@@ -6,7 +6,6 @@ namespace App\Services\Teams;
 
 use App\Enums\ResultSessionType;
 use App\Models\Constructor;
-use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
 use App\Services\Standings\StandingsService;
@@ -46,10 +45,7 @@ class TeamStatsService
             points: (float) $base()->sum('results.points'),
             wins: $race()->where('results.position', 1)->count(),
             podiums: $race()->whereBetween('results.position', [1, 3])->count(),
-            poles: Race::query()
-                ->where('season_id', $season->id)
-                ->whereIn('pole_driver_id', $driverIds)
-                ->count(),
+            poles: $race()->where('results.grid_position', 1)->count(),
             fastestLaps: $race()->where('results.fastest_lap', true)->count(),
             dnfs: $race()->where('results.dnf', true)->count(),
         );

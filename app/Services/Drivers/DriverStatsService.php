@@ -39,7 +39,7 @@ class DriverStatsService
                     ->sum('points'),
                 'wins' => $race()->where('results.position', 1)->count(),
                 'podiums' => $race()->whereBetween('results.position', [1, 3])->count(),
-                'poles' => Race::query()->where('season_id', $season->id)->where('pole_driver_id', $driver->id)->count(),
+                'poles' => $race()->where('results.grid_position', 1)->count(),
                 'fastest_laps' => $race()->where('results.fastest_lap', true)->count(),
                 'dnfs' => $race()->where('results.dnf', true)->count(),
             ];
@@ -64,7 +64,7 @@ class DriverStatsService
                 'points' => (float) Result::query()->whereIn('driver_id', $ids)->sum('points'),
                 'wins' => $race()->where('position', 1)->count(),
                 'podiums' => $race()->whereBetween('position', [1, 3])->count(),
-                'poles' => Race::query()->whereIn('pole_driver_id', $ids)->count(),
+                'poles' => $race()->where('grid_position', 1)->count(),
                 'races' => $race()->distinct()->count('race_id'),
                 'seasons' => Driver::query()->whereIn('id', $ids)->distinct()->count('season_id'),
             ];
@@ -176,7 +176,7 @@ class DriverStatsService
             return [
                 'wins' => $wins,
                 'podiums' => $race()->whereBetween('position', [1, 3])->count(),
-                'poles' => Race::query()->whereIn('pole_driver_id', $ids)->count(),
+                'poles' => $race()->where('grid_position', 1)->count(),
                 'fastest_laps' => $race()->where('fastest_lap', true)->count(),
                 'races' => $races,
                 'win_rate' => $races > 0 ? round($wins / $races * 100, 1) : 0.0,

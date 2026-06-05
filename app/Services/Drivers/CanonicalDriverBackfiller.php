@@ -7,7 +7,6 @@ namespace App\Services\Drivers;
 use App\Enums\ResultSessionType;
 use App\Models\Driver;
 use App\Models\DriverCanonical;
-use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
 use Illuminate\Support\Facades\DB;
@@ -71,6 +70,7 @@ class CanonicalDriverBackfiller
                 ."COUNT(DISTINCT CASE WHEN results.session_type = '{$race}' THEN results.race_id END) as races, "
                 ."SUM(CASE WHEN results.position = 1 AND results.session_type = '{$race}' THEN 1 ELSE 0 END) as wins, "
                 ."SUM(CASE WHEN results.position BETWEEN 1 AND 3 AND results.session_type = '{$race}' THEN 1 ELSE 0 END) as podiums, "
+                ."SUM(CASE WHEN results.grid_position = 1 AND results.session_type = '{$race}' THEN 1 ELSE 0 END) as poles, "
                 .'MIN(races.race_datetime_utc) as first_at, MAX(races.race_datetime_utc) as last_at')
             ->join('drivers', 'drivers.id', '=', 'results.driver_id')
             ->join('races', 'races.id', '=', 'results.race_id')
@@ -79,20 +79,13 @@ class CanonicalDriverBackfiller
             ->get()
             ->keyBy('cid');
 
-        $poles = Race::query()
-            ->selectRaw('drivers.canonical_id as cid, COUNT(*) as poles')
-            ->join('drivers', 'drivers.id', '=', 'races.pole_driver_id')
-            ->whereNotNull('drivers.canonical_id')
-            ->groupBy('drivers.canonical_id')
-            ->pluck('poles', 'cid');
-
         $currentSeasonId = Season::query()->where('is_current', true)->value('id');
         $activeIds = $currentSeasonId
             ? Driver::query()->where('season_id', $currentSeasonId)->whereNotNull('canonical_id')
                 ->distinct()->pluck('canonical_id')->flip()
             : collect();
 
-        DriverCanonical::query()->chunkById(200, function ($canonicals) use ($agg, $poles, $activeIds) {
+        DriverCanonical::query()->chunkById(200, function ($canonicals) use ($agg, $activeIds) {
             foreach ($canonicals as $canonical) {
                 $a = $agg->get($canonical->id);
 
@@ -100,7 +93,7 @@ class CanonicalDriverBackfiller
                     'total_races' => (int) ($a->races ?? 0),
                     'total_wins' => (int) ($a->wins ?? 0),
                     'total_podiums' => (int) ($a->podiums ?? 0),
-                    'total_poles' => (int) ($poles[$canonical->id] ?? 0),
+                    'total_poles' => (int) ($a->poles ?? 0),
                     'first_race_at' => $a->first_at ?? null,
                     'last_race_at' => $a->last_at ?? null,
                     'is_active' => $activeIds->has($canonical->id),

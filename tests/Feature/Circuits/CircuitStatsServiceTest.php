@@ -18,12 +18,13 @@ it('връща all-time класиране, групирано по canonical_id
     $ham26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'HAM', 'slug' => 'lewis-hamilton', 'first_name' => 'Lewis', 'last_name' => 'Hamilton']);
     $ver26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'VER', 'slug' => 'max-verstappen', 'first_name' => 'Max', 'last_name' => 'Verstappen']);
 
-    $monaco24 = Race::factory()->create(['season_id' => $s24->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $ham24->id]);
-    $monaco26 = Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $ham26->id]);
+    $monaco24 = Race::factory()->create(['season_id' => $s24->id, 'jolpica_id' => 'monaco']);
+    $monaco26 = Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'monaco']);
 
-    Result::factory()->position(1)->create(['race_id' => $monaco24->id, 'driver_id' => $ham24->id, 'points' => 25]);
-    Result::factory()->position(2)->create(['race_id' => $monaco26->id, 'driver_id' => $ham26->id, 'points' => 18]);
-    Result::factory()->position(1)->create(['race_id' => $monaco26->id, 'driver_id' => $ver26->id, 'points' => 25]);
+    // Hamilton стартира от P1 (pole) и в двата сезона.
+    Result::factory()->position(1)->create(['race_id' => $monaco24->id, 'driver_id' => $ham24->id, 'points' => 25, 'grid_position' => 1]);
+    Result::factory()->position(2)->create(['race_id' => $monaco26->id, 'driver_id' => $ham26->id, 'points' => 18, 'grid_position' => 1]);
+    Result::factory()->position(1)->create(['race_id' => $monaco26->id, 'driver_id' => $ver26->id, 'points' => 25, 'grid_position' => 3]);
 
     app(CanonicalDriverBackfiller::class)->backfill();
     $standings = app(CircuitStatsService::class)->getAllTimeDriverStandings('monaco');
@@ -71,15 +72,19 @@ it('връща пилота с най-много pole позиции на пис
     $s24 = Season::factory()->create(['year' => 2024]);
     $s26 = Season::factory()->current()->create(['year' => 2026]);
 
-    $ham24 = Driver::factory()->create(['season_id' => $s24->id, 'driver_code' => 'HAM', 'slug' => 'ham-24', 'first_name' => 'Lewis', 'last_name' => 'Hamilton']);
-    $ham26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'HAM', 'slug' => 'ham-26', 'first_name' => 'Lewis', 'last_name' => 'Hamilton']);
-    $ver26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'VER', 'slug' => 'ver-26']);
+    $ham24 = Driver::factory()->create(['season_id' => $s24->id, 'driver_code' => 'HAM', 'slug' => 'lewis-hamilton', 'first_name' => 'Lewis', 'last_name' => 'Hamilton']);
+    $ham26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'HAM', 'slug' => 'lewis-hamilton', 'first_name' => 'Lewis', 'last_name' => 'Hamilton']);
+    $ver26 = Driver::factory()->create(['season_id' => $s26->id, 'driver_code' => 'VER', 'slug' => 'max-verstappen', 'first_name' => 'Max', 'last_name' => 'Verstappen']);
 
-    // HAM с 2 pole (по сезон), VER с 1 → HAM води.
-    Race::factory()->create(['season_id' => $s24->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $ham24->id]);
-    Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $ham26->id]);
-    Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'spa', 'pole_driver_id' => $ver26->id]);
+    // HAM стартира от P1 в Монако 2 пъти; VER веднъж в Спа.
+    $m24 = Race::factory()->create(['season_id' => $s24->id, 'jolpica_id' => 'monaco']);
+    $m26 = Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'monaco']);
+    $spa = Race::factory()->create(['season_id' => $s26->id, 'jolpica_id' => 'spa']);
+    Result::factory()->position(1)->create(['race_id' => $m24->id, 'driver_id' => $ham24->id, 'grid_position' => 1]);
+    Result::factory()->position(1)->create(['race_id' => $m26->id, 'driver_id' => $ham26->id, 'grid_position' => 1]);
+    Result::factory()->position(1)->create(['race_id' => $spa->id, 'driver_id' => $ver26->id, 'grid_position' => 1]);
 
+    app(CanonicalDriverBackfiller::class)->backfill();
     $most = app(CircuitStatsService::class)->getMostPolePosDriver('monaco');
 
     expect($most)->not->toBeNull()
@@ -105,10 +110,11 @@ it('определя активна писта по последните 3 се�
 
 it('връща рекорди и последни победители', function () {
     $season = Season::factory()->current()->create();
-    $driver = Driver::factory()->create(['season_id' => $season->id, 'driver_code' => 'VER', 'first_name' => 'Max', 'last_name' => 'Verstappen']);
-    $race = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monaco', 'pole_driver_id' => $driver->id]);
-    Result::factory()->position(1)->create(['race_id' => $race->id, 'driver_id' => $driver->id, 'fastest_lap' => true]);
+    $driver = Driver::factory()->create(['season_id' => $season->id, 'driver_code' => 'VER', 'slug' => 'max-verstappen', 'first_name' => 'Max', 'last_name' => 'Verstappen']);
+    $race = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monaco']);
+    Result::factory()->position(1)->create(['race_id' => $race->id, 'driver_id' => $driver->id, 'fastest_lap' => true, 'grid_position' => 1]);
 
+    app(CanonicalDriverBackfiller::class)->backfill();
     $service = app(CircuitStatsService::class);
 
     expect($service->getRecords('monaco')['most_wins']['name'])->toBe('Max Verstappen')
