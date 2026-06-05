@@ -6,6 +6,7 @@ use App\Models\Driver;
 use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
+use App\Services\Drivers\CanonicalDriverBackfiller;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -13,6 +14,7 @@ beforeEach(function () {
     $driver = Driver::factory()->create(['season_id' => $this->season->id, 'driver_code' => 'VER']);
     $race = Race::factory()->create(['season_id' => $this->season->id, 'jolpica_id' => 'monaco', 'circuit' => 'Circuit de Monaco']);
     Result::factory()->position(1)->create(['race_id' => $race->id, 'driver_id' => $driver->id]);
+    app(CanonicalDriverBackfiller::class)->backfill();
 });
 
 it('показва списъка с писти', function () {

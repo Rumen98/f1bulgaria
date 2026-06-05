@@ -30,40 +30,36 @@ class CircuitStatsService
     }
 
     /**
-     * All-time класиране на пилотите за дадена писта — групирано по driver_code
-     * (един пилот = няколко записа по сезони, но един код).
+     * All-time класиране на пилотите за дадена писта — групирано по canonical_id
+     * (истинската идентичност на пилота, устойчиво на преизползвани/split кодове).
      *
-     * @return Collection<int, array{position:int, code:string, name:string, slug:?string, races:int, wins:int, poles:int}>
+     * @return Collection<int, array{position:int, code:?string, name:string, slug:?string, races:int, wins:int, poles:int}>
      */
     public function getAllTimeDriverStandings(string $circuitSlug): Collection
     {
         return Cache::remember("circuit-standings:{$circuitSlug}", now()->addDay(), function () use ($circuitSlug) {
-            // Без limit/order в SQL — подреждаме по победи в PHP (вкл. pole tiebreak,
-            // който се смята отделно), за да изберем правилния топ 20.
             $rows = Result::query()
-                ->selectRaw('drivers.driver_code as code, '
+                ->selectRaw('drivers.canonical_id as cid, dc.code as code, dc.first_name, dc.last_name, dc.slug, '
                     .'COUNT(DISTINCT results.race_id) as races, '
                     ."SUM(CASE WHEN results.position = 1 AND results.session_type = 'race' THEN 1 ELSE 0 END) as wins")
                 ->join('drivers', 'drivers.id', '=', 'results.driver_id')
+                ->join('drivers_canonical as dc', 'dc.id', '=', 'drivers.canonical_id')
                 ->join('races', 'races.id', '=', 'results.race_id')
                 ->where('races.jolpica_id', $circuitSlug)
-                ->whereNotNull('drivers.driver_code')
-                ->groupBy('drivers.driver_code')
+                ->whereNotNull('drivers.canonical_id')
+                ->groupBy('drivers.canonical_id', 'dc.code', 'dc.first_name', 'dc.last_name', 'dc.slug')
                 ->get();
 
-            // Името/slug-ът е от пилота с НАЙ-МНОГО състезания за този код — за да
-            // не показваме грешен човек при остатъчни колизии (напр. Bruno вместо Ayrton).
-            $canonical = $this->canonicalByCode($rows->pluck('code'));
-            $poles = $this->polesByCode($circuitSlug);
+            $poles = $this->polesByCanonical($circuitSlug);
 
             return $rows
                 ->map(fn ($r) => [
                     'code' => $r->code,
-                    'name' => $canonical[$r->code]['name'] ?? $r->code,
-                    'slug' => $canonical[$r->code]['slug'] ?? null,
+                    'name' => trim("{$r->first_name} {$r->last_name}"),
+                    'slug' => $r->slug,
                     'races' => (int) $r->races,
                     'wins' => (int) $r->wins,
-                    'poles' => (int) ($poles[$r->code] ?? 0),
+                    'poles' => (int) ($poles[$r->cid] ?? 0),
                 ])
                 // Победи (primary) → pole → старта. Точките са подвеждащи между
                 // ерите (9т за победа до 1990 vs 25т сега), затова не ги ползваме.
@@ -72,6 +68,24 @@ class CircuitStatsService
                 ->values()
                 ->map(fn ($r, $i) => ['position' => $i + 1, ...$r]);
         });
+    }
+
+    /**
+     * Pole позиции по canonical_id за дадена писта.
+     *
+     * @return array<int, int>
+     */
+    private function polesByCanonical(string $circuitSlug): array
+    {
+        return DB::table('races')
+            ->selectRaw('drivers.canonical_id as cid, COUNT(*) as cnt')
+            ->join('drivers', 'drivers.id', '=', 'races.pole_driver_id')
+            ->where('races.jolpica_id', $circuitSlug)
+            ->whereNotNull('drivers.canonical_id')
+            ->groupBy('drivers.canonical_id')
+            ->pluck('cnt', 'cid')
+            ->map(fn ($c) => (int) $c)
+            ->all();
     }
 
     /**
@@ -165,38 +179,6 @@ class CircuitStatsService
     }
 
     /**
-     * За всеки код — името и slug-ът на пилота с НАЙ-МНОГО състезателни резултати
-     * (каноничният собственик на кода). Защитава срещу остатъчни колизии.
-     *
-     * @param  Collection<int, string>  $codes
-     * @return array<string, array{name:string, slug:?string}>
-     */
-    private function canonicalByCode(Collection $codes): array
-    {
-        $rows = Result::query()
-            ->selectRaw('drivers.driver_code as code, drivers.first_name, drivers.last_name, drivers.slug, COUNT(*) as cnt')
-            ->join('drivers', 'drivers.id', '=', 'results.driver_id')
-            ->where('results.session_type', ResultSessionType::Race->value)
-            ->whereIn('drivers.driver_code', $codes)
-            ->groupBy('drivers.driver_code', 'drivers.first_name', 'drivers.last_name', 'drivers.slug')
-            ->orderByDesc('cnt')
-            ->get();
-
-        $canonical = [];
-        foreach ($rows as $row) {
-            // Първият срещнат за даден код има най-много резултати (order DESC).
-            if (! isset($canonical[$row->code])) {
-                $canonical[$row->code] = [
-                    'name' => trim("{$row->first_name} {$row->last_name}"),
-                    'slug' => $row->slug,
-                ];
-            }
-        }
-
-        return $canonical;
-    }
-
-    /**
      * @param  Collection<int, string>  $codes
      * @return array<string, string>
      */
@@ -231,23 +213,5 @@ class CircuitStatsService
         }
 
         return ['name' => $this->latestNamesByCode(collect([$row->code]))[$row->code] ?? $row->code, 'count' => (int) $row->cnt];
-    }
-
-    /**
-     * Pole позиции по driver_code за дадена писта.
-     *
-     * @return array<string, int>
-     */
-    private function polesByCode(string $circuitSlug): array
-    {
-        return DB::table('races')
-            ->selectRaw('drivers.driver_code as code, COUNT(*) as cnt')
-            ->join('drivers', 'drivers.id', '=', 'races.pole_driver_id')
-            ->where('races.jolpica_id', $circuitSlug)
-            ->whereNotNull('drivers.driver_code')
-            ->groupBy('drivers.driver_code')
-            ->pluck('cnt', 'code')
-            ->map(fn ($c) => (int) $c)
-            ->all();
     }
 }
