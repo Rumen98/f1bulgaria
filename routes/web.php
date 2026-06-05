@@ -9,6 +9,7 @@ use App\Http\Controllers\DriversController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\NewsController;
+use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicProfileController;
@@ -36,6 +37,9 @@ Route::get('/compare', [CompareController::class, 'index'])->name('compare.index
 Route::get('/compare/{slug1}/{slug2}', [CompareController::class, 'show'])->name('compare.show');
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [NewsController::class, 'show'])->name('news.show');
+Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->name('newsletter.subscribe');
+Route::get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm'])->name('newsletter.confirm');
+Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');
 
 Route::get('/dashboard', [CalendarController::class, 'index'])

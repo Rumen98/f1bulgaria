@@ -1,4 +1,5 @@
 <script setup>
+import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
@@ -102,6 +103,10 @@ const items = computed(() => navItems.filter((i) => has(i.route)));
         </main>
 
         <footer class="mt-12 border-t border-zinc-800 py-8 text-center text-sm text-zinc-500">
+            <div class="mb-6">
+                <p class="mb-3 font-semibold text-zinc-300">Бюлетин с най-важното от F1</p>
+                <NewsletterForm source="footer" />
+            </div>
             F1 България — общност на българските фенове на Формула 1.
             Live чатът е в нашия <a href="#" class="text-red-500 transition hover:text-red-400">Telegram канал</a>.
         </footer>
