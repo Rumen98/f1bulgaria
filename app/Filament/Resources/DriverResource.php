@@ -23,9 +23,11 @@ class DriverResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user-circle';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'F1 данни';
+    protected static string|\UnitEnum|null $navigationGroup = 'Записи по сезон';
 
-    protected static ?string $navigationLabel = 'Пилоти';
+    protected static ?int $navigationSort = 90;
+
+    protected static ?string $navigationLabel = 'Пилоти (по сезон)';
 
     protected static ?string $modelLabel = 'пилот';
 

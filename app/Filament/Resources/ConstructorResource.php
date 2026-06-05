@@ -25,9 +25,11 @@ class ConstructorResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-wrench-screwdriver';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'F1 данни';
+    protected static string|\UnitEnum|null $navigationGroup = 'Записи по сезон';
 
-    protected static ?string $navigationLabel = 'Конструктори';
+    protected static ?int $navigationSort = 91;
+
+    protected static ?string $navigationLabel = 'Конструктори (по сезон)';
 
     protected static ?string $modelLabel = 'конструктор';
 
