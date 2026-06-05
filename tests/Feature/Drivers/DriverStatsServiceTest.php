@@ -65,9 +65,9 @@ it('изчислява кариерни постижения с win rate', funct
     $r1 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monaco']);
     Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $driver->id, 'fastest_lap' => true, 'grid_position' => 1]);
     $r2 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'spa']);
-    Result::factory()->position(1)->create(['race_id' => $r2->id, 'driver_id' => $driver->id]);
+    Result::factory()->position(1)->create(['race_id' => $r2->id, 'driver_id' => $driver->id, 'grid_position' => 5]);
     $r3 = Race::factory()->create(['season_id' => $season->id, 'jolpica_id' => 'monza']);
-    Result::factory()->position(3)->create(['race_id' => $r3->id, 'driver_id' => $driver->id]);
+    Result::factory()->position(3)->create(['race_id' => $r3->id, 'driver_id' => $driver->id, 'grid_position' => 8]);
 
     $a = service()->getAchievements($driver);
 

@@ -17,6 +17,7 @@ class Constructor extends Model
 
     protected $fillable = [
         'season_id',
+        'canonical_id',
         'jolpica_id',
         'name',
         'slug',
@@ -27,6 +28,12 @@ class Constructor extends Model
     public function season(): BelongsTo
     {
         return $this->belongsTo(Season::class);
+    }
+
+    /** @return BelongsTo<ConstructorCanonical, $this> */
+    public function canonical(): BelongsTo
+    {
+        return $this->belongsTo(ConstructorCanonical::class, 'canonical_id');
     }
 
     /** @return HasMany<Driver, $this> */
