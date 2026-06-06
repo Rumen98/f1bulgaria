@@ -19,6 +19,12 @@ final class CountryFlag
         'ARG' => '🇦🇷', 'RUS' => '🇷🇺', 'POL' => '🇵🇱', 'SWE' => '🇸🇪', 'NZL' => '🇳🇿',
         'PRT' => '🇵🇹', 'IND' => '🇮🇳', 'IDN' => '🇮🇩', 'ZAF' => '🇿🇦', 'COL' => '🇨🇴',
         'HUN' => '🇭🇺', 'CZE' => '🇨🇿', 'IRL' => '🇮🇪', 'MYS' => '🇲🇾', 'VEN' => '🇻🇪',
+        'NOR' => '🇳🇴', 'EST' => '🇪🇪', 'PRY' => '🇵🇾',
+
+        // IOC кодове (както ги дава Wikipedia за F2) — допълват ISO3 по-горе.
+        'BUL' => '🇧🇬', 'GER' => '🇩🇪', 'NED' => '🇳🇱', 'SUI' => '🇨🇭', 'PAR' => '🇵🇾',
+        'IRE' => '🇮🇪', 'DEN' => '🇩🇰', 'RSA' => '🇿🇦', 'INA' => '🇮🇩', 'POR' => '🇵🇹',
+        'MON' => '🇲🇨', 'CHI' => '🇨🇱', 'URU' => '🇺🇾', 'NZL' => '🇳🇿', 'JPN' => '🇯🇵',
     ];
 
     public static function emoji(?string $iso3): string
