@@ -54,6 +54,7 @@ class DriverPhotoFetcher
         return array_values(array_unique(array_filter([
             $team !== null ? "{$name} {$team}" : null,
             "{$name} (racing driver)",
+            "{$name} racing driver",
             $name,
             "{$name} Jr.",
             $demonym !== null ? "{$name} ({$demonym} racing driver)" : null,

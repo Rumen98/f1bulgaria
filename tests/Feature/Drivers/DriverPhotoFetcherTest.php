@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Constructor;
 use App\Models\Driver;
+use App\Models\DriverCanonical;
 use App\Models\Season;
 use App\Services\Drivers\DriverPhotoFetcher;
 use Illuminate\Support\Facades\Http;
@@ -110,6 +111,23 @@ it('--refresh презарежда дори пилоти с вече налич�
     // С --refresh: презаписва.
     $this->artisan('drivers:fetch-photos', ['--sleep' => 0, '--refresh' => true])->assertSuccessful();
     expect(Driver::first()->photo_url)->toBe('https://upload.wikimedia.org/new.jpg');
+});
+
+it('--all записва photo_url на каноничните пилоти (легенди)', function () {
+    Http::fake(['*/page/summary/*' => Http::response([
+        'originalimage' => ['source' => 'https://upload.wikimedia.org/legend.jpg'],
+    ])]);
+
+    $season = Season::factory()->create(['year' => 1990, 'is_current' => false]);
+    $canonical = DriverCanonical::create(['slug' => 'ayrton-senna', 'first_name' => 'Ayrton', 'last_name' => 'Senna']);
+    Driver::factory()->create([
+        'season_id' => $season->id, 'canonical_id' => $canonical->id,
+        'first_name' => 'Ayrton', 'last_name' => 'Senna', 'slug' => 'ayrton-senna',
+    ]);
+
+    $this->artisan('drivers:fetch-photos', ['--all' => true, '--sleep' => 0])->assertSuccessful();
+
+    expect($canonical->fresh()->photo_url)->toBe('https://upload.wikimedia.org/legend.jpg');
 });
 
 it('командата записва photo_url за пилотите от текущия сезон', function () {
