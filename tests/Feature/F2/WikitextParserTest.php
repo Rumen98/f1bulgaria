@@ -217,6 +217,34 @@ WIKI;
     expect($rows[0]['points'])->toBe(16.0);
 });
 
+it('чете pole и дати от едноредов (inline) инфобокс', function () {
+    // Повечето реални страници ползват инфобокс на един ред (за разлика от Melbourne fixture).
+    $wikitext = <<<'WIKI'
+{{Infobox FIA Formula 2 race report|Country=Italy|Name=Imola|Round_No=4|Type_r1=Sprint Race|Date_r1=17 May|First_team_r1=[[DAMS|DAMS Lucas Oil]]|Type_r2=Feature Race|Date_r2=18 May|Pole_driver_country_r2=SWE|Pole_driver_r2=[[Dino Beganovic]]|Pole_team_r2=[[Hitech Grand Prix|Hitech]]|Pole_Time_r2=1:27.418}}
+
+=== Feature race ===
+{| class="wikitable"
+! Pos !! No !! Driver !! Entrant !! Laps !! Time/Retired !! Grid !! Points
+|-
+!1
+| align="center" |6
+|{{Flagicon|BUL}} [[Nikola Tsolov]]
+|[[Campos Racing]]
+| align="center" |35
+|1:00:00.000
+| align="center" |1
+| align="center" |25
+|}
+WIKI;
+
+    $r = parser()->parseRoundPage($wikitext);
+
+    expect($r['round_no'])->toBe(4)
+        ->and($r['pole_driver'])->toBe('Dino Beganovic')
+        ->and($r['sprint']['date'])->toBe('17 May')
+        ->and($r['feature']['date'])->toBe('18 May');
+});
+
 it('извлича секция, дори когато е последна на страницата', function () {
     $wikitext = <<<'WIKI'
 {{Infobox}}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\F2Race;
+use App\Models\F2Season;
 use App\Services\F2\F2WikipediaSync;
 use Illuminate\Console\Command;
 
@@ -22,11 +23,6 @@ class SyncF2WikipediaCommand extends Command
 
     public function handle(F2WikipediaSync $sync): int
     {
-        if ($this->option('rebuild')) {
-            $this->warn('Изтривам съществуващите F2 race данни…');
-            F2Race::query()->delete(); // каскадно трие сесии + резултати
-        }
-
         $current = (int) now()->year;
         $yearOpt = $this->option('year');
 
@@ -35,6 +31,13 @@ class SyncF2WikipediaCommand extends Command
             $yearOpt !== null => [(int) $yearOpt],
             default => range((int) $this->option('since'), $current),
         };
+
+        if ($this->option('rebuild')) {
+            // Само за синхронизираните години — да не трием чужди сезони.
+            $this->warn('Изтривам F2 race данните за: '.implode(', ', $years).'…');
+            $seasonIds = F2Season::query()->whereIn('year', $years)->pluck('id');
+            F2Race::query()->whereIn('f2_season_id', $seasonIds)->delete(); // каскадно трие сесии + резултати
+        }
 
         $this->info('🏁 Синхрон на F2 от Wikipedia');
 

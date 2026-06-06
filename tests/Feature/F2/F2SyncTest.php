@@ -6,6 +6,7 @@ use App\Models\F2Driver;
 use App\Models\F2Race;
 use App\Models\F2RaceSession;
 use App\Models\F2Result;
+use App\Models\F2Season;
 use App\Services\F2\F2WikipediaSync;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -87,6 +88,19 @@ it('командата работи end-to-end', function () {
     $this->artisan('f2:sync-wikipedia', ['--year' => '2026'])->assertSuccessful();
 
     expect(F2Race::where('location_name', 'Melbourne')->exists())->toBeTrue();
+});
+
+it('--rebuild за конкретна година не трие данните на друг сезон', function () {
+    // Чужд сезон, който НЕ бива да се трие.
+    $other = F2Season::create(['year' => 2024, 'is_current' => false]);
+    $otherRace = F2Race::create([
+        'f2_season_id' => $other->id, 'location_name' => 'Sakhir', 'round' => 1, 'slug' => '2024-sakhir',
+    ]);
+
+    $this->artisan('f2:sync-wikipedia', ['--year' => '2026', '--rebuild' => true])->assertSuccessful();
+
+    expect(F2Race::whereKey($otherRace->id)->exists())->toBeTrue()      // 2024 оцелява
+        ->and(F2Race::where('location_name', 'Melbourne')->exists())->toBeTrue(); // 2026 е презаписан
 });
 
 it('изчислява класиране (точки + позиция) за текущ сезон без шампион', function () {

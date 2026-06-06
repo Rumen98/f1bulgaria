@@ -204,10 +204,31 @@ class WikitextParser
         return ['driver' => $this->firstLink($chunk), 'time' => $time];
     }
 
+    /**
+     * Стойност на поле от инфобокса. Поддържа двата формата на Wikipedia:
+     *  - многоредов: `| Field = value` (всяко поле на свой ред);
+     *  - едноредов:  `{{Infobox|Field=value|Next=...}}` (полета, разделени с `|`).
+     * При едноредовия стойността спира при следващото поле (`|име=`) или края
+     * на шаблона (`}}`), но НЕ при `|` вътре в wiki-връзка (`[[A|B]]`).
+     */
     private function infoboxField(string $wikitext, string $field): ?string
     {
-        if (preg_match('/^\s*\|\s*'.preg_quote($field, '/').'\s*=\s*(.+)$/m', $wikitext, $m)) {
-            return trim($m[1]);
+        $q = preg_quote($field, '/');
+
+        // Многоредов формат — стойност до края на реда.
+        if (preg_match('/^\s*\|\s*'.$q.'\s*=\s*(.*)$/m', $wikitext, $m)) {
+            $value = trim($m[1]);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        // Едноредов/inline формат.
+        if (preg_match('/\|\s*'.$q.'\s*=\s*(.*?)\s*(?=\|\s*[A-Za-z_][\w-]*\s*=|\}\})/s', $wikitext, $m)) {
+            $value = trim($m[1]);
+            if ($value !== '') {
+                return $value;
+            }
         }
 
         return null;
