@@ -62,4 +62,11 @@ return [
         'password' => env('OPENF1_PASSWORD'),
     ],
 
+    'wikipedia' => [
+        'base_url' => env('WIKIPEDIA_BASE_URL', 'https://en.wikipedia.org/w/api.php'),
+        'user_agent' => env('WIKIPEDIA_USER_AGENT', 'F1Bulgaria/1.0 (https://f1bulgaria.bg)'),
+        'timeout' => (int) env('WIKIPEDIA_TIMEOUT', 15),
+        'rate_limit_ms' => (int) env('WIKIPEDIA_RATE_LIMIT_MS', 1000),
+    ],
+
 ];
