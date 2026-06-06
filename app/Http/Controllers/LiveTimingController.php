@@ -40,12 +40,20 @@ class LiveTimingController extends Controller
     {
         $session = $this->client->getLiveSession();
 
+        $isQualifying = $session !== null && str_contains(
+            mb_strtolower($session['type'].' '.$session['name']),
+            'qualifying',
+        );
+
         return [
             'session' => $session !== null ? [
                 'name' => $session['name'],
                 'type' => $session['type'],
                 'circuit' => $session['circuit_short_name'],
                 'ends_at' => $session['date_end']?->toIso8601String(),
+                'is_qualifying' => $isQualifying,
+                // Граници на отпадане в квалификацията (Q1 след P15, Q2 след P10).
+                'cutoffs' => $isQualifying ? [15, 10] : [],
             ] : null,
             'standings' => $session !== null ? $this->builder->build($session['key'], $session['type']) : collect(),
             'updated_at' => now()->toIso8601String(),

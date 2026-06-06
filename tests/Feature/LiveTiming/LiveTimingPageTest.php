@@ -109,3 +109,31 @@ it('третира приключила сесия като не-активна'
 
     $this->getJson('/live/refresh')->assertOk()->assertJsonPath('session', null);
 });
+
+it('маркира квалификацията с cutoff граници', function () {
+    fakeLiveSession(); // session_type = Qualifying
+
+    $this->getJson('/live/refresh')
+        ->assertOk()
+        ->assertJsonPath('session.is_qualifying', true)
+        ->assertJsonPath('session.cutoffs', [15, 10]);
+});
+
+it('не маркира практиката като квалификация', function () {
+    Http::fake([
+        '*/sessions*' => Http::response([[
+            'session_key' => 7777, 'session_name' => 'Practice 1', 'session_type' => 'Practice',
+            'date_start' => now()->subMinutes(5)->toIso8601String(),
+            'date_end' => now()->addMinutes(55)->toIso8601String(),
+            'circuit_short_name' => 'Spa',
+        ]]),
+        '*/drivers*' => Http::response([]),
+        '*/laps*' => Http::response([]),
+        '*/stints*' => Http::response([]),
+    ]);
+
+    $this->getJson('/live/refresh')
+        ->assertOk()
+        ->assertJsonPath('session.is_qualifying', false)
+        ->assertJsonPath('session.cutoffs', []);
+});

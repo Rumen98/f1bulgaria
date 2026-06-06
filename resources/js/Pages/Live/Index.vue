@@ -66,6 +66,9 @@ const updatedLabel = computed(() => {
     return secs < 5 ? 'сега' : `преди ${secs}с`;
 });
 
+const isQualifying = computed(() => session.value?.is_qualifying ?? false);
+const cutoffs = computed(() => session.value?.cutoffs ?? []);
+
 const posClass = (p) => ({ 1: 'text-amber-300', 2: 'text-zinc-300', 3: 'text-orange-400' })[p] ?? 'text-zinc-500';
 
 const tire = (compound) => {
@@ -118,6 +121,7 @@ const nextRaceCountdown = computed(() => {
                     <h1 class="text-xl font-black sm:text-2xl">
                         LIVE — <span class="text-red-500">{{ session.circuit }}</span> · {{ session.name }}
                     </h1>
+                    <span v-if="isQualifying" class="rounded bg-purple-500/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-purple-300">Квалификация</span>
                 </div>
                 <div class="flex items-center gap-3 text-sm text-zinc-400">
                     <span v-if="countdown" class="tabular-nums">⏳ {{ countdown }}</span>
@@ -146,12 +150,14 @@ const nextRaceCountdown = computed(() => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-800/60">
-                        <tr v-for="row in rows" :key="row.driver_number" class="bg-zinc-900/40 transition hover:bg-zinc-800/40">
+                        <template v-for="row in rows" :key="row.driver_number">
+                        <tr class="bg-zinc-900/40 transition hover:bg-zinc-800/40">
                             <td class="px-2 py-2.5 font-black tabular-nums sm:px-3" :class="posClass(row.position)">{{ row.position }}</td>
                             <td class="px-2 py-2.5 sm:px-3">
                                 <span class="inline-flex items-center gap-2">
                                     <span class="h-4 w-1 rounded" :style="{ backgroundColor: row.team_colour }" />
                                     <span class="font-semibold text-white">{{ row.acronym ?? row.name }}</span>
+                                    <span v-if="isQualifying && row.position === 1 && row.best_lap_time" title="Pole">🏁</span>
                                 </span>
                             </td>
                             <td class="hidden px-3 py-2.5 text-zinc-400 lg:table-cell">{{ row.team_name }}</td>
@@ -169,6 +175,12 @@ const nextRaceCountdown = computed(() => {
                             </td>
                             <td class="hidden px-2 py-2.5 text-right tabular-nums text-zinc-500 sm:table-cell">{{ row.laps_completed }}</td>
                         </tr>
+                        <tr v-if="cutoffs.includes(row.position)" :key="`cut-${row.position}`" class="bg-red-950/30">
+                            <td colspan="11" class="px-3 py-1 text-center text-[10px] font-bold uppercase tracking-wider text-red-400">
+                                ⸻ граница на отпадане (P{{ row.position }}) ⸻
+                            </td>
+                        </tr>
+                        </template>
                     </tbody>
                 </table>
                 <div v-if="rows.length === 0" class="p-8 text-center text-zinc-500">
