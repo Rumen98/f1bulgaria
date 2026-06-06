@@ -81,15 +81,22 @@ class FetchDriverPhotosCommand extends Command
         $refresh = (bool) $this->option('refresh');
         $sleepMs = max(0, (int) $this->option('sleep'));
 
-        $query = DriverCanonical::query()->when(! $refresh, fn ($q) => $q->whereNull('photo_url'));
-        $total = $query->count();
+        // Прихващаме ID-тата предварително — иначе обновяването на photo_url по
+        // време на chunkById с филтър whereNull прекъсва обхождането рано.
+        $ids = DriverCanonical::query()
+            ->when(! $refresh, fn ($q) => $q->whereNull('photo_url'))
+            ->orderBy('last_name')
+            ->pluck('id');
 
+        $total = $ids->count();
         $found = 0;
         $missing = 0;
 
         $this->info("Търся снимки за {$total} канонични пилота (≈".ceil($total * $sleepMs / 60000).' мин)...');
 
-        $query->orderBy('last_name')->chunkById(50, function ($canonicals) use ($fetcher, $sleepMs, &$found, &$missing) {
+        foreach ($ids->chunk(50) as $chunk) {
+            $canonicals = DriverCanonical::query()->whereIn('id', $chunk)->get();
+
             foreach ($canonicals as $canonical) {
                 $driver = $canonical->seasons()->with('constructor')->orderByDesc('season_id')->first();
 
@@ -110,7 +117,7 @@ class FetchDriverPhotosCommand extends Command
 
                 $this->pause($sleepMs);
             }
-        });
+        }
 
         $this->info("Готово: {$found} със снимка, {$missing} без (остават с монограма).");
 
