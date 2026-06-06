@@ -54,6 +54,10 @@ return [
     'openf1' => [
         'base_url' => env('OPENF1_BASE_URL', 'https://api.openf1.org/v1'),
         'timeout' => (int) env('OPENF1_TIMEOUT', 10),
+        // ВАЖНО: OpenF1 ограничава достъпа ПО ВРЕМЕ на живи сесии само за
+        // автентикирани потребители (HTTP 401). За live timing по време на
+        // състезание е НУЖЕН ключ. Без ключ /live показва fallback съобщение.
+        'key' => env('OPENF1_API_KEY'),
     ],
 
 ];

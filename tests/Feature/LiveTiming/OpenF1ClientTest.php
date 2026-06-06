@@ -80,3 +80,21 @@ it('връща празна колекция при HTTP 500 (graceful)', functi
     expect(client()->getStints(9999))->toBeEmpty()
         ->and(client()->getCurrentSession())->toBeNull();
 });
+
+it('праща Bearer токен когато е конфигуриран ключ (за живи сесии)', function () {
+    config(['services.openf1.key' => 'secret-token']);
+    Http::fake(['*/laps*' => Http::response([['driver_number' => 1, 'lap_number' => 1]])]);
+
+    client()->getLatestLaps(9999);
+
+    Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer secret-token'));
+});
+
+it('НЕ праща Authorization когато няма ключ', function () {
+    config(['services.openf1.key' => null]);
+    Http::fake(['*/laps*' => Http::response([])]);
+
+    client()->getLatestLaps(9999);
+
+    Http::assertSent(fn ($request) => ! $request->hasHeader('Authorization'));
+});

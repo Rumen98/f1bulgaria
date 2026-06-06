@@ -24,10 +24,13 @@ class OpenF1Client
 
     private int $timeout;
 
+    private ?string $apiKey;
+
     public function __construct()
     {
         $this->baseUrl = rtrim((string) config('services.openf1.base_url'), '/');
         $this->timeout = (int) config('services.openf1.timeout', 10);
+        $this->apiKey = config('services.openf1.key') ?: null;
     }
 
     /**
@@ -116,9 +119,14 @@ class OpenF1Client
     private function get(string $endpoint, array $query): Collection
     {
         try {
-            $response = Http::acceptJson()
-                ->timeout($this->timeout)
-                ->get("{$this->baseUrl}/{$endpoint}", $query);
+            $request = Http::acceptJson()->timeout($this->timeout);
+
+            // OpenF1 изисква Bearer токен по време на живи сесии (иначе 401).
+            if ($this->apiKey !== null) {
+                $request = $request->withToken($this->apiKey);
+            }
+
+            $response = $request->get("{$this->baseUrl}/{$endpoint}", $query);
 
             if (! $response->successful()) {
                 Log::warning('OpenF1 заявка неуспешна', ['endpoint' => $endpoint, 'status' => $response->status()]);
