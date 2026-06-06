@@ -68,3 +68,29 @@ it('резолва легендарен отбор извън текущия с�
             ->where('stats.wins', 1)
             ->where('stats.poles', 1));
 });
+
+it('?season избира конкретен сезон на отбора', function () {
+    $old = Season::factory()->create(['year' => 2014, 'is_current' => false]);
+    Constructor::factory()->create(['season_id' => $old->id, 'name' => 'McLaren', 'slug' => 'mclaren']);
+    Constructor::factory()->create(['season_id' => $this->season->id, 'name' => 'McLaren', 'slug' => 'mclaren']);
+    backfillTeamCanonical();
+
+    // По подразбиране → последният сезон.
+    $this->get('/teams/mclaren')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('selectedSeason', $this->season->year)
+            ->where('seasons', [$this->season->year, 2014]));
+
+    // ?season=2014 → конкретният сезон.
+    $this->get('/teams/mclaren?season=2014')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('selectedSeason', 2014)
+            ->where('season', 2014));
+
+    // Невалиден сезон → fallback към последния.
+    $this->get('/teams/mclaren?season=1850')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('selectedSeason', $this->season->year));
+});

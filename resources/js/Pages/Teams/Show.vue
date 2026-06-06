@@ -4,7 +4,7 @@ import TeamDriverCard from '@/Components/Team/TeamDriverCard.vue';
 import TeamNewsList from '@/Components/Team/TeamNewsList.vue';
 import TeamStatsBar from '@/Components/Team/TeamStatsBar.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     team: Object,
@@ -13,14 +13,30 @@ const props = defineProps({
     news: Array,
     recentResults: Array,
     season: Number,
+    seasons: { type: Array, default: () => [] },
+    selectedSeason: { type: Number, default: null },
 });
+
+const goToSeason = (e) => {
+    router.visit(route('teams.show', props.team.slug) + `?season=${e.target.value}`, { preserveScroll: true });
+};
 </script>
 
 <template>
     <Head :title="team.name" />
 
     <PublicLayout>
-        <Link :href="route('teams.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички отбори</Link>
+        <div class="flex items-center justify-between gap-3">
+            <Link :href="route('teams.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички отбори</Link>
+            <select
+                v-if="seasons.length > 1"
+                :value="selectedSeason"
+                class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-white focus:border-red-600 focus:outline-none"
+                @change="goToSeason"
+            >
+                <option v-for="y in seasons" :key="y" :value="y">Сезон {{ y }}</option>
+            </select>
+        </div>
 
         <!-- Hero -->
         <section

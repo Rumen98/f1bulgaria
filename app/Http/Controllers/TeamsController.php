@@ -14,6 +14,7 @@ use App\Models\TeamNewsItem;
 use App\Services\Standings\StandingsService;
 use App\Services\Teams\TeamStatsService;
 use App\Support\CountryFlag;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,33 +34,44 @@ class TeamsController extends Controller
         ]);
     }
 
-    public function show(string $slug): Response
+    public function show(Request $request, string $slug): Response
     {
         // Идентичността идва от каноничния модел (един запис на отбор, легендите включени).
         $canonical = $this->stats->getCanonicalBySlug($slug);
         abort_if($canonical === null, 404);
 
-        $current = Season::current();
-
-        // Най-новият per-season ред на отбора — за състава и за новините.
-        $latest = Constructor::query()
+        // Годините, в които отборът е участвал (за season dropdown), най-новите първо.
+        $years = Constructor::query()
             ->where('constructors.canonical_id', $canonical->id)
             ->join('seasons', 'seasons.id', '=', 'constructors.season_id')
             ->orderByDesc('seasons.year')
-            ->select('constructors.*')
-            ->with(['season', 'drivers'])
-            ->first();
+            ->pluck('seasons.year')
+            ->map(fn ($y) => (int) $y)
+            ->unique()
+            ->values();
 
-        $allDriverIds = Driver::query()
-            ->whereIn('constructor_id', Constructor::query()->where('canonical_id', $canonical->id)->pluck('id'))
-            ->pluck('id');
+        $requested = (int) $request->query('season');
+        $selectedYear = $years->contains($requested) ? $requested : $years->first();
 
-        // Класиране на пилотите — само ако отборът е активен в текущия сезон.
-        $driverStandings = ($latest && $current && $latest->season_id === $current->id)
-            ? $this->standings->drivers($current)->keyBy(fn ($r) => $r['driver']->id)
+        // Per-season ред за избрания сезон — за състава, новините и класирането.
+        $team = $selectedYear !== null
+            ? Constructor::query()
+                ->where('constructors.canonical_id', $canonical->id)
+                ->join('seasons', 'seasons.id', '=', 'constructors.season_id')
+                ->where('seasons.year', $selectedYear)
+                ->select('constructors.*')
+                ->with(['season', 'drivers'])
+                ->first()
+            : null;
+
+        $season = $team?->season;
+
+        // Класиране на пилотите за избрания сезон.
+        $driverStandings = $season
+            ? $this->standings->drivers($season)->keyBy(fn ($r) => $r['driver']->id)
             : collect();
 
-        $roster = $latest ? $latest->drivers->sortBy('last_name')->values() : collect();
+        $roster = $team ? $team->drivers->sortBy('last_name')->values() : collect();
 
         return Inertia::render('Teams/Show', [
             'team' => [
@@ -82,9 +94,11 @@ class TeamsController extends Controller
                 'points' => $driverStandings->get($d->id)['points'] ?? 0,
                 'position' => $driverStandings->get($d->id)['position'] ?? null,
             ]),
-            'news' => $latest ? $this->news($latest) : collect(),
-            'recentResults' => $this->recentResults($allDriverIds),
-            'season' => $latest?->season?->year,
+            'news' => $team ? $this->news($team) : collect(),
+            'recentResults' => $this->recentResults($roster->pluck('id')),
+            'season' => $selectedYear,
+            'seasons' => $years,
+            'selectedSeason' => $selectedYear,
         ]);
     }
 
