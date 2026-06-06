@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
         $this->call(TeamNewsSourceSeeder::class);
         // Зависи от каноничните пилоти (drivers:backfill-canonical) — пропуска липсващите.
         $this->call(RivalrySeeder::class);
+        $this->call(F2SeedSeeder::class);
 
         // Администраторски акаунт (Румен) за достъп до Filament панела.
         User::query()->updateOrCreate(
