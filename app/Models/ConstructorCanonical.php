@@ -18,7 +18,7 @@ class ConstructorCanonical extends Model
     protected $fillable = [
         'name', 'slug', 'color_hex', 'logo_url', 'bio_bg', 'is_active',
         'total_wins', 'total_podiums', 'total_poles', 'total_races',
-        'first_race_at', 'last_race_at',
+        'championships_count', 'first_race_at', 'last_race_at',
     ];
 
     protected function casts(): array
@@ -31,6 +31,7 @@ class ConstructorCanonical extends Model
             'total_podiums' => 'integer',
             'total_poles' => 'integer',
             'total_races' => 'integer',
+            'championships_count' => 'integer',
         ];
     }
 

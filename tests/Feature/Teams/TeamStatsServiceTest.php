@@ -52,6 +52,7 @@ it('изчислява all-time статистика за каноничен к�
     app(CanonicalConstructorBackfiller::class)->backfill();
     $canonical = ConstructorCanonical::where('slug', 'ferrari')->first();
 
+    $canonical->update(['championships_count' => 16]);
     $stats = app(TeamStatsService::class)->getStatsForCanonical($canonical);
 
     expect($stats['wins'])->toBe(1)
@@ -59,7 +60,8 @@ it('изчислява all-time статистика за каноничен к�
         ->and($stats['races'])->toBe(2)
         ->and($stats['fastest_laps'])->toBe(1)
         ->and($stats['dnfs'])->toBe(1)
-        ->and($stats['points'])->toBe(25.0)
+        ->and($stats)->not->toHaveKey('points') // all-time точки премахнати (подвеждащи)
+        ->and($stats['championships'])->toBe(16)
         ->and($stats['seasons'])->toBe(2)
         ->and($stats['position'])->toBeNull()
         ->and($stats['win_rate'])->toBe(50.0);

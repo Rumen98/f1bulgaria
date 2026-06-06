@@ -5,13 +5,15 @@ const props = defineProps({
     stats: { type: Object, required: true },
 });
 
+// Без all-time точки (точковите системи са се менили — подвеждащо). Показваме
+// титли (когато са въведени) + честни кумулативни статистики.
 const items = computed(() => [
-    { label: 'Точки', value: props.stats.points },
+    ...(props.stats.championships !== undefined ? [{ label: 'Титли', value: props.stats.championships }] : []),
     { label: 'Победи', value: props.stats.wins },
     { label: 'Подиуми', value: props.stats.podiums },
     { label: 'Pole', value: props.stats.poles },
-    { label: 'Най-бързи обиколки', value: props.stats.fastest_laps },
-    { label: 'Отпадания', value: props.stats.dnfs },
+    { label: 'Старта', value: props.stats.races },
+    { label: 'Сезони', value: props.stats.seasons },
 ]);
 </script>
 

@@ -40,18 +40,25 @@ class TeamStatsService
      * обиколки, отпадания и брой сезони се смятат от свързаните per-season записи.
      * position е null (няма смисъл all-time).
      *
-     * @return array{position:null, points:float, wins:int, podiums:int, poles:int, fastest_laps:int, dnfs:int, races:int, seasons:int, win_rate:float}
+     * Без all-time точки — точковите системи са се менили през годините и
+     * сравнението е подвеждащо. Вместо това показваме титли (championships_count,
+     * ръчно поддържано).
+     *
+     * @return array{position:null, championships:int, wins:int, podiums:int, poles:int, fastest_laps:int, dnfs:int, races:int, seasons:int, win_rate:float}
      */
     public function getStatsForCanonical(ConstructorCanonical $canonical): array
     {
-        return Cache::remember("team-canon-stats:{$canonical->id}", now()->addDay(), function () use ($canonical) {
+        // Фингърпринт по данните — обезсилва кеша при промяна (нов backfill /
+        // ръчно въведени титли) и пази от преплитане между изолирани тестове.
+        $fp = "{$canonical->total_races}-{$canonical->total_wins}-{$canonical->championships_count}";
+
+        return Cache::remember("team-canon-stats:{$canonical->id}:{$fp}", now()->addDay(), function () use ($canonical) {
             $constructorIds = Constructor::query()->where('canonical_id', $canonical->id)->pluck('id');
 
             $agg = Result::query()
                 ->join('drivers', 'drivers.id', '=', 'results.driver_id')
                 ->whereIn('drivers.constructor_id', $constructorIds)
-                ->selectRaw('SUM(results.points) as points, '
-                    ."SUM(CASE WHEN results.session_type = 'race' AND results.fastest_lap = 1 THEN 1 ELSE 0 END) as fl, "
+                ->selectRaw("SUM(CASE WHEN results.session_type = 'race' AND results.fastest_lap = 1 THEN 1 ELSE 0 END) as fl, "
                     ."SUM(CASE WHEN results.session_type = 'race' AND results.dnf = 1 THEN 1 ELSE 0 END) as dnfs")
                 ->first();
 
@@ -60,7 +67,7 @@ class TeamStatsService
 
             return [
                 'position' => null,
-                'points' => (float) ($agg->points ?? 0),
+                'championships' => $canonical->championships_count,
                 'wins' => $canonical->total_wins,
                 'podiums' => $canonical->total_podiums,
                 'poles' => $canonical->total_poles,

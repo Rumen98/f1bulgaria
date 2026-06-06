@@ -32,6 +32,9 @@ class ConstructorCanonicalForm
                         ColorPicker::make('color_hex')->label('Цвят'),
                         TextInput::make('logo_url')->label('URL на лого')->url()->maxLength(2048),
                         Toggle::make('is_active')->label('Активен отбор'),
+                        TextInput::make('championships_count')->label('Конструкторски титли')
+                            ->numeric()->minValue(0)->default(0)
+                            ->helperText('Ръчно — показва се вместо all-time точки.'),
                         Textarea::make('bio_bg')->label('Описание (BG)')->rows(5)->columnSpanFull(),
                     ]),
 
