@@ -1,10 +1,11 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
     profile: { type: Object, required: true },
+    f2Season: { type: Number, default: null },
 });
 
 const age = computed(() => {
@@ -93,6 +94,14 @@ const photo = computed(() => props.profile.photos?.[0] ?? null);
                     {{ link.label }}
                 </a>
             </div>
+
+            <Link
+                v-if="f2Season"
+                :href="route('f2.season', f2Season)"
+                class="mt-4 inline-block rounded-lg bg-red-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-red-500"
+            >
+                Виж го във Формула 2 →
+            </Link>
         </section>
     </PublicLayout>
 </template>

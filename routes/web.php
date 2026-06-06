@@ -6,6 +6,7 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CircuitsController;
 use App\Http\Controllers\CompareController;
 use App\Http\Controllers\DriversController;
+use App\Http\Controllers\F2Controller;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
@@ -45,6 +46,8 @@ Route::get('/compare', [CompareController::class, 'index'])->name('compare.index
 Route::get('/compare/{slug1}/{slug2}', [CompareController::class, 'show'])->name('compare.show');
 Route::get('/tsolov', [TsolovController::class, 'index'])->name('tsolov');
 Route::get('/terminologiya', [TerminologyController::class, 'index'])->name('terminology');
+Route::get('/f2', [F2Controller::class, 'index'])->name('f2');
+Route::get('/f2/seasons/{year}', [F2Controller::class, 'season'])->where('year', '[0-9]{4}')->name('f2.season');
 Route::get('/istoria', [HistoryController::class, 'index'])->name('history');
 Route::get('/istoria/svetovna', [HistoryController::class, 'world'])->name('history.world');
 Route::get('/istoria/bulgaria', [HistoryController::class, 'bulgaria'])->name('history.bulgaria');

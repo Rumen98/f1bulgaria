@@ -19,6 +19,7 @@ const primaryNav = [
     { label: 'Цолов 🇧🇬', route: 'tsolov' },
 ];
 const secondaryNav = [
+    { label: 'Формула 2', route: 'f2' },
     { label: 'Дуели', route: 'rivalries.index' },
     { label: 'Прогнози', route: 'leaderboard' },
     { label: 'История', route: 'history' },
