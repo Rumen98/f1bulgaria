@@ -9,6 +9,7 @@ use App\Http\Controllers\DriversController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
+use App\Http\Controllers\LiveTimingController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\PredictionController;
@@ -23,6 +24,8 @@ use Illuminate\Support\Facades\Route;
 
 // Публични страници.
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/live', [LiveTimingController::class, 'index'])->name('live');
+Route::get('/live/refresh', [LiveTimingController::class, 'refresh'])->name('live.refresh');
 Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
 Route::get('/calendar.ics', [CalendarController::class, 'ics'])->name('calendar.ics');
 Route::get('/calendar/team/{slug}.ics', [CalendarController::class, 'teamIcs'])->where('slug', '[a-z0-9_-]+')->name('calendar.team.ics');
