@@ -8,6 +8,7 @@ use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
 use App\Services\Standings\StandingsService;
+use Inertia\Testing\AssertableInertia as Assert;
 
 it('изчислява класирането на пилотите от резултатите', function () {
     $season = Season::factory()->current()->create();
@@ -45,4 +46,31 @@ it('агрегира точките на конструкторите от дв�
 
     expect($standings->first()['constructor']->id)->toBe($team->id)
         ->and($standings->first()['points'])->toBe(40.0);
+});
+
+it('/standings показва текущия сезон + списък със сезони', function () {
+    Season::factory()->create(['year' => 2023, 'is_current' => false]);
+    Season::factory()->current()->create(['year' => 2024]);
+
+    $this->get('/standings')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Standings/Index')
+            ->where('season', 2024)
+            ->where('seasons', [2024, 2023]));
+});
+
+it('/standings/{year} показва конкретен сезон', function () {
+    Season::factory()->create(['year' => 2023, 'is_current' => false]);
+    Season::factory()->current()->create(['year' => 2024]);
+
+    $this->get('/standings/2023')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('season', 2023));
+});
+
+it('/standings/{year} за несъществуващ сезон връща 404', function () {
+    Season::factory()->current()->create(['year' => 2024]);
+
+    $this->get('/standings/1850')->assertNotFound();
 });

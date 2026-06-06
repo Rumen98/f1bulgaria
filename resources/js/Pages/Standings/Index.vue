@@ -1,23 +1,39 @@
 <script setup>
 import TeamBrand from '@/Components/Team/TeamBrand.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
-defineProps({
+const props = defineProps({
     season: Number,
+    seasons: { type: Array, default: () => [] },
     drivers: Array,
     constructors: Array,
 });
 
 const tab = ref('drivers');
+
+const goToSeason = (e) => {
+    const year = Number(e.target.value);
+    router.visit(route('standings.year', year));
+};
 </script>
 
 <template>
     <Head title="Класиране" />
 
     <PublicLayout>
-        <h1 class="mb-6 text-2xl font-black sm:text-3xl">Класиране <span class="text-red-600">{{ season }}</span></h1>
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <h1 class="text-2xl font-black sm:text-3xl">Класиране <span class="text-red-600">{{ season }}</span></h1>
+            <select
+                v-if="seasons.length"
+                :value="season"
+                class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none"
+                @change="goToSeason"
+            >
+                <option v-for="y in seasons" :key="y" :value="y">{{ y }}</option>
+            </select>
+        </div>
 
         <div class="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/60 p-1">
             <button

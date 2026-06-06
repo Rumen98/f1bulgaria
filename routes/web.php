@@ -31,6 +31,7 @@ Route::get('/calendar.ics', [CalendarController::class, 'ics'])->name('calendar.
 Route::get('/calendar/team/{slug}.ics', [CalendarController::class, 'teamIcs'])->where('slug', '[a-z0-9_-]+')->name('calendar.team.ics');
 Route::get('/calendar/{slug}.ics', [CalendarController::class, 'driverIcs'])->where('slug', '[a-z0-9_-]+')->name('calendar.driver.ics');
 Route::get('/standings', [StandingsController::class, 'index'])->name('standings');
+Route::get('/standings/{year}', [StandingsController::class, 'index'])->where('year', '[0-9]{4}')->name('standings.year');
 Route::get('/leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard');
 Route::get('/races/{race}', [RaceController::class, 'show'])->name('races.show');
 Route::get('/teams', [TeamsController::class, 'index'])->name('teams.index');
