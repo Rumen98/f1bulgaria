@@ -33,4 +33,10 @@ class F2Season extends Model
     {
         return $this->hasMany(F2Driver::class);
     }
+
+    /** @return HasMany<F2Race, $this> */
+    public function races(): HasMany
+    {
+        return $this->hasMany(F2Race::class);
+    }
 }
