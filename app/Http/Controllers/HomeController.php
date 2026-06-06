@@ -10,6 +10,7 @@ use App\Models\TeamNewsItem;
 use App\Services\Hero\HeroRaceContext;
 use App\Services\Hero\NextRaceResolver;
 use App\Services\Homepage\ThisDayInF1Service;
+use App\Services\LiveTiming\OpenF1Client;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -17,13 +18,34 @@ use Inertia\Response;
 
 class HomeController extends Controller
 {
-    public function index(NextRaceResolver $resolver, ThisDayInF1Service $thisDay): Response
+    public function index(NextRaceResolver $resolver, ThisDayInF1Service $thisDay, OpenF1Client $openF1): Response
     {
         return Inertia::render('Home', [
             'hero' => $this->heroProp($resolver->resolve()),
+            'liveSession' => $this->liveSession($openF1),
             'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
             'topNews' => $this->topNews(),
         ]);
+    }
+
+    /**
+     * Лек проверител за активна сесия (кеширан 60s в клиента) — за live банера.
+     *
+     * @return array{name:string, circuit:?string}|null
+     */
+    private function liveSession(OpenF1Client $openF1): ?array
+    {
+        // Без OpenF1 ключ live достъпът е блокиран по време на сесии (401), затова
+        // не правим излишна заявка на всяко зареждане на началната страница.
+        if (! config('services.openf1.key')) {
+            return null;
+        }
+
+        $session = $openF1->getLiveSession();
+
+        return $session !== null
+            ? ['name' => $session['name'], 'circuit' => $session['circuit_short_name']]
+            : null;
     }
 
     /**

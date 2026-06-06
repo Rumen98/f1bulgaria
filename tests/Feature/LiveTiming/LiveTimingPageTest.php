@@ -78,6 +78,25 @@ it('/live/refresh връща session=null при API грешка (graceful)', f
         ->assertJsonPath('standings', []);
 });
 
+it('началната страница показва live банер при активна сесия (с ключ)', function () {
+    config(['services.openf1.key' => 'test-key']);
+    fakeLiveSession();
+    Season::factory()->current()->create();
+
+    $this->get('/')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('liveSession.name', 'Qualifying'));
+});
+
+it('началната страница няма live банер без ключ (не прави заявка)', function () {
+    config(['services.openf1.key' => null]);
+    Season::factory()->current()->create();
+
+    $this->get('/')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('liveSession', null));
+});
+
 it('третира приключила сесия като не-активна', function () {
     Http::fake([
         '*/sessions*' => Http::response([[

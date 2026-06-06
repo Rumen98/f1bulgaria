@@ -62,6 +62,32 @@ class OpenF1Client
     }
 
     /**
+     * Текущата сесия само ако е АКТИВНА в момента (буфер: 30 мин преди старт до
+     * 30 мин след край). Без дати → приемаме я за активна (защитно). null иначе.
+     *
+     * @return array{key:int, name:string, type:string, date_start:?Carbon, date_end:?Carbon, meeting_key:?int, circuit_short_name:?string}|null
+     */
+    public function getLiveSession(): ?array
+    {
+        $session = $this->getCurrentSession();
+
+        if ($session === null) {
+            return null;
+        }
+
+        $start = $session['date_start'];
+        $end = $session['date_end'];
+
+        if ($start === null || $end === null) {
+            return $session;
+        }
+
+        return now()->between($start->copy()->subMinutes(30), $end->copy()->addMinutes(30))
+            ? $session
+            : null;
+    }
+
+    /**
      * Пилотите в сесията. Кеш 5 мин (рядко се мени по време на сесия).
      *
      * @return Collection<int, array{driver_number:int, name_acronym:?string, full_name:?string, team_name:?string, team_colour:?string}>

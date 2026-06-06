@@ -1,6 +1,7 @@
 <script setup>
 import HeroSection from '@/Components/Hero/HeroSection.vue';
 import ThisDayWidget from '@/Components/Homepage/ThisDayWidget.vue';
+import LiveSessionBanner from '@/Components/LiveSessionBanner.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
@@ -8,6 +9,7 @@ import { computed } from 'vue';
 
 defineProps({
     hero: { type: Object, required: true },
+    liveSession: { type: Object, default: null },
     thisDay: { type: Array, default: () => [] },
     topNews: { type: Array, default: () => [] },
 });
@@ -37,6 +39,8 @@ const links = computed(() => allLinks.filter((l) => has(l.route)));
     <Head title="F1 България" />
 
     <PublicLayout>
+        <LiveSessionBanner :session="liveSession" />
+
         <HeroSection :hero="hero" />
 
         <!-- На този ден във F1 -->
