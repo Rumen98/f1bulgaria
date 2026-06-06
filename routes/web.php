@@ -15,6 +15,7 @@ use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicProfileController;
 use App\Http\Controllers\RaceController;
+use App\Http\Controllers\RivalriesController;
 use App\Http\Controllers\StandingsController;
 use App\Http\Controllers\TeamsController;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,8 @@ Route::get('/circuits/{slug}', [CircuitsController::class, 'show'])->name('circu
 Route::get('/compare', [CompareController::class, 'index'])->name('compare.index');
 Route::get('/compare/{slug1}/{slug2}', [CompareController::class, 'show'])->name('compare.show');
 Route::get('/istoria', [HistoryController::class, 'index'])->name('history');
+Route::get('/rivalries', [RivalriesController::class, 'index'])->name('rivalries.index');
+Route::get('/rivalries/{slug}', [RivalriesController::class, 'show'])->name('rivalries.show');
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [NewsController::class, 'show'])->name('news.show');
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->name('newsletter.subscribe');

@@ -13,6 +13,8 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(BadgeSeeder::class);
         $this->call(TeamNewsSourceSeeder::class);
+        // Зависи от каноничните пилоти (drivers:backfill-canonical) — пропуска липсващите.
+        $this->call(RivalrySeeder::class);
 
         // Администраторски акаунт (Румен) за достъп до Filament панела.
         User::query()->updateOrCreate(
