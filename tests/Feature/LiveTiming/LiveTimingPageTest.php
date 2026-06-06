@@ -78,9 +78,17 @@ it('/live/refresh връща session=null при API грешка (graceful)', f
         ->assertJsonPath('standings', []);
 });
 
-it('началната страница показва live банер при активна сесия (с ключ)', function () {
-    config(['services.openf1.key' => 'test-key']);
-    fakeLiveSession();
+it('началната страница показва live банер при активна сесия (с кредитали)', function () {
+    config(['services.openf1.username' => 'u@x.bg', 'services.openf1.password' => 'p']);
+    Http::fake([
+        '*/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
+        '*/sessions*' => Http::response([[
+            'session_key' => 9999, 'session_name' => 'Qualifying', 'session_type' => 'Qualifying',
+            'date_start' => now()->subMinutes(10)->toIso8601String(),
+            'date_end' => now()->addMinutes(20)->toIso8601String(),
+            'circuit_short_name' => 'Monaco',
+        ]]),
+    ]);
     Season::factory()->current()->create();
 
     $this->get('/')
@@ -88,8 +96,8 @@ it('началната страница показва live банер при а
         ->assertInertia(fn (Assert $page) => $page->where('liveSession.name', 'Qualifying'));
 });
 
-it('началната страница няма live банер без ключ (не прави заявка)', function () {
-    config(['services.openf1.key' => null]);
+it('началната страница няма live банер без кредитали (не прави заявка)', function () {
+    config(['services.openf1.username' => null, 'services.openf1.password' => null]);
     Season::factory()->current()->create();
 
     $this->get('/')

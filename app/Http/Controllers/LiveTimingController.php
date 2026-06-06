@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Race;
 use App\Services\LiveTiming\LiveStandingsBuilder;
 use App\Services\LiveTiming\OpenF1Client;
+use App\Services\LiveTiming\OpenF1TokenManager;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,6 +17,7 @@ class LiveTimingController extends Controller
     public function __construct(
         private readonly OpenF1Client $client,
         private readonly LiveStandingsBuilder $builder,
+        private readonly OpenF1TokenManager $tokens,
     ) {}
 
     public function index(): Response
@@ -25,6 +27,7 @@ class LiveTimingController extends Controller
         return Inertia::render('Live/Index', [
             ...$payload,
             'nextRace' => $payload['session'] === null ? $this->nextRace() : null,
+            'credentialsConfigured' => $this->tokens->hasCredentials(),
         ]);
     }
 

@@ -11,6 +11,7 @@ use App\Services\Hero\HeroRaceContext;
 use App\Services\Hero\NextRaceResolver;
 use App\Services\Homepage\ThisDayInF1Service;
 use App\Services\LiveTiming\OpenF1Client;
+use App\Services\LiveTiming\OpenF1TokenManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -18,11 +19,11 @@ use Inertia\Response;
 
 class HomeController extends Controller
 {
-    public function index(NextRaceResolver $resolver, ThisDayInF1Service $thisDay, OpenF1Client $openF1): Response
+    public function index(NextRaceResolver $resolver, ThisDayInF1Service $thisDay, OpenF1Client $openF1, OpenF1TokenManager $tokens): Response
     {
         return Inertia::render('Home', [
             'hero' => $this->heroProp($resolver->resolve()),
-            'liveSession' => $this->liveSession($openF1),
+            'liveSession' => $this->liveSession($openF1, $tokens),
             'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
             'topNews' => $this->topNews(),
         ]);
@@ -33,11 +34,11 @@ class HomeController extends Controller
      *
      * @return array{name:string, circuit:?string}|null
      */
-    private function liveSession(OpenF1Client $openF1): ?array
+    private function liveSession(OpenF1Client $openF1, OpenF1TokenManager $tokens): ?array
     {
-        // Без OpenF1 ключ live достъпът е блокиран по време на сесии (401), затова
-        // не правим излишна заявка на всяко зареждане на началната страница.
-        if (! config('services.openf1.key')) {
+        // Без OpenF1 кредитали live достъпът е блокиран по време на сесии (401),
+        // затова не правим излишна заявка на всяко зареждане на началната страница.
+        if (! $tokens->hasCredentials()) {
             return null;
         }
 

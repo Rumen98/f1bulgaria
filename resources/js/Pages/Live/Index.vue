@@ -8,6 +8,7 @@ const props = defineProps({
     standings: { type: Array, default: () => [] },
     nextRace: { type: Object, default: null },
     updated_at: { type: String, default: null },
+    credentialsConfigured: { type: Boolean, default: true },
 });
 
 const session = ref(props.session);
@@ -195,6 +196,10 @@ const nextRaceCountdown = computed(() => {
             <div class="text-4xl">🏁</div>
             <h1 class="mt-3 text-2xl font-black">Няма активна сесия в момента</h1>
             <p class="mt-2 text-zinc-400">Live таймингът се появява по време на тренировки, квалификации и състезания.</p>
+
+            <p v-if="!credentialsConfigured" class="mx-auto mt-4 max-w-md rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+                ⚠️ Live данните изискват OpenF1 акаунт (OPENF1_USERNAME/PASSWORD). Без тях таймингът остава недостъпен по време на сесии.
+            </p>
 
             <div v-if="nextRace" class="mx-auto mt-6 max-w-sm rounded-xl border border-zinc-800 bg-zinc-950 p-5">
                 <div class="text-xs uppercase tracking-wide text-zinc-500">Следващо състезание</div>
