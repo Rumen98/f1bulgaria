@@ -19,11 +19,11 @@ it('изчислява сезонната статистика на отбора
 
     $race1 = Race::factory()->create(['season_id' => $season->id, 'round' => 1]);
     Result::factory()->position(1)->create(['race_id' => $race1->id, 'driver_id' => $a->id, 'points' => 25, 'fastest_lap' => true, 'grid_position' => 1]);
-    Result::factory()->position(3)->create(['race_id' => $race1->id, 'driver_id' => $b->id, 'points' => 15]);
+    Result::factory()->position(3)->create(['race_id' => $race1->id, 'driver_id' => $b->id, 'points' => 15, 'grid_position' => 4]);
 
     $race2 = Race::factory()->create(['season_id' => $season->id, 'round' => 2]);
-    Result::factory()->dnf()->create(['race_id' => $race2->id, 'driver_id' => $a->id]);
-    Result::factory()->position(2)->create(['race_id' => $race2->id, 'driver_id' => $b->id, 'points' => 18]);
+    Result::factory()->dnf()->create(['race_id' => $race2->id, 'driver_id' => $a->id, 'grid_position' => 8]);
+    Result::factory()->position(2)->create(['race_id' => $race2->id, 'driver_id' => $b->id, 'points' => 18, 'grid_position' => 3]);
 
     $stats = app(TeamStatsService::class)->getSeasonStats($team, $season);
 
