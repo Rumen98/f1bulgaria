@@ -90,6 +90,33 @@ it('предпочита текущия сезон при cross-season резо�
         ->assertInertia(fn (Assert $page) => $page->where('isHistorical', false));
 });
 
+it('?season избира конкретен сезон на пилота', function () {
+    $old = Season::factory()->create(['year' => 2014, 'is_current' => false]);
+    $merc = Constructor::factory()->create(['season_id' => $old->id, 'name' => 'Mercedes', 'slug' => 'mercedes']);
+    Driver::factory()->create(['season_id' => $old->id, 'constructor_id' => $merc->id, 'first_name' => 'Lewis', 'last_name' => 'Hamilton', 'slug' => 'lewis-hamilton', 'driver_code' => 'HAM']);
+    Driver::factory()->create(['season_id' => $this->season->id, 'constructor_id' => $this->team->id, 'first_name' => 'Lewis', 'last_name' => 'Hamilton', 'slug' => 'lewis-hamilton', 'driver_code' => 'HAM']);
+    backfillDriverCanonical();
+
+    // Без параметър → последният сезон.
+    $this->get('/drivers/lewis-hamilton')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('selectedSeason', $this->season->year)
+            ->where('seasons', [$this->season->year, 2014]));
+
+    // С ?season=2014 → избира 2014 (отбор Mercedes).
+    $this->get('/drivers/lewis-hamilton?season=2014')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('selectedSeason', 2014)
+            ->where('season', 2014)
+            ->where('driver.team', 'Mercedes'));
+
+    // Невалиден сезон → fallback към последния (без 404).
+    $this->get('/drivers/lewis-hamilton?season=1850')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('selectedSeason', $this->season->year));
+});
+
 it('getCareerTimeline връща структурирани данни по сезони', function () {
     $s1 = Season::factory()->create(['year' => 1990, 'is_current' => false]);
     $s2 = Season::factory()->create(['year' => 1991, 'is_current' => false]);

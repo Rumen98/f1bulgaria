@@ -11,6 +11,7 @@ use App\Models\Season;
 use App\Services\Drivers\DriverStatsService;
 use App\Services\Standings\StandingsService;
 use App\Support\CountryFlag;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -53,22 +54,37 @@ class DriversController extends Controller
         ]);
     }
 
-    public function show(string $slug): Response
+    public function show(Request $request, string $slug): Response
     {
         // Идентичността идва от каноничния модел (един запис на човек).
         $canonical = $this->stats->getCanonicalBySlug($slug);
 
         abort_if($canonical === null, 404);
 
-        // Най-новият per-season ред на този човек — за hero отбора и за
-        // сезонно-специфичните секции (head-to-head, последни резултати).
-        $driver = Driver::query()
+        // Годините, в които пилотът е карал (за season dropdown), най-новите първо.
+        $years = Driver::query()
             ->where('drivers.canonical_id', $canonical->id)
             ->join('seasons', 'seasons.id', '=', 'drivers.season_id')
             ->orderByDesc('seasons.year')
-            ->select('drivers.*')
-            ->with(['constructor', 'season'])
-            ->first();
+            ->pluck('seasons.year')
+            ->map(fn ($y) => (int) $y)
+            ->unique()
+            ->values();
+
+        // Избран сезон от ?season (ако е валиден за пилота), иначе най-новият.
+        $requested = (int) $request->query('season');
+        $selectedYear = $years->contains($requested) ? $requested : $years->first();
+
+        // Per-season ред за избрания сезон — за hero отбора и сезонните секции.
+        $driver = $selectedYear !== null
+            ? Driver::query()
+                ->where('drivers.canonical_id', $canonical->id)
+                ->join('seasons', 'seasons.id', '=', 'drivers.season_id')
+                ->where('seasons.year', $selectedYear)
+                ->select('drivers.*')
+                ->with(['constructor', 'season'])
+                ->first()
+            : null;
 
         $statsSeason = $driver?->season;
 
@@ -89,6 +105,7 @@ class DriversController extends Controller
 
         return Inertia::render('Drivers/Show', [
             'driver' => [
+                'slug' => $canonical->slug,
                 'name' => $canonical->fullName(),
                 'number' => $canonical->permanent_number ?? $driver?->permanent_number,
                 'code' => $canonical->code,
@@ -99,6 +116,8 @@ class DriversController extends Controller
                 'color_hex' => $driver?->constructor?->color_hex ?? '#e10600',
             ],
             'season' => $statsSeason?->year,
+            'seasons' => $years,
+            'selectedSeason' => $selectedYear,
             'isHistorical' => ! $canonical->is_active,
             'seasonStats' => $driver && $statsSeason ? $this->stats->getSeasonStats($driver, $statsSeason) : null,
             'allTimeStats' => $this->stats->getStatsForCanonical($canonical),

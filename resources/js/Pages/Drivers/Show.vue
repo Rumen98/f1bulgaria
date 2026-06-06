@@ -5,11 +5,13 @@ import DriverRecentResults from '@/Components/Driver/DriverRecentResults.vue';
 import DriverStatsGrid from '@/Components/Driver/DriverStatsGrid.vue';
 import HeadToHeadBars from '@/Components/Driver/HeadToHeadBars.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     driver: Object,
     season: Number,
+    seasons: { type: Array, default: () => [] },
+    selectedSeason: { type: Number, default: null },
     isHistorical: { type: Boolean, default: false },
     seasonStats: Object,
     allTimeStats: Object,
@@ -19,13 +21,27 @@ const props = defineProps({
     headToHead: Object,
     recentResults: Array,
 });
+
+const goToSeason = (e) => {
+    router.visit(route('drivers.show', props.driver.slug) + `?season=${e.target.value}`, { preserveScroll: true });
+};
 </script>
 
 <template>
     <Head :title="driver.name" />
 
     <PublicLayout>
-        <Link :href="route('drivers.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички пилоти</Link>
+        <div class="flex items-center justify-between gap-3">
+            <Link :href="route('drivers.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички пилоти</Link>
+            <select
+                v-if="seasons.length > 1"
+                :value="selectedSeason"
+                class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-white focus:border-red-600 focus:outline-none"
+                @change="goToSeason"
+            >
+                <option v-for="y in seasons" :key="y" :value="y">Сезон {{ y }}</option>
+            </select>
+        </div>
 
         <!-- Hero -->
         <section
@@ -87,7 +103,7 @@ const props = defineProps({
         </div>
 
         <div v-if="careerTimeline.length" class="mt-10">
-            <CareerTimeline :timeline="careerTimeline" />
+            <CareerTimeline :timeline="careerTimeline" :highlight-year="selectedSeason" />
         </div>
     </PublicLayout>
 </template>

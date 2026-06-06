@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 const props = defineProps({
     timeline: { type: Array, default: () => [] },
+    highlightYear: { type: Number, default: null },
 });
 
 // Най-новите сезони първо.
@@ -17,6 +18,7 @@ const rows = computed(() => [...props.timeline].reverse());
                 v-for="row in rows"
                 :key="row.year"
                 class="flex items-center gap-4 border-b border-zinc-800/60 px-4 py-2.5 last:border-0 hover:bg-zinc-800/30"
+                :class="{ 'bg-red-600/10 ring-1 ring-inset ring-red-600/40': row.year === highlightYear }"
             >
                 <div class="flex w-14 items-center gap-1 font-bold tabular-nums text-white">
                     {{ row.year }}
