@@ -1,0 +1,17 @@
+{
+    "name": "F1 България",
+    "short_name": "F1 BG",
+    "description": "Формула 1 на български — новини, календар, класирания и статистика.",
+    "lang": "bg",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0a0a",
+    "theme_color": "#e10600",
+    "icons": [
+        {
+            "src": "/favicon.ico",
+            "sizes": "48x48",
+            "type": "image/x-icon"
+        }
+    ]
+}

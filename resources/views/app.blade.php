@@ -3,8 +3,24 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#e10600">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ config('app.name', 'F1 България') }}</title>
+
+        <!-- SEO / Open Graph (по подразбиране; Inertia <Head> презаписва title-а на отделните страници) -->
+        <meta name="description" content="F1 България — новини, календар, класирания, статистика и live тайминг от Формула 1 на български.">
+        <link rel="canonical" href="{{ url()->current() }}">
+        <meta property="og:site_name" content="F1 България">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="F1 България">
+        <meta property="og:description" content="Формула 1 на български — новини, календар, класирания и статистика.">
+        <meta property="og:url" content="{{ url()->current() }}">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="F1 България">
+        <meta name="twitter:description" content="Формула 1 на български — новини, календар, класирания и статистика.">
+
+        <!-- PWA -->
+        <link rel="manifest" href="/manifest.webmanifest">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
