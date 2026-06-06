@@ -17,6 +17,7 @@ const navItems = [
     { label: 'Дуели', route: 'rivalries.index' },
     { label: 'Прогнози', route: 'leaderboard' },
     { label: 'История', route: 'history' },
+    { label: 'Цолов 🇧🇬', route: 'tsolov' },
 ];
 
 const mobileOpen = ref(false);

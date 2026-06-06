@@ -18,6 +18,7 @@ use App\Http\Controllers\RaceController;
 use App\Http\Controllers\RivalriesController;
 use App\Http\Controllers\StandingsController;
 use App\Http\Controllers\TeamsController;
+use App\Http\Controllers\TsolovController;
 use Illuminate\Support\Facades\Route;
 
 // Публични страници.
@@ -37,6 +38,7 @@ Route::get('/circuits', [CircuitsController::class, 'index'])->name('circuits.in
 Route::get('/circuits/{slug}', [CircuitsController::class, 'show'])->name('circuits.show');
 Route::get('/compare', [CompareController::class, 'index'])->name('compare.index');
 Route::get('/compare/{slug1}/{slug2}', [CompareController::class, 'show'])->name('compare.show');
+Route::get('/tsolov', [TsolovController::class, 'index'])->name('tsolov');
 Route::get('/istoria', [HistoryController::class, 'index'])->name('history');
 Route::get('/istoria/svetovna', [HistoryController::class, 'world'])->name('history.world');
 Route::get('/istoria/bulgaria', [HistoryController::class, 'bulgaria'])->name('history.bulgaria');
