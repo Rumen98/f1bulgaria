@@ -1,27 +1,32 @@
 <script setup>
 import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
 import { Link, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
 const flashSuccess = computed(() => page.props.flash?.success);
 
-const navItems = [
-    { label: 'На живо 🔴', route: 'live' },
+// Основна навигация (винаги видима на десктоп) + второстепенна (под „Повече ▾").
+const primaryNav = [
+    { label: 'На живо', route: 'live', live: true },
     { label: 'Новини', route: 'news.index' },
     { label: 'Календар', route: 'calendar' },
     { label: 'Класиране', route: 'standings' },
     { label: 'Отбори', route: 'teams.index' },
     { label: 'Пилоти', route: 'drivers.index' },
     { label: 'Писти', route: 'circuits.index' },
+    { label: 'Цолов 🇧🇬', route: 'tsolov' },
+];
+const secondaryNav = [
     { label: 'Дуели', route: 'rivalries.index' },
     { label: 'Прогнози', route: 'leaderboard' },
     { label: 'История', route: 'history' },
-    { label: 'Цолов 🇧🇬', route: 'tsolov' },
 ];
 
 const mobileOpen = ref(false);
+const moreOpen = ref(false);
+const moreRef = ref(null);
 
 // Ziggy може да не познава всички routes по време на изграждане — пазим се.
 const has = (name) => {
@@ -31,7 +36,17 @@ const has = (name) => {
         return false;
     }
 };
-const items = computed(() => navItems.filter((i) => has(i.route)));
+const primary = computed(() => primaryNav.filter((i) => has(i.route)));
+const secondary = computed(() => secondaryNav.filter((i) => has(i.route)));
+const allItems = computed(() => [...primary.value, ...secondary.value]);
+
+const onClickOutside = (e) => {
+    if (moreRef.value && !moreRef.value.contains(e.target)) {
+        moreOpen.value = false;
+    }
+};
+onMounted(() => document.addEventListener('click', onClickOutside));
+onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
 </script>
 
 <template>
@@ -42,16 +57,42 @@ const items = computed(() => navItems.filter((i) => has(i.route)));
                     <span class="text-red-600">F1</span><span>България</span>
                 </Link>
 
-                <div class="hidden items-center gap-6 lg:flex">
+                <div class="hidden items-center gap-3 lg:flex xl:gap-5">
                     <Link
-                        v-for="item in items"
+                        v-for="item in primary"
                         :key="item.route"
                         :href="route(item.route)"
-                        class="text-sm font-medium text-zinc-400 transition duration-200 hover:text-white"
+                        class="flex items-center gap-1 whitespace-nowrap text-[13px] font-medium text-zinc-400 transition duration-200 hover:text-white xl:text-sm"
                         :class="{ 'text-white': route().current(item.route) }"
                     >
+                        <span v-if="item.live" class="relative flex h-2 w-2">
+                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                            <span class="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
+                        </span>
                         {{ item.label }}
                     </Link>
+
+                    <div v-if="secondary.length" ref="moreRef" class="relative">
+                        <button
+                            type="button"
+                            class="flex items-center gap-1 whitespace-nowrap text-[13px] font-medium text-zinc-400 transition hover:text-white xl:text-sm"
+                            @click="moreOpen = !moreOpen"
+                        >
+                            Повече ▾
+                        </button>
+                        <div v-if="moreOpen" class="absolute right-0 z-40 mt-2 w-44 rounded-xl border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl">
+                            <Link
+                                v-for="item in secondary"
+                                :key="item.route"
+                                :href="route(item.route)"
+                                class="block rounded-lg px-3 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800/60 hover:text-white"
+                                :class="{ 'text-white': route().current(item.route) }"
+                                @click="moreOpen = false"
+                            >
+                                {{ item.label }}
+                            </Link>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-3 text-sm">
@@ -83,12 +124,13 @@ const items = computed(() => navItems.filter((i) => has(i.route)));
             <div v-show="mobileOpen" class="border-t border-zinc-800/80 lg:hidden">
                 <div class="mx-auto flex max-w-6xl flex-col px-4 py-2">
                     <Link
-                        v-for="item in items"
+                        v-for="item in allItems"
                         :key="item.route"
                         :href="route(item.route)"
-                        class="py-2 text-sm font-medium text-zinc-300 transition hover:text-white"
+                        class="flex items-center gap-1.5 py-2 text-sm font-medium text-zinc-300 transition hover:text-white"
                         @click="mobileOpen = false"
                     >
+                        <span v-if="item.live" class="h-2 w-2 rounded-full bg-red-600" />
                         {{ item.label }}
                     </Link>
                 </div>
