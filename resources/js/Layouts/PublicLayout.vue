@@ -14,6 +14,7 @@ const navItems = [
     { label: 'Отбори', route: 'teams.index' },
     { label: 'Пилоти', route: 'drivers.index' },
     { label: 'Писти', route: 'circuits.index' },
+    { label: 'Дуели', route: 'rivalries.index' },
     { label: 'Прогнози', route: 'leaderboard' },
     { label: 'История', route: 'history' },
 ];

@@ -8,6 +8,9 @@ use App\Models\DriverCanonical;
 use App\Models\Rivalry;
 use App\Services\Drivers\ComparisonService;
 use App\Support\CountryFlag;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,6 +23,7 @@ class RivalriesController extends Controller
         $rivalries = Rivalry::query()
             ->with(['driverOne', 'driverTwo'])
             ->orderByDesc('is_featured')
+            ->orderBy('is_custom') // официалните преди потребителските
             ->orderByDesc('era_start_year')
             ->get()
             ->map(fn (Rivalry $r) => [
@@ -28,11 +32,75 @@ class RivalriesController extends Controller
                 'description' => $r->description_bg,
                 'era' => $this->era($r),
                 'is_featured' => $r->is_featured,
+                'is_custom' => $r->is_custom,
                 'one' => ['name' => $r->driverOne->fullName(), 'photo' => $r->driverOne->photo_url],
                 'two' => ['name' => $r->driverTwo->fullName(), 'photo' => $r->driverTwo->photo_url],
             ]);
 
-        return Inertia::render('Rivalries/Index', ['rivalries' => $rivalries]);
+        return Inertia::render('Rivalries/Index', [
+            'rivalries' => $rivalries,
+            'canCreate' => auth()->check(),
+        ]);
+    }
+
+    public function create(): Response
+    {
+        return Inertia::render('Rivalries/Create', [
+            'drivers' => DriverCanonical::query()
+                ->orderByDesc('total_wins')
+                ->orderBy('last_name')
+                ->get(['slug', 'first_name', 'last_name', 'total_wins'])
+                ->map(fn (DriverCanonical $c) => [
+                    'slug' => $c->slug,
+                    'name' => $c->fullName(),
+                    'wins' => $c->total_wins,
+                ]),
+        ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'driver_one' => ['required', 'string', 'exists:drivers_canonical,slug'],
+            'driver_two' => ['required', 'string', 'different:driver_one', 'exists:drivers_canonical,slug'],
+            'title' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $one = DriverCanonical::query()->where('slug', $data['driver_one'])->firstOrFail();
+        $two = DriverCanonical::query()->where('slug', $data['driver_two'])->firstOrFail();
+
+        $title = ($data['title'] ?? null) ?: "{$one->last_name} срещу {$two->last_name}";
+        $slug = $this->uniqueSlug("{$one->slug}-vs-{$two->slug}");
+
+        Rivalry::query()->create([
+            'slug' => $slug,
+            'user_id' => $request->user()->id,
+            'driver_one_canonical_id' => $one->id,
+            'driver_two_canonical_id' => $two->id,
+            'era_start_year' => max($one->first_race_at?->year, $two->first_race_at?->year) ?: null,
+            'era_end_year' => min($one->last_race_at?->year, $two->last_race_at?->year) ?: null,
+            'title_bg' => $title,
+            'description_bg' => null,
+            'notable_moments' => [],
+            'is_featured' => false,
+            'is_custom' => true,
+        ]);
+
+        return redirect()->route('rivalries.show', $slug)->with('success', 'Дуелът е създаден!');
+    }
+
+    private function uniqueSlug(string $base): string
+    {
+        $slug = Str::slug($base);
+        $candidate = $slug;
+        $i = 2;
+
+        while (Rivalry::query()->where('slug', $candidate)->exists()) {
+            $candidate = "{$slug}-{$i}";
+            $i++;
+        }
+
+        return $candidate;
     }
 
     public function show(string $slug): Response

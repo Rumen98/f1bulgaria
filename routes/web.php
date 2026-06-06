@@ -39,6 +39,10 @@ Route::get('/compare', [CompareController::class, 'index'])->name('compare.index
 Route::get('/compare/{slug1}/{slug2}', [CompareController::class, 'show'])->name('compare.show');
 Route::get('/istoria', [HistoryController::class, 'index'])->name('history');
 Route::get('/rivalries', [RivalriesController::class, 'index'])->name('rivalries.index');
+Route::middleware('auth')->group(function () {
+    Route::get('/rivalries/create', [RivalriesController::class, 'create'])->name('rivalries.create');
+    Route::post('/rivalries', [RivalriesController::class, 'store'])->name('rivalries.store');
+});
 Route::get('/rivalries/{slug}', [RivalriesController::class, 'show'])->name('rivalries.show');
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [NewsController::class, 'show'])->name('news.show');

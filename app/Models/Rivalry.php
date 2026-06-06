@@ -15,9 +15,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Rivalry extends Model
 {
     protected $fillable = [
-        'slug', 'driver_one_canonical_id', 'driver_two_canonical_id',
+        'slug', 'user_id', 'driver_one_canonical_id', 'driver_two_canonical_id',
         'era_start_year', 'era_end_year', 'title_bg', 'description_bg',
-        'notable_moments', 'is_featured',
+        'notable_moments', 'is_featured', 'is_custom',
     ];
 
     protected function casts(): array
@@ -25,9 +25,16 @@ class Rivalry extends Model
         return [
             'notable_moments' => 'array',
             'is_featured' => 'boolean',
+            'is_custom' => 'boolean',
             'era_start_year' => 'integer',
             'era_end_year' => 'integer',
         ];
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /** @return BelongsTo<DriverCanonical, $this> */
