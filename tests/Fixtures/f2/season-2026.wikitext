@@ -1,0 +1,2148 @@
+{{Short description|Motor racing championship held in 2026}}
+{{Use dmy dates|date=June 2025}}
+{{Motorsport season
+|series= FIA Formula 2 Championship
+|year=2026
+|title=[[FIA Formula 2 Championship]]
+| previouslink = 2025 Formula 2 Championship
+| nextlink = 2027 Formula 2 Championship
+|footer=<small>Parent series:</small><br>[[2026 Formula One World Championship|Formula One World Championship]]<br><small>Support series:</small><br>[[2026 FIA Formula 3 Championship|FIA Formula 3 Championship]]<br>[[2026 F1 Academy season|F1 Academy]]<br/>[[2026 Porsche Supercup|Porsche Supercup]]}}
+
+{{Multiple image
+| perrow            = 3/2
+| total_width       = 400
+| image1            = FIA F2 Austria 2025 Nr. 10 Minì.jpg
+| footer            = [[Gabriele Minì]] (left), driving for [[MP Motorsport]], leads the Drivers' Championship, while [[Campos Racing]] (right) lead the Teams' Championship.
+| image2            = FIA F2 Austria 2025 Nr. 4 Lindblad.jpg
+}}
+The '''2026 FIA Formula 2 Championship''' is a [[motor racing]] championship for [[Formula Two|Formula 2]] cars sanctioned by the [[Fédération Internationale de l'Automobile]] (FIA). The championship is the sixtieth season of Formula 2 racing and the tenth season run under the [[FIA Formula 2 Championship]] moniker. Formula 2 is an [[open-wheel racing]] category serving as the second tier of [[formula racing]] in the [[FIA Global Pathway]]. The category is run in support of selected rounds of the [[2026 Formula One World Championship]]. As the championship is a [[spec series]], all teams and drivers competing in the championship run the same car, the [[Dallara F2 2024]].
+
+[[Invicta Racing]] entered the championship as the reigning Teams' Champions, having secured their title at the final race of the previous season in Abu Dhabi.
+
+== Entries ==
+The following teams and drivers are contracted to compete in the 2026 Formula 2 Championship. As the championship is a [[One-design#Car racing|spec series]], all teams compete with an identical [[Dallara F2 2024]] chassis using a [[Mecachrome V634 engine|V6 turbo engine]] developed by [[Mecachrome]].<ref>{{Cite web |last=Wood |first=Ida |date=2023-08-31 |title=Formula 2 unveils its new-for-2024 car to be built by Dallara |url=https://formulascout.com/formula-2-unveils-its-new-for-2024-car/110697 |access-date=2025-06-14 |website=Formula Scout |language=en-US}}</ref> All teams compete with tyres supplied by [[Pirelli]].<ref>{{Cite web |title=The car and engine |url=https://www.fiaformula2.com/About/14LCsEEMG9yyx5DkhcN1J8/the-car-and-engine-f2 |access-date=2025-06-14 |website=FIA_F2® - The Official F2® Website |language=en}}</ref>
+
+{| class="wikitable" style="font-size: 85%"
+! Team
+! No.
+! Driver
+! Rounds
+|-
+| rowspan="2" nowrap| {{flagicon|GBR}} [[Invicta Racing]]
+| 1
+|{{flagicon|BRA}} [[Rafael Câmara]]
+|1–4
+|-
+| 2
+|{{flagicon|PAR}} [[Joshua Dürksen]]
+|1–4
+|-
+| rowspan="2" nowrap| {{flagicon|GBR}} [[Hitech Grand Prix|Hitech]]
+| 3
+| nowrap|{{flagicon|JPN}} [[Ritomo Miyata]]
+|1–4
+|-
+| 4
+|{{flagicon|USA}} [[Colton Herta]]
+|1–4
+|-
+| rowspan="2" nowrap| {{flagicon|ESP}} [[Campos Racing]]
+| 5
+|{{flagicon|MEX}} [[Noel León]]
+|1–4
+|-
+| 6
+|{{flagicon|BUL}} [[Nikola Tsolov]]
+|1–4
+|-
+| rowspan="2" nowrap| {{flagicon|FRA}} [[DAMS Lucas Oil]]
+| 7
+|{{flagicon|SWE}} [[Dino Beganovic]]
+|1–4
+|-
+| 8
+|{{flagicon|POL}} [[Roman Bilinski]]
+|1–4
+|-
+| rowspan="2" nowrap| {{flagicon|NLD}} [[MP Motorsport]]
+| 9
+|{{flagicon|ITA}} [[Gabriele Minì]]
+|1–4
+|-
+| 10
+|{{flagicon|DEU}} [[Oliver Goethe]]
+|1–4
+|-
+| rowspan="2" nowrap| {{flagicon|ITA}} [[Prema Racing]]
+| 11
+|{{flagicon|COL}} [[Sebastián Montoya]]
+|1–4
+|-
+| 12
+|{{flagicon|ESP}} [[Mari Boya]]
+|1–4
+|-
+| rowspan="2" nowrap| {{flagicon|NZL}} [[Rodin Motorsport]]
+| 14
+|{{flagicon|NOR}} [[Martinius Stenshorne]]
+|1–4
+|-
+| 15
+|{{flagicon|IRE}} [[Alex Dunne]]
+|1–4
+|-
+| rowspan="2" nowrap| {{flagicon|FRA}} [[ART Grand Prix]]
+| 16
+|{{flagicon|IND}} [[Kush Maini]]
+|1–4
+|-
+| 17
+|nowrap|{{flagicon|THA}} [[Tasanapol Inthraphuvasak]]
+|1–4{{efn|[[Tasanapol Inthraphuvasak]] was entered into the [[2026 Montreal Formula 2 round|Montreal round]], but later withdrew following a crash in qualifying.<ref>{{cite web|date=23 May 2026 |title=Inthraphuvasak withdraws from F2 round in Canada |url=https://www.insidef2.com/inthraphuvasak-withdraws-from-f2-round-in-canada/ |access-date=24 May 2026 |website=insideF2}}</ref>}}
+|-
+|rowspan="2" | {{flagicon|ARE}} [[AIX Racing]]
+| 20
+|nowrap| {{flagicon|BRA}} [[Emerson Fittipaldi Jr.]]
+|1–4
+|-
+| 21
+|{{flagicon|GBR}} [[Cian Shields]]
+|1–4
+|-
+| rowspan="2" nowrap="" | {{flagicon|NLD}} [[Van Amersfoort Racing]]
+| 22
+|{{flagicon|ARG}} [[Nico Varrone]]
+|1–4
+|-
+| 23
+|{{Flagicon|MEX}} [[Rafael Villagómez]]
+|1–4
+|-
+| rowspan="2" |{{flagicon|ITA}} [[Trident Motorsport|Trident]]
+| 24
+|{{flagicon|NLD}} [[Laurens van Hoepen]]
+|1–4
+|-
+| 25
+|{{flagicon|GBR}} [[John Bennett (racing driver)|John Bennett]]
+|1–4
+|-
+! colspan="4" |Source:<ref>Official entry lists:
+
+*{{cite web |date=5 March 2026 |title=2026 Melbourne Event – F2 Entry List |url=https://www.fia.com/system/files/decision-document/2026_melbourne_event_-_entry_list_-_melbourne_2026.pdf |access-date=5 March 2026 |website=[[Fédération Internationale de l'Automobile]]}}
+*{{cite web |date=30 April 2026 |title=2026 Miami Event – F2 Entry List |url=https://www.fia.com/system/files/decision-document/2026_miami_event_-_f2_entry_list_-_miami_2026.pdf |access-date=1 May 2026 |website=[[Fédération Internationale de l'Automobile]]}}
+*{{cite web |date=22 May 2026 |title=2026 Montreal Event – F2 Entry List |url=https://www.fia.com/system/files/decision-document/2026_montreal_event_-_f2_entry_list_-_montreal_2026.pdf |access-date=22 May 2026 |website=[[Fédération Internationale de l'Automobile]]}}
+*{{cite web |date=4 June 2026 |title=2026 Monaco Event – F2 Entry List |url=https://www.fia.com/system/files/decision-document/2026_monaco_event_-_f2_entry_list_-_monaco_2026.pdf |access-date=4 June 2026 |website=[[Fédération Internationale de l'Automobile]]}}</ref>
+|}
+
+=== Team changes ===
+[[Hitech Grand Prix|Hitech]] ended their partnership with [[Toyota Gazoo Racing]] after one season, dropping the 'TGR' moniker from its name.<sup><nowiki>[</nowiki>[[Wikipedia:Belege|''citation needed'']]<nowiki>]</nowiki></sup>
+
+=== Driver changes ===
+Reigning teams' champions [[Invicta Racing]] have an all-new driver lineup as reigning drivers' champion [[Leonardo Fornaroli]] joined the [[McLaren F1 Team]] as a reserve driver and [[Roman Staněk]] left Formula 2 to join [[Kondo Racing]]'s Buzz MK Racing offshoot in [[2026 Super Formula Championship|Super Formula]].<ref>{{Cite web |last=Murphy |first=Drew |date=2026-01-15 |title=McLaren confirm Leonardo Fornaroli as 2026 reserve driver in academy update |url=https://www.gpblog.com/en/news/mclaren-confirm-leonardo-fornaroli-as-2026-reserve-driver-in-academy-update |access-date=2026-01-16 |website=GPblog |language=en}}</ref><ref name="Staněk">{{Cite news|url=https://www.autosport.com/super-formula/news/f2-race-winner-stanek-makes-super-formula-switch-with-kondo-racing/10799383/|title=F2 race winner Stanek makes Super Formula switch with Kondo Racing|date=21 February 2026|access-date=21 February 2026|work=[[Autosport]]|last=Klein|first=Jamie}}</ref> Invicta signed [[2025 FIA Formula 3 Championship|2025 FIA Formula 3 Champion]] and [[Ferrari Driver Academy]] driver [[Rafael Câmara]] from [[Trident Motorsport|Trident]], and [[Joshua Dürksen]], who left AIX Racing after finishing the 2025 campaign ninth to join the team for his third season in the championship.<ref>{{Cite web |title=2025 Formula 3 Champion Rafael Câmara steps up to F2 with Invicta Racing|url=https://www.fiaformula2.com/Latest/5EqLKOLpgVAm8ujP8FNlGq/2025-formula-3-champion-rafael-camara-steps-up-to-f2-with-invicta-racing |date=28 October 2025|access-date=28 October 2025|website=FIA_F2® - The Official F2® Website |language=en}}</ref><ref name="DurksenInvicta" />
+
+[[Hitech GP|Hitech]] saw [[Dino Beganovic]] move to DAMS Lucas Oil and [[Luke Browning]] leave the series to compete in Super Formula with Kondo Racing.<ref name="BeganovicDAMS"/><ref>{{Cite news|url=https://www.williamsf1.com/articles/e585a9bc-289d-440e-9553-7dac715b4e73/luke-browning-atlassian-williams-f1-team-reserve-role-full-driver-academy-2026?cid=sm_twx_|title=Luke Browning secures Atlassian Williams F1 Team Reserve role as full Driver Academy line-up is announced|date=16 January 2026|access-date=16 January 2026|work=[[Williams F1 Team]]}}</ref> They signed [[Cadillac F1]] test driver [[Colton Herta]] for his Formula 2 debut. He moved over from the [[IndyCar Series]], where he won nine races over eight years and ended the 2025 season in seventh driving for [[Andretti Global]].<ref>{{Cite web |last=Medland |first=Chris |date=2025-10-21 |title=Herta to race with Hitech in F2 {{!}} RACER |url=https://racer.com/2025/10/20/herta-to-race-with-hitech-in-f2 |access-date=2025-10-21 |website=racer.com |language=en}}</ref> The team also signed former [[2023 Super Formula Championship|Super Formula]] champion [[Ritomo Miyata]], who embarks on his third F2 campaign after coming 17th with [[ART Grand Prix]] in 2025.<ref name="Miyata">{{Cite web |title=Hitech announces Ritomo Miyata for 2026 FIA Formula 2 campaign| url=https://www.hitechgp.co.uk/hitech-announces-ritomo-miyata-for-2026-fia-formula-2-campaign/|date=8 December 2025|access-date=8 December 2025|website=[[Hitech GP]]|language=en}}</ref>
+
+Campos Racing saw [[Pepe Martí]] graduate to [[2025–26 Formula E World Championship|Formula E]] with [[Cupra Racing|Cupra]] [[Kiro Race Co|Kiro]] ahead of the penultimate round of the 2025 season, and [[Arvid Lindblad]] graduate to [[2026 Formula One World Championship|Formula One]] with [[Racing Bulls]].<ref name="Marti">{{Cite web |date=21 October 2025 |title=Pepe Martí joins CUPRA KIRO for 2025/26 FIA Formula E season |url=https://kiroraceco.com/latest/pepe-mart-joins-cupra-kiro-for-202526-fia-formula-e-season |access-date=21 October 2025 |website=[[Kiro Race Co]] |language=en}}</ref><ref>{{Cite web |date=2 December 2025 |title=Our Driver Line-Up For 2026|url=https://www.visacashapprb.com/int-en/2026-driver-live-up-announcement|access-date=2 December 2025 |website=[[Racing Bulls]] |language=en}}</ref> 2025 FIA F3 runner-up and [[Red Bull Junior Team]] driver [[Nikola Tsolov]], who already replaced Martí for the final two rounds of the 2025 season, stayed with Campos for his full-season graduation.<ref>{{Cite web |date=16 September 2025 |title=Nikola Tsolov Graduates to FIA Formula 2 with Campos Racing in 2026 |url=https://www.camposracing.com/en/noticias/fia-f2/nikola-tsolov-graduates-to-fia-formula-2-with-campos-racing-in-2026 |access-date=16 September 2025 |website=[[Campos Racing]]}}</ref> He was joined by [[Noel León]], who also stepped up from FIA F3 after finishing the 2025 season in 17th driving for Prema Racing.<ref>{{Cite web |date=21 October 2025 |title=Noel León to Make FIA F2 Debut with Campos Racing in 2026 |url=https://www.camposracing.com/en/noticias/fia-f2/noel-leon-to-make-fia-f2-debut-with-campos-racing-in-2026 |access-date=21 October 2025 |website=[[Campos Racing]]}}</ref>
+
+[[DAMS|DAMS Lucas Oil]] have a new lineup as [[Kush Maini]] moved to [[ART Grand Prix]] and [[Jak Crawford]] left the series to join the [[Aston Martin in Formula One|Aston Martin F1 Team]] as their third driver.<ref>{{Cite web |title=Jak Crawford confirmed as Aston Martin Aramco Third Driver for 2026|url=https://www.astonmartinf1.com/en-GB/news/announcement/jak-crawford-confirmed-as-aston-martin-aramco-third-driver-for-2026|date=28 October 2025 |access-date=28 October 2025 |website=Aston Martin F1}}</ref> [[Ferrari Driver Academy]] member [[Dino Beganovic]] returned to the team where he made his F2 debut in 2024 as he departed [[Hitech GP|Hitech]], with whom he finished seventh in 2025, and [[Roman Bilinski]] made his series debut after finishing eleventh in FIA F3 with [[Rodin Motorsport]].<ref name="BeganovicDAMS">{{Cite web |title=DINO BEGANOVIC IS CONFIRMED FOR 2026!|url=https://damslucasoil.com/2025/10/22/dino-beganovic-is-confirmed-for-2026/|date=21 October 2025 |access-date=22 October 2025 |website=[[DAMS]]}}</ref><ref>{{Cite web |title=Roman Bilinski steps up to Formula 2 with DAMS Lucas Oil for 2026|url=https://www.fiaformula2.com/Latest/3RurcrjQJx9BsvQSUWTnAV/roman-bilinski-steps-up-to-formula-2-with-dams-lucas-oil-for-2026|date=25 November 2025 |access-date=25 November 2025 |website=FIA_F2® - The Official F2® Website}}</ref>
+
+[[Richard Verschoor]] left [[MP Motorsport]] after spending five seasons in the category to join [[Duqueine Team]] in the [[2026 European Le Mans Series|European Le Mans Series]]' LMP2 class.<ref>{{cite web |date=8 July 2025 |title=F2 leader Verschoor confirms this season will be his last |url=https://formulascout.com/f2-leader-verschoor-confirms-this-season-will-be-his-last |access-date=8 July 2025 |website=Formula Scout}}</ref><ref>{{Cite web |last=Klein |first=Jamie |date=2025-12-17 |title=Record 47-Car Provisional Full-Season Entry List Revealed – Sportscar365 |url=https://sportscar365.com/lemans/elms/record-47-car-provisional-full-season-entry-list-revealed/ |access-date=2025-12-17 |language=en-US}}</ref> His replacement was [[Gabriele Minì]], who finished his first full season in F2 in 13th driving for [[Prema Racing]].<ref name="Mini">{{Cite web|title=Minì picks MP Motorsport for second full-season attempt at FIA Formula 2 glory|url=https://www.mpmotorsport.com/news/mini-picks-mp-motorsport-for-second-full-season-attempt-at-fia-formula-2-glory|date=8 December 2025|access-date=8 December 2025|website=[[MP Motorsport]]|language=en}}</ref>
+
+[[Prema Racing]] replaced MP-bound Minì with [[Aston Martin in Formula One#Driver development programme|Aston Martin junior]] driver [[Mari Boya]], who graduated from FIA F3 after finishing the 2025 season in third with [[Campos Racing]].<ref>{{Cite web|title=Boya joins PREMA Racing for 2026 FIA Formula 2 season|url=https://premaracing.com/en/news/19658-promising-spaniard-step-up-to-rookie-f2-year|date=24 November 2025|access-date=24 November 2025|website=[[Prema Racing]]|language=en}}</ref>
+
+[[Rodin Motorsport]] driver [[Amaury Cordeel]] left Formula 2 ahead of the final two rounds of the 2025 season to join [[Team WRT]] in the [[2026 GT World Challenge Europe|GT World Challenge Europe]].<ref>{{Cite web |last=Goodwin |first=Graham |date=2026-02-16 |title=Team WRT Complete 2026 GT World Challenge Europe Roster |url=https://www.dailysportscar.com/2026/02/16/team-wrt-complete-2026-gt-world-challenge-europe-roster.html |access-date=2026-02-16 |website=www.dailysportscar.com |language=en-GB}}</ref> To replace him, the team signed [[Martinius Stenshorne]] for his full-season debut after he had already entered the Baku round of the 2025 season with [[Trident Motorsport|Trident]] before deputising for Cordeel during the final two rounds of 2025. He stepped up from FIA F3, where he came fifth in 2025 with [[Hitech GP|Hitech]].<ref>{{Cite web |date=1 October 2025|title=Martinius Stenshorne joins Rodin Motorsport for 2026 campaign|url=https://www.fiaformula2.com/Latest/5WORxKNqxNTSXTiGgxiEu0/martinius-stenshorne-joins-rodin-motorsport-for-2026-campaign|access-date=1 October 2025|website=FIA Formula 2 Championship}}</ref>
+
+[[ART Grand Prix]] saw [[Ritomo Miyata]] move to Hitech, while [[Victor Martins]] left Formula 2 after three seasons to join [[Alpine Endurance Team|Alpine]] for their [[2026 FIA World Endurance Championship|WEC Hypercar]] programme and the [[Williams F1 Team]] as a test and development driver.<ref>{{Cite web |last=Villemant |first=Thibaut |last2=Khorounzhiy |first2=Valentin |date=2026-01-12 |title=Long-time F1 hopeful joins Alpine WEC roster |url=https://www.the-race.com/endurance/wec-alpine-new-signing-2026-victor-martins-williams/ |access-date=2026-01-12 |website=The Race |language=en}}</ref> The team signed Thai driver [[Tasanapol Inthraphuvasak]], who finished seventh with [[Campos Racing]] in the 2025 FIA F3 season and already made his F2 debut in the 2025 season finale driving for Trident, and [[Kush Maini]], who joined ART for his fourth F2 season after finishing 16th in 2025 with DAMS.<ref>{{Cite web |date=18 November 2025 |title=Tasanapol Inthraphusak graduates to Formula 2 in 2026 |url=https://www.art-grandprix.com/en/tasanapol-inthraphusak-graduates-to-formula-2-in-2026/ |access-date=18 November 2025 |website=[[ART Grand Prix]]}}</ref><ref>{{Cite web |date=9 December 2025 |title=ART Grand Prix sign Kush Maini for the 2026 Formula 2 season |url=https://www.fiaformula2.com/Latest/7SAyy3pFmIDFHfZOmSPzW/art-grand-prix-sign-kush-maini-for-the-2026-formula-2-season|access-date=9 December 2025|website=FIA Formula 2 Championship}}</ref>
+
+[[Joshua Dürksen]] left [[AIX Racing]] after two seasons of driving for the team, to join [[Invicta Racing]].<ref name="DurksenInvicta">{{Cite web |title=Invicta Racing sign Joshua Duerksen for the 2026 Formula 2 season |url=https://www.fiaformula2.com/Latest/21FlttUecWTenudO2ynXx1/invicta-racing-sign-joshua-duerksen-for-the-2026-formula-2-season |access-date=2025-10-22 |website=FIA_F2® - The Official F2® Website |language=en}}</ref> To replace him, AIX signed [[Emerson Fittipaldi Jr.]], who stepped up from [[Eurocup-3]], where he drove for MP Motorsport.<ref>{{Cite web |last=Wood |first=Ida |date=7 September 2025|title=Emmo Fittipaldi to leap up to F2 with AIX Racing in 2026 |url=https://formulascout.com/emmo-fittipaldi-to-leap-up-to-f2-with-aix-racing-in-2026/132980 |access-date=7 September 2025|website=Formula Scout |language=en-US}}</ref>
+
+[[Van Amersfoort Racing]] saw [[John Bennett (racing driver)|John Bennett]] move to [[Trident Motorsport|Trident]].<ref name="Bennett">{{Cite web |title=FIA F2, John Bennett to Contest the 2026 FIA F2 with Trident Motorsport|url=https://www.tridentmotorsport.com/en/news/fia-f2,-john-bennett-to-contest-the-2026-fia-f2-with-trident-motorsport.html|date=9 December 2025|access-date=9 December 2025|website=[[Trident Motorsport]]|language=en}}</ref> [[2023 FIA World Endurance Championship|2023 FIA WEC LMGTE Am]] Champion and 24 Hours of Le Mans winner [[Nico Varrone]], who last competed in single-seaters in the [[2020 BRDC British Formula 3 Championship]], replaced him.<ref>{{Cite web |title=Van Amersfoort Racing welcomes Argentinian driver Nicolas Varrone to 2026 FIA Formula 2 campaign for 2026 |url=https://www.vanamersfoortracing.nl/news/2025/van-amersfoort-racing-welcomes-argentinian-driver-nicolas-varrone-to-2026-fia-formula-2-campaign/ |date=23 October 2025|access-date=23 October 2025|website=[[Van Amersfoort Racing]]|language=en}}</ref>
+
+[[Trident Motorsport|Trident]] have an all-new lineup as [[Max Esterson]] and [[Sami Meguetounif]], who raced for the majority of 2025, did not return to the series, with Esterson joining [[Rahal Letterman Lanigan Racing|RLL Team McLaren]] in [[2026 IMSA SportsCar Championship|IMSA's GTD class]], and Meguetounif  joining [[TDS Racing]] in the European Le Mans Series' LMP2 class.<ref>{{cite web|url=https://sportscar365.com/imsa/iwsc/61-car-rolex-24-entry-list-released/|title=61-Car Rolex 24 Entry List Released|website=Sportscar365|publisher=John Dagys Media|last=Dagys|first=John|date=December 9, 2025|access-date=December 9, 2025}}</ref><ref>{{cite web|url=https://www.endurance-info.com/auto/article/119528-tds-racing-mise-sur-meguetounif-et-huffaker-pour-epauler-thomas-en-lmp2-pro-am|title=TDS Racing mise sur Meguetounif et Huffaker pour épauler Thomas en LMP2 Pro-Am|website=Endurance-Info|language=fr|date=8 March 2026|access-date=8 March 2026}}</ref> The team signed [[John Bennett (racing driver)|John Bennett]], who finished his debut F2 season 22nd with [[Van Amersfoort Racing]], and FIA F3 driver [[Laurens van Hoepen]], who came 12th with [[ART Grand Prix]] and already raced with Trident for the last three rounds of 2025.<ref name="Bennett"/><ref>{{Cite web |title=Van Hoepen to compete in the 2026 FIA F2 Championship with Trident|url=https://www.tridentmotorsport.com/en/news/van-hoepen-to-compete-in-the-2026-fia-f2-championship-with-trident.html|date=8 December 2025|access-date=8 December 2025|website=[[Trident Motorsport]]|language=en}}</ref>
+
+== Race calendar ==
+{| class="wikitable" style="font-size:85%;"
+|-
+! Round
+! Circuit
+! nowrap="" | Sprint race
+! nowrap="" | Feature race
+|-
+!1
+| nowrap="" | {{flagicon|AUS}} [[Albert Park Circuit]], [[Melbourne]]
+|7 March
+|8 March
+|-
+!2
+|nowrap|{{flagicon|USA}} [[Miami International Autodrome]], [[Miami Gardens, Florida]]
+|2 May
+|3 May
+|-
+!3
+|{{flagicon|CAN}} [[Circuit Gilles Villeneuve]], [[Montreal]]
+| 23 May
+| 24 May
+|-
+!4
+| nowrap="" | {{flagicon|MON}} [[Circuit de Monaco]], [[Monaco]]
+|6 June
+|7 June
+|-
+!5
+| nowrap="" | {{flagicon|ESP}} [[Circuit de Barcelona-Catalunya]], [[Montmeló]]
+|13 June
+|14 June
+|-
+!6
+| nowrap="" | {{flagicon|AUT}} [[Red Bull Ring]], [[Spielberg, Austria|Spielberg]]
+|27 June
+|28 June
+|-
+!7
+| nowrap="" | {{flagicon|GBR}} [[Silverstone Circuit]], [[Silverstone]]
+|4 July
+|5 July
+|-
+!8
+| nowrap="" | {{flagicon|BEL}} [[Circuit de Spa-Francorchamps]], [[Stavelot]]
+|18 July
+|19 July
+|-
+!9
+| nowrap="" | {{flagicon|HUN}} [[Hungaroring]], [[Mogyoród]]
+|25 July 
+|26 July 
+|-
+!10
+| nowrap="" | {{flagicon|ITA}} [[Monza Circuit]], [[Monza]]
+|5 September 
+|6 September
+|-
+!11
+|{{flagicon|ESP}} [[Madring]], [[Madrid]]
+|12 September
+|13 September
+|-
+!12
+| nowrap="" | {{flagicon|AZE}} [[Baku City Circuit]], [[Baku]]
+| nowrap="" |25 September{{efn|The races of the [[2026 Baku Formula 2 round|Baku round]] were originally scheduled for 26–27 September but were moved forward by one day to accommodate [[Remembrance Day (Azerbaijan)|Remembrance Day]], following a request from the promoter and relevant government stakeholders.|name=Baku round}}
+| nowrap="" |26 September{{efn|name=Baku round}}
+|-
+!13
+| nowrap="" | {{flagicon|QAT}} [[Lusail International Circuit]], [[Lusail]]
+|28 November
+|29 November 
+|-
+!14
+| nowrap="" | {{flagicon|ARE}} [[Yas Marina Circuit]], [[Abu Dhabi]]
+|5 December
+|6 December
+|- 
+! colspan="4" | Source: <ref>{{Cite web |date=10 June 2025 |title=FIA Formula 2 Championship 2026 season calendar revealed |url=https://www.fiaformula2.com/Latest/28OvYB98ektUm0D8vrUgYS/fia-formula-2-championship-2026-season-calendar-revealed |access-date=10 June 2025 |website=FIA_F2® - The Official F2® Website |language=en}}</ref>
+|}
+
+===Calendar changes===
+* Formula 2 and FIA Formula 3 followed Formula One in replacing the round at [[Imola Circuit]] with a second round in Spain held at the newly-built [[Madring]].<ref>{{Cite web |last=Wood |first=Ida |date=10 June 2025 |title=F2 and FIA F3 to race at Barcelona as well as streets of Madrid in 2026 |url=https://formulascout.com/f2-and-fia-f3-to-race-at-barcelona-as-well-as-streets-of-madrid-in-2026/131886 |access-date=10 June 2025 |website=Formula Scout |language=en}}</ref><ref>{{Cite web |date=2025-06-10 |title=F2 set to visit major new venue as 2026 calendar confirmed |url=https://racingnews365.com/f2-set-to-visit-major-new-venue-as-2026-calendar-confirmed |access-date=2025-06-14 |website=RacingNews365 |language=en}}</ref>
+* The round at [[Baku City Circuit]] will be held a day earlier in the week than usual, with the sprint race held on Friday and the feature race held on Saturday, to accommodate the country's national day.<ref>{{Cite web |date=30 June 2025 |title=Formula 1 confirms 2026 pre-season testing dates |url=https://www.formula1.com/en/latest/article/formula-1-confirms-2026-pre-season-testing-dates-and-issues-calendar-update.5VKfdqe7JcdsCJcEnQE0xw |access-date=30 June 2025 |website=www.formula1.com |language=en}}</ref>
+* Two rounds were set to be held at [[Bahrain International Circuit]] and [[Jeddah Corniche Circuit]], but were cancelled due to the [[2026 Iran war|Iran war]].<ref>{{Cite web |date=14 March 2026 |title=Bahrain and Saudi Arabian GPs will not take place in April |url=https://www.formula1.com/en/latest/article/bahrain-and-saudi-arabian-grands-prix-will-not-take-place-in-april.1hnqllVG85RSt8pbFc5Ivx |access-date=14 March 2026 |website=Formula One}}</ref> They were replaced by rounds at [[Miami International Autodrome]] and [[Circuit Gilles Villeneuve]], marking the first time the championship raced in [[North America]].<ref>{{cite web|title=Miami and Montreal to host FIA Formula 2 Championship Rounds in 2026|url=https://www.fiaformula2.com/Latest/piQa16CR1LT7Ks5rIkqAM/miami-and-montreal-to-host-fia-formula-2-championship-rounds-in-2026|publisher=FIA Formula 2 Championship|access-date=9 April 2026}}</ref>
+
+== Regulation changes ==
+
+=== Technical regulations ===
+
+* 2025 saw the championship use [[Saudi Aramco|Aramco]]-supplied fuel containing 70% sustainable components, and a further increase in sustainability is planned for 2026 ahead of the series' goal of adopting fully synthetic fuels in 2027.<ref>{{Cite web |last=Lloyd |first=Daniel |date=2024-12-19 |title=F2 and F3's Shared Pathway Towards Fully Synthetic Fuel |url=https://www.racecar-engineering.com/articles/f1/formula-2-and-3/f2-and-f3s-shared-pathway-towards-fully-synthetic-fuel/ |access-date=2025-06-14 |website=Racecar Engineering |language=en-US}}</ref>
+
+== Season report ==
+=== Round 1: Australia ===
+{{Further|2026 Melbourne Formula 2 round}}
+The season-opener at [[Albert Park Circuit]] began with [[Dino Beganovic]] qualifying on [[pole position]] followed by [[Martinius Stenshorne]] in second and [[Alex Dunne]] in third. [[Tasanapol Inthraphuvasak]] started the reverse-grid sprint race from pole position by virtue of having qualified tenth. Third-place starter [[Oliver Goethe]] gained a position from [[Joshua Dürksen]] at the start, but later lost the place and then spun out. Dürksen then overtook Inthraphuvasak for the lead on lap two. On lap fifteen, [[Mari Boya]] crashed and brought out the [[safety car]]. [[Noel León]], who started seventh but had improved to third place, overtook Inthraphuvasak for second shortly after racing resumed. Inthraphuvasak was then passed by Stenshorne and Dunne in the closing laps, however Stenshorne was demoted from the podium with a penalty for leaving the track and gaining an advantage, promoting Dunne to third. Dürksen claimed his fifth Formula 2 race win and León achieved a podium in his debut Formula 2 race.
+
+In the feature race, a slow start from pole-sitter Beganovic dropped him to fifth place at the first corner. A collision between teammates Stenshorne and Dunne on lap three eliminated both drivers from the race and allowed [[Nikola Tsolov]] into the lead. Most drivers were running the softest tyre compound and thus made pit stops in the early laps. After the pit stops, Tsolov maintained his position with [[Rafael Câmara]] behind. Beganovic had recovered from his poor start and overtook Câmara on lap fifteen, but soon stopped on-track with a mechanical failure, causing a safety car deployment. Race leader [[Nico Varrone]], who was yet to pit, made his tyre change under the safety car conditions and emerged in first place. Varrone was unable to hold the lead for long and soon received a penalty for speeding in the pit lane, dropping him outside the points. Tsolov crossed the finish line to take his first Formula 2 victory, followed by Câmara and 11th-place starter [[Laurens van Hoepen]], who both achieved their first Formula 2 podium finishes. Tsolov's victory put him in the lead of the championship after the first round, seven points ahead of Câmara in second.
+
+== Results and standings ==
+
+=== Season summary ===
+{| class="wikitable" style="font-size: 85%;"
+! colspan="2" |Round
+!Circuit
+![[Pole position]]
+![[Fastest lap]]
+!Winning driver
+!Winning team
+!{{Tooltip|Report|Race report}}
+|-
+! rowspan="2" |1
+!{{Tooltip|SR|Sprint race}}
+| rowspan="2" |{{flagicon|AUS}} [[Albert Park Circuit]]
+|
+|nowrap| {{flagicon|NOR}} [[Martinius Stenshorne]]
+| {{flagicon|PAR}} [[Joshua Dürksen]]
+|nowrap| {{flagicon|GBR}} [[Invicta Racing]]
+| rowspan="2" |[[2026 Melbourne Formula 2 round|Report]]
+|-
+!{{Tooltip|FR|Feature race}}
+| {{flagicon|SWE}} [[Dino Beganovic]]
+|nowrap| {{flagicon|SWE}} [[Dino Beganovic]]{{efn|[[Dino Beganovic]] set the fastest lap but did not finish in the top ten, so he was ineligible to score the point for it. [[Laurens van Hoepen]] scored the point for setting the fastest lap among those finishing in the top ten.}}
+|nowrap| {{flagicon|BUL}} [[Nikola Tsolov]]
+|nowrap| {{flagicon|ESP}} [[Campos Racing]]
+|-
+! rowspan="2" |2
+!SR
+| rowspan="2" nowrap="" |{{flagicon|USA}} [[Miami International Autodrome]]
+|
+|nowrap| {{flagicon|MEX}} [[Noel León]]
+|nowrap| {{flagicon|BUL}} [[Nikola Tsolov]]
+| {{flagicon|ESP}} [[Campos Racing]]
+| rowspan="2" |[[2026 Miami Formula 2 round|Report]]
+|-
+!FR
+|{{flagicon|IND}} [[Kush Maini]]
+|{{flagicon|BRA}} [[Rafael Câmara]]
+|{{flagicon|ITA}} [[Gabriele Minì]]
+|{{flagicon|NLD}} [[MP Motorsport]]
+|-
+! rowspan="2" |3
+!SR
+| rowspan="2" |{{flagicon|CAN}} [[Circuit Gilles Villeneuve]]
+|
+|{{flagicon|IRL}} [[Alex Dunne]]{{efn|[[Alex Dunne]] set the fastest lap but did not finish in the top ten, so he was ineligible to score the point for it. [[Noel León]] scored the point for setting the fastest lap among those finishing in the top ten.}}
+|{{flagicon|MEX}} [[Noel León]]
+|{{flagicon|ESP}} [[Campos Racing]]
+| rowspan="2" |[[2026 Montreal Formula 2 round|Report]]
+|-
+!FR
+|nowrap| {{flagicon|NLD}} [[Laurens van Hoepen]]
+| {{flagicon|ARG}} [[Nicolás Varrone|Nico Varrone]]
+|nowrap| {{flagicon|NOR}} [[Martinius Stenshorne]]
+|nowrap| {{flagicon|NZL}} [[Rodin Motorsport]]
+|-
+! rowspan="2" |4
+!SR
+| rowspan="2" |{{flagicon|MON}} [[Circuit de Monaco]]
+|
+| {{flagicon|BUL}} [[Nikola Tsolov]]
+| {{flagicon|MEX}} [[Noel León]]
+| {{flagicon|ESP}} [[Campos Racing]]
+| rowspan="2" |[[2026 Monte Carlo Formula 2 round|Report]]
+|-
+!FR
+| {{flagicon|BRA}} [[Rafael Câmara]]
+|
+|
+|
+|-
+! rowspan="2" |5
+!SR
+| rowspan="2" |{{flagicon|ESP}} [[Circuit de Barcelona-Catalunya]]
+|
+|
+|
+|
+| rowspan="2" |[[2026 Barcelona Formula 2 round|Report]]
+|-
+!FR
+|
+|
+|
+|
+|-
+! rowspan="2" |6
+!SR
+| rowspan="2" |{{flagicon|AUT}} [[Red Bull Ring]]
+|
+|
+|
+|
+| rowspan="2" |[[2026 Spielberg Formula 2 round|Report]]
+|-
+!FR
+|
+| nowrap="" |
+|
+|
+|-
+! rowspan="2" |7
+!SR
+| rowspan="2" |{{flagicon|GBR}} [[Silverstone Circuit]]
+|
+|
+| nowrap="" |
+|
+| rowspan="2" |[[2026 Silverstone Formula 2 round|Report]]
+|-
+!FR
+|
+|
+|
+|
+|-
+! rowspan="2" |8
+!SR
+| rowspan="2" |{{flagicon|BEL}} [[Circuit de Spa-Francorchamps]]
+|
+|
+|
+|
+| rowspan="2" |[[2026 Spa-Francorchamps Formula 2 round|Report]]
+|-
+!FR
+|
+|
+|
+|
+|-
+! rowspan="2" |9
+!SR
+| rowspan="2" |{{flagicon|HUN}} [[Hungaroring]]
+|
+|
+|
+|
+| rowspan="2" |[[2026 Budapest Formula 2 round|Report]]
+|-
+!FR
+|
+|
+|
+|
+|-
+! rowspan="2" |10
+!SR
+| rowspan="2" |{{flagicon|ITA}} [[Monza Circuit]]
+|
+|
+|
+|
+| rowspan="2" |[[2026 Monza Formula 2 round|Report]]
+|-
+!FR
+|
+|
+|
+|
+|-
+! rowspan="2" |11
+!SR
+| rowspan="2" |{{flagicon|ESP}} [[Madring]]
+|
+|
+|
+|
+| rowspan="2" |[[2026 Madrid Formula 2 round|Report]]
+|-
+!FR
+|
+|
+|
+|
+|-
+! rowspan="2" |12
+!SR
+| rowspan="2" |{{flagicon|AZE}} [[Baku City Circuit]]
+|
+|
+|
+|
+| rowspan="2" |[[2026 Baku Formula 2 round|Report]]
+|-
+!FR
+|
+|
+|
+|
+|-
+! rowspan="2" |13
+!SR
+| rowspan="2" |{{flagicon|QAT}} [[Lusail International Circuit]]
+|
+|
+|
+|
+| rowspan="2" |[[2026 Lusail Formula 2 round|Report]]
+|-
+!FR
+| nowrap="" |
+|
+|
+|
+|-
+! rowspan="2" |14
+!SR
+| rowspan="2" |{{flagicon|ARE}} [[Yas Marina Circuit]]
+|
+|
+|
+|
+| rowspan="2" |[[2026 Yas Island Formula 2 round|Report]]
+|-
+!FR
+|
+|
+|
+|
+|-
+| colspan="8" style="background-color:#EAECF0;text-align:center" align="bottom" |'''Source:<ref>{{cite web|title=FIA Formula 2 Championship Results 2026|url=https://motorsportstats.com/series/fia-formula-2-championship/results/2026|work=Motorsport Stats|access-date=7 March 2026}}</ref>'''
+|}
+
+=== Scoring system ===
+Points are awarded to the top eight classified finishers in the sprint race, and to the top ten classified finishers in the feature race.{{efn|In the event of a race ending prematurely, the number of points-paying positions may be reduced, depending on how much of the race has been completed.<ref name=Regulations/>}} The pole-sitter in the feature race also receives two points, and one point is given to the driver who set the fastest lap in both the feature and sprint races, provided that driver finished inside the top ten. If the driver who set the fastest lap is classified outside the top ten, the point is given to the driver who set the fastest lap of those inside the top ten. No extra points are awarded to the pole-sitter in the sprint race as the grid for it is set by reversing the top ten qualifiers.<ref name="Regulations">{{cite web |date=26 February 2025 |title=2025 FIA Formula 2 Sporting Regulations |url=https://api.fia.com/sites/default/files/documents/2025_fia_f2_sporting_regulations_v2_26-02-2025.pdf |access-date=7 September 2025 |publisher=[[Fédération Internationale de l'Automobile]] |pages=4-6}}</ref>
+
+; Sprint race points
+
+Points are awarded to the top eight classified finishers, excluding the fastest lap point which is given to the top ten classified finishers.<ref name="Regulations" />
+{| class="wikitable" style="font-size:85%; text-align:center"
+!Position
+| style="background:#ffffbf;" |&nbsp;'''1st'''&nbsp;
+| style="background:#dfdfdf;" |&nbsp;'''2nd'''&nbsp;
+| style="background:#ffdf9f;" |&nbsp;'''3rd'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''4th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''5th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''6th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''7th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''8th'''&nbsp;
+|&nbsp;'''[[Fastest lap|FL]]'''&nbsp;
+|-
+!Points
+| style="background:#ffffbf;" |10
+| style="background:#dfdfdf;" |8
+| style="background:#ffdf9f;" |6
+| style="background:#dfffdf;" |5
+| style="background:#dfffdf;" |4
+| style="background:#dfffdf;" |3
+| style="background:#dfffdf;" |2
+| style="background:#dfffdf;" |1
+|1
+|}
+
+; Feature race points
+
+Points are awarded to the top ten classified finishers. Bonus points are awarded to the pole-sitter and to the driver who set the fastest lap and finished in the top ten.<ref name="Regulations" />
+{| class="wikitable" style="font-size:85%; text-align:center"
+!Position
+| style="background:#ffffbf;" |&nbsp;'''1st'''&nbsp;
+| style="background:#dfdfdf;" |&nbsp;'''2nd'''&nbsp;
+| style="background:#ffdf9f;" |&nbsp;'''3rd'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''4th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''5th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''6th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''7th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''8th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''9th'''&nbsp;
+| style="background:#dfffdf;" |&nbsp;'''10th'''&nbsp;
+|&nbsp;'''[[Pole position|Pole]]'''&nbsp;
+|&nbsp;'''[[Fastest lap|FL]]'''&nbsp;
+|-
+!Points
+| style="background:#ffffbf;" |25
+| style="background:#dfdfdf;" |18
+| style="background:#ffdf9f;" |15
+| style="background:#dfffdf;" |12
+| style="background:#dfffdf;" |10
+| style="background:#dfffdf;" |8
+| style="background:#dfffdf;" |6
+| style="background:#dfffdf;" |4
+| style="background:#dfffdf;" |2
+| style="background:#dfffdf;" |1
+|2
+|1
+|}
+
+=== Drivers' Championship standings ===
+{|
+| style="vertical-align:top; text-align:center" |
+{| class="wikitable" style="font-size: 85%;"
+! rowspan="2" |{{Tooltip|Pos.|Position}}
+! rowspan="2" |Driver
+! colspan="2" |[[2026 Melbourne Formula 2 round|ALB]]<br>{{flagicon|AUS}}
+! colspan="2" |[[2026 Miami Formula 2 round|MIA]]<br>{{flagicon|USA}}
+! colspan="2" |[[2026 Montreal Formula 2 round|MTL]]<br>{{flagicon|CAN}}
+! colspan="2" |[[2026 Monte Carlo Formula 2 round|MON]]<br>{{flagicon|MCO}}
+! colspan="2" |[[2026 Barcelona Formula 2 round|CAT]]<br>{{flagicon|ESP}}
+! colspan="2" |[[2026 Spielberg Formula 2 round|RBR]]<br>{{flagicon|AUT}}
+! colspan="2" |[[2026 Silverstone Formula 2 round|SIL]]<br>{{flagicon|GBR}}
+! colspan="2" |[[2026 Spa-Francorchamps Formula 2 round|SPA]]<br>{{flagicon|BEL}}
+! colspan="2" |[[2026 Budapest Formula 2 round|HUN]]<br>{{flagicon|HUN}}
+! colspan="2" |[[2026 Monza Formula 2 round|MNZ]]<br>{{flagicon|ITA}}
+! colspan="2" |[[2026 Madrid Formula 2 round|MAD]]<br>{{flagicon|ESP}}
+! colspan="2" |[[2026 Baku Formula 2 round|BAK]]<br>{{flagicon|AZE}}
+! colspan="2" |[[2026 Lusail Formula 2 round|LUS]]<br>{{flagicon|QAT}}
+! colspan="2" |[[2026 Yas Island Formula 2 round|YAS]]<br>{{flagicon|ARE}}
+! rowspan="2" |Points
+|-
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+|-
+! 1
+| align="left" |{{flagicon|ITA}} [[Gabriele Minì]]
+| style="background:#DFFFDF;" | 6
+| style="background:#DFFFDF;" | 8
+| style="background:#DFFFDF;" | 7
+| style="background:#FFFFBF;" | 1
+| style="background:#DFDFDF;" | 2
+| style="background:#FFDF9F;" | 3
+| style="background:#FFDF9F;" | 3
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 63
+|-
+! 2
+| align="left" |{{flagicon|MEX}} [[Noel León]]
+| style="background:#DFDFDF;" | 2
+| style="background:#CFCFFF;" | 14
+| style="background:#CFCFFF;" | 9<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#DFFFDF;" | 4
+| style="background:#FFFFBF;" | 1<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#DFFFDF;" | 10
+| style="background:#FFFFBF;" | 1
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 43
+|-
+! 3
+| align="left" |{{flagicon|BRA}} [[Rafael Câmara]]
+| style="background:#CFCFFF;" | 11
+| style="background:#DFDFDF;" | 2
+| style="background:#CFCFFF;" | 10
+| style="background:#FFDF9F;" | 3<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#DFFFDF;" | 7
+| style="background:#CFCFFF;" | 14
+| style="background:#DFFFDF;" | 8
+| <span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>P</sup></span>
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 39
+|-
+! 4
+| align="left" |{{flagicon|NOR}} [[Martinius Stenshorne]]
+| style="background:#CFCFFF;" | 10<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#EFCFFF;" | Ret
+| style="background:#DFFFDF;" | 6
+| style="background:#EFCFFF;" | Ret
+| style="background:#FFDF9F;" | 3
+| style="background:#FFFFBF;" | 1
+| style="background:#DFFFDF;" | 6
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 38
+|-
+! 5
+| align="left" |{{flagicon|BUL}} [[Nikola Tsolov]]
+| style="background:#CFCFFF;" | 17
+| style="background:#FFFFBF;" | 1
+| style="background:#FFFFBF;" | 1 
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 14
+| style="background:#CFCFFF;" | 12
+| style="background:#CFCFFF;" | 10<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 36
+|-
+! 6
+| align="left" |{{flagicon|NLD}} [[Laurens van Hoepen]]
+| style="background:#DFFFDF;" | 7
+| style="background:#FFDF9F;" | 3<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#DFDFDF;" | 2
+| style="background:#CFCFFF;" | 11
+| style="background:#DFFFDF;" | 4
+| style="background:#EFCFFF;" | Ret<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>P</sup></span>
+| style="background:#CFCFFF;" | 19
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 33
+|-
+! 7
+| align="left" |{{flagicon|IRE}} [[Alex Dunne]]
+| style="background:#FFDF9F;" | 3
+| style="background:#EFCFFF;" | Ret
+| style="background:#FFDF9F;" | 3
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 13
+| style="background:#DFDFDF;" | 2
+| style="background:#CFCFFF;" | 9
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 30
+|-
+! 8
+| align="left" |{{flagicon|SWE}} [[Dino Beganovic]]
+| style="background:#CFCFFF;" | 20
+| style="background:#EFCFFF;" | Ret<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>P</sup></span>
+| style="background:#DFFFDF;" | 8
+| style="background:#DFDFDF;" | 2
+| style="background:#DFFFDF;" | 6
+| style="background:#EFCFFF;" | Ret
+| style="background:#DFFFDF;" | 5
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 28
+|-
+! 9
+| align="left" |{{flagicon|JPN}} [[Ritomo Miyata]]
+| style="background:#DFFFDF;" | 5
+| style="background:#DFFFDF;" | 5
+| style="background:#CFCFFF;" | 12
+| style="background:#DFFFDF;" | 6
+| style="background:#CFCFFF;" | 11
+| style="background:#CFCFFF;" | 16{{dagger}}
+| style="background:#CFCFFF;" | 11
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 22
+|-
+! 10
+| align="left" |{{flagicon|PAR}} [[Joshua Dürksen]]
+| style="background:#FFFFBF;" | 1
+| style="background:#DFFFDF;" | 10
+| style="background:#DFFFDF;" | 5
+| style="background:#DFFFDF;" | 10
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 11
+| style="background:#DFFFDF;" | 4
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 21
+|-
+! 11
+| align="left" |{{flagicon|COL}} [[Sebastián Montoya]]
+| style="background:#CFCFFF;" | 9
+| style="background:#DFFFDF;" | 9
+| style="background:#CFCFFF;" | 16
+| style="background:#DFFFDF;" | 9
+| style="background:#CFCFFF;" | 17{{dagger}}
+| style="background:#DFFFDF;" | 4
+| style="background:#CFCFFF;" | 13
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 16
+|-
+! 12
+| align="left" |{{flagicon|IND}} [[Kush Maini]]
+| style="background:#CFCFFF;" | 12
+| style="background:#CFCFFF;" | 16
+| style="background:#EFCFFF;" | Ret 
+| style="background:#DFFFDF;" | 5<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>P</sup></span>
+| style="background:#CFCFFF;" | 12
+| style="background:#DFFFDF;" | 9
+| style="background:#DFFFDF;" | 7
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 16
+|-
+! 13
+| align="left" |{{flagicon|USA}} [[Colton Herta]]
+| style="background:#CFCFFF;" | 16
+| style="background:#DFFFDF;" | 7
+| style="background:#CFCFFF;" | 15
+| style="background:#DFFFDF;" | 8
+| style="background:#CFCFFF;" | 9
+| style="background:#DFFFDF;" | 7
+| style="background:#CFCFFF;" | 15
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 16
+|-
+! 14
+| align="left" |{{flagicon|ARG}} [[Nico Varrone]]
+| style="background:#CFCFFF;" | 21
+| style="background:#CFCFFF;" | 17
+| style="background:#DFFFDF;" | 4
+| style="background:#CFCFFF;" | 13
+| style="background:#CFCFFF;" | 16
+| style="background:#DFFFDF;" | 6<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#CFCFFF;" | 12
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 14
+|-
+! 15
+| align="left" nowrap="" |{{flagicon|THA}} [[Tasanapol Inthraphuvasak]]
+| style="background:#DFFFDF;" | 4
+| style="background:#DFFFDF;" | 6
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 15
+| WD
+| WD
+| style="background:#CFCFFF;" | NC
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 13
+|-
+! 16
+| align="left" |{{flagicon|DEU}} [[Oliver Goethe]]
+| style="background:#CFCFFF;" | 18
+| style="background:#DFFFDF;" | 4
+| style="background:#CFCFFF;" | 11
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 10
+| style="background:#CFCFFF;" | 15{{dagger}}
+| style="background:#EFCFFF;" | Ret
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 12
+|-
+! 17
+| align="left" |{{flagicon|POL}} [[Roman Bilinski]]
+| style="background:#DFFFDF;" | 8
+| style="background:#CFCFFF;" | 12
+| style="background:#CFCFFF;" | 14
+| style="background:#FFFFFF;" | DNS
+| style="background:#DFFFDF;" | 8
+| style="background:#CFCFFF;" | 13
+| style="background:#DFDFDF;" | 2
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 10
+|-
+! 18
+| align="left" nowrap="" |{{flagicon|GBR}} [[Cian Shields]]
+| style="background:#CFCFFF;" | 19
+| style="background:#CFCFFF;" | 19
+| style="background:#CFCFFF;" | 18
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#DFFFDF;" | 5
+| style="background:#CFCFFF;" | 18
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 10
+|-
+! 19
+| align="left" |{{flagicon|ESP}} [[Mari Boya]]
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 13
+| style="background:#CFCFFF;" | 17
+| style="background:#DFFFDF;" | 7
+| style="background:#CFCFFF;" | 15
+| style="background:#DFFFDF;" | 8
+| style="background:#CFCFFF;" | 14
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 10
+|-
+! 20
+| align="left" |{{flagicon|BRA}} [[Emerson Fittipaldi Jr.]]
+| style="background:#CFCFFF;" | 14
+| style="background:#CFCFFF;" | 15
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 12
+| style="background:#DFFFDF;" | 5
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 17
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 4
+|-
+! 21
+| align="left" nowrap="" |{{Flagicon|MEX}} [[Rafael Villagómez]]
+| style="background:#CFCFFF;" | 13
+| style="background:#CFCFFF;" | 11
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 16
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 0
+|-
+! 22
+| align="left" |{{flagicon|GBR}} [[John Bennett (racing driver)|John Bennett]]
+| style="background:#CFCFFF;" | 15
+| style="background:#CFCFFF;" | 18
+| style="background:#CFCFFF;" | 13
+| style="background:#CFCFFF;" | 14
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 20
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! 0
+|-
+! rowspan="2" |{{Tooltip|Pos.|Position}}
+! rowspan="2" |Driver
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+! rowspan="2" |Points
+|-
+! colspan="2" |[[2026 Melbourne Formula 2 round|ALB]]<br>{{flagicon|AUS}}
+! colspan="2" |[[2026 Miami Formula 2 round|MIA]]<br>{{flagicon|USA}}
+! colspan="2" |[[2026 Montreal Formula 2 round|MTL]]<br>{{flagicon|CAN}}
+! colspan="2" |[[2026 Monte Carlo Formula 2 round|MON]]<br>{{flagicon|MCO}}
+! colspan="2" |[[2026 Barcelona Formula 2 round|CAT]]<br>{{flagicon|ESP}}
+! colspan="2" |[[2026 Spielberg Formula 2 round|RBR]]<br>{{flagicon|AUT}}
+! colspan="2" |[[2026 Silverstone Formula 2 round|SIL]]<br>{{flagicon|GBR}}
+! colspan="2" |[[2026 Spa-Francorchamps Formula 2 round|SPA]]<br>{{flagicon|BEL}}
+! colspan="2" |[[2026 Budapest Formula 2 round|HUN]]<br>{{flagicon|HUN}}
+! colspan="2" |[[2026 Monza Formula 2 round|MNZ]]<br>{{flagicon|ITA}}
+! colspan="2" |[[2026 Madrid Formula 2 round|MAD]]<br>{{flagicon|ESP}}
+! colspan="2" |[[2026 Baku Formula 2 round|BAK]]<br>{{flagicon|AZE}}
+! colspan="2" |[[2026 Lusail Formula 2 round|LUS]]<br>{{flagicon|QAT}}
+! colspan="2" |[[2026 Yas Island Formula 2 round|YAS]]<br>{{flagicon|ARE}}
+|-
+| colspan="31" align="bottom" style="background-color:#EAECF0;text-align:center" |'''Sources:<ref>{{cite web|title=Driver Standings for the FIA Formula 2 2026 Championship|url=https://www.fiaformula2.com/Standings/Driver|work=FIA Formula 2 Championship|access-date=6 March 2026}}</ref>'''
+|}
+| style="vertical-align:top;" |{{F1 driver results legend 9}}
+{{dagger}}&nbsp;– Driver did not finish the race, but was classified as he completed more than 90% of the race distance.
+|}
+
+=== Teams' Championship standings ===
+{|
+| style="vertical-align:top; text-align:center" |
+{| class="wikitable" style="font-size: 85%;"
+! rowspan="2" |{{Tooltip|Pos.|Position}}
+! rowspan="2" |Team
+! colspan="2" |[[2026 Melbourne Formula 2 round|ALB]]<br>{{flagicon|AUS}}
+! colspan="2" |[[2026 Miami Formula 2 round|MIA]]<br>{{flagicon|USA}}
+! colspan="2" |[[2026 Montreal Formula 2 round|MTL]]<br>{{flagicon|CAN}}
+! colspan="2" |[[2026 Monte Carlo Formula 2 round|MON]]<br>{{flagicon|MCO}}
+! colspan="2" |[[2026 Barcelona Formula 2 round|CAT]]<br>{{flagicon|ESP}}
+! colspan="2" |[[2026 Spielberg Formula 2 round|RBR]]<br>{{flagicon|AUT}}
+! colspan="2" |[[2026 Silverstone Formula 2 round|SIL]]<br>{{flagicon|GBR}}
+! colspan="2" |[[2026 Spa-Francorchamps Formula 2 round|SPA]]<br>{{flagicon|BEL}}
+! colspan="2" |[[2026 Budapest Formula 2 round|HUN]]<br>{{flagicon|HUN}}
+! colspan="2" |[[2026 Monza Formula 2 round|MNZ]]<br>{{flagicon|ITA}}
+! colspan="2" |[[2026 Madrid Formula 2 round|MAD]]<br>{{flagicon|ESP}}
+! colspan="2" |[[2026 Baku Formula 2 round|BAK]]<br>{{flagicon|AZE}}
+! colspan="2" |[[2026 Lusail Formula 2 round|LUS]]<br>{{flagicon|QAT}}
+! colspan="2" |[[2026 Yas Island Formula 2 round|YAS]]<br>{{flagicon|ARE}}
+! rowspan="2" |Points
+|-
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+|-
+! rowspan="2" | 1
+| rowspan="2" align="left" |{{flagicon|ESP}} [[Campos Racing]]
+| style="background:#DFDFDF;" | 2
+| style="background:#FFFFBF;" | 1
+| style="background:#FFFFBF;" | 1
+| style="background:#DFFFDF;" | 4
+| style="background:#FFFFBF;" | 1<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#DFFFDF;" | 10
+| style="background:#FFFFBF;" | 1
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 79
+|-
+| style="background:#CFCFFF;" | 17
+| style="background:#CFCFFF;" | 14
+| style="background:#CFCFFF;" | 9<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 14
+| style="background:#CFCFFF;" | 12
+| style="background:#CFCFFF;" | 10<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" | 2
+| rowspan="2" align="left" |{{flagicon|NLD}} [[MP Motorsport]]
+| style="background:#DFFFDF;" | 6
+| style="background:#DFFFDF;" | 4
+| style="background:#DFFFDF;" | 7
+| style="background:#FFFFBF;" | 1
+| style="background:#DFDFDF;" | 2
+| style="background:#FFDF9F;" | 3
+| style="background:#FFDF9F;" | 3
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 75
+|-
+| style="background:#CFCFFF;" | 18
+| style="background:#DFFFDF;" | 8
+| style="background:#CFCFFF;" | 11
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 10
+| style="background:#CFCFFF;" | 15{{dagger}}
+| style="background:#EFCFFF;" | Ret
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" | 3
+| rowspan="2" align="left" |{{flagicon|NZL}} [[Rodin Motorsport]]
+| style="background:#FFDF9F;" | 3
+| style="background:#EFCFFF;" | Ret
+| style="background:#FFDF9F;" | 3
+| style="background:#EFCFFF;" | Ret
+| style="background:#FFDF9F;" | 3
+| style="background:#FFFFBF;" | 1
+| style="background:#DFFFDF;" | 6
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 68
+|-
+| style="background:#CFCFFF;" | 10<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#EFCFFF;" | Ret
+| style="background:#DFFFDF;" | 6
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 13
+| style="background:#DFDFDF;" | 2
+| style="background:#CFCFFF;" | 9
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" | 4
+| rowspan="2" align="left" |{{flagicon|GBR}} [[Invicta Racing]]
+| style="background:#FFFFBF;" | 1
+| style="background:#DFDFDF;" | 2
+| style="background:#DFFFDF;" | 5
+| style="background:#FFDF9F;" | 3<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#DFFFDF;" | 7
+| style="background:#CFCFFF;" | 11
+| style="background:#DFFFDF;" | 4
+| <span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>P</sup></span>
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 60
+|-
+| style="background:#CFCFFF;" | 11
+| style="background:#DFFFDF;" | 10
+| style="background:#CFCFFF;" | 10
+| style="background:#DFFFDF;" | 10
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 14
+| style="background:#DFFFDF;" | 8
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2"| 5
+| rowspan="2" align="left" |{{flagicon|FRA}} [[DAMS Lucas Oil]]
+| style="background:#DFFFDF;" | 8
+| style="background:#CFCFFF;" | 12
+| style="background:#DFFFDF;" | 8
+| style="background:#DFDFDF;" | 2
+| style="background:#DFFFDF;" | 6
+| style="background:#CFCFFF;" | 13
+| style="background:#DFDFDF;" | 2
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 38
+|-
+| style="background:#CFCFFF;" | 20
+| style="background:#EFCFFF;" | Ret<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>P</sup></span>
+| style="background:#CFCFFF;" | 14
+| style="background:#FFFFFF;" | DNS
+| style="background:#DFFFDF;" | 8
+| style="background:#EFCFFF;" | Ret
+| style="background:#DFFFDF;" | 5
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" | 6
+| rowspan="2" align="left" |{{flagicon|GBR}} [[Hitech Grand Prix|Hitech]]
+| style="background:#DFFFDF;" | 5
+| style="background:#DFFFDF;" | 5
+| style="background:#CFCFFF;" | 12
+| style="background:#DFFFDF;" | 6
+| style="background:#CFCFFF;" | 9
+| style="background:#DFFFDF;" | 7
+| style="background:#CFCFFF;" | 11
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 38
+|-
+| style="background:#CFCFFF;" | 16
+| style="background:#DFFFDF;" | 7
+| style="background:#CFCFFF;" | 15
+| style="background:#DFFFDF;" | 8
+| style="background:#CFCFFF;" | 11
+| style="background:#CFCFFF;" | 16{{dagger}}
+| style="background:#CFCFFF;" | 15
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" | 7
+| rowspan="2" align="left" |{{flagicon|ITA}} [[Trident Motorsport|Trident]]
+| style="background:#DFFFDF;" | 7
+| style="background:#FFDF9F;" | 3<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#DFDFDF;" | 2
+| style="background:#CFCFFF;" | 11
+| style="background:#DFFFDF;" | 4
+| style="background:#EFCFFF;" | Ret<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>P</sup></span>
+| style="background:#CFCFFF;" | 19
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 33
+|-
+| style="background:#CFCFFF;" | 15
+| style="background:#CFCFFF;" | 18
+| style="background:#CFCFFF;" | 13
+| style="background:#CFCFFF;" | 14
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 20
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" | 8
+| rowspan="2" align="left" |{{flagicon|FRA}} [[ART Grand Prix]]
+| style="background:#DFFFDF;" | 4
+| style="background:#DFFFDF;" | 6
+| style="background:#EFCFFF;" | Ret
+| style="background:#DFFFDF;" | 5<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>P</sup></span>
+| style="background:#CFCFFF;" | 12
+| style="background:#DFFFDF;" | 9
+| style="background:#DFFFDF;" | 7
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 29
+|-
+| style="background:#CFCFFF;" | 12
+| style="background:#CFCFFF;" | 16
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 15
+| WD
+| WD
+| style="background:#CFCFFF;" | NC
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" | 9
+| rowspan="2" align="left" |{{flagicon|ITA}} [[Prema Racing]]
+| style="background:#CFCFFF;" | 9
+| style="background:#DFFFDF;" | 9
+| style="background:#CFCFFF;" | 16
+| style="background:#DFFFDF;" | 7
+| style="background:#CFCFFF;" | 15
+| style="background:#DFFFDF;" | 4
+| style="background:#CFCFFF;" | 13
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 26
+|-
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 13
+| style="background:#CFCFFF;" | 17
+| style="background:#DFFFDF;" | 9
+| style="background:#CFCFFF;" | 17{{dagger}}
+| style="background:#DFFFDF;" | 8
+| style="background:#CFCFFF;" | 14
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" | 10
+| rowspan="2" align="left" nowrap|{{flagicon|NLD}} [[Van Amersfoort Racing]]
+| style="background:#CFCFFF;" | 13
+| style="background:#CFCFFF;" | 11
+| style="background:#DFFFDF;" | 4
+| style="background:#CFCFFF;" | 13
+| style="background:#CFCFFF;" | 16
+| style="background:#DFFFDF;" | 6<span style="margin:0 0.1em 0 0.1em;font-size:110%;font-weight:bold;white-space:nowrap;"><sup>F</sup></span>
+| style="background:#CFCFFF;" | 12
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 14
+|-
+| style="background:#CFCFFF;" | 21
+| style="background:#CFCFFF;" | 17
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 16
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" | 11
+| rowspan="2" align="left" |{{flagicon|ARE}} [[AIX Racing]]
+| style="background:#CFCFFF;" | 14
+| style="background:#CFCFFF;" | 15
+| style="background:#CFCFFF;" | 18
+| style="background:#CFCFFF;" | 12
+| style="background:#DFFFDF;" | 5
+| style="background:#DFFFDF;" | 5
+| style="background:#CFCFFF;" | 17
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+! rowspan="2" | 14
+|-
+| style="background:#CFCFFF;" | 19
+| style="background:#CFCFFF;" | 19
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#EFCFFF;" | Ret
+| style="background:#CFCFFF;" | 18
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|-
+! rowspan="2" |{{Tooltip|Pos.|Position}}
+! rowspan="2" |Team
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+!SR
+!FR
+! rowspan="2" |Points
+|-
+! colspan="2" |[[2026 Melbourne Formula 2 round|ALB]]<br>{{flagicon|AUS}}
+! colspan="2" |[[2026 Miami Formula 2 round|MIA]]<br>{{flagicon|USA}}
+! colspan="2" |[[2026 Montreal Formula 2 round|MTL]]<br>{{flagicon|CAN}}
+! colspan="2" |[[2026 Monte Carlo Formula 2 round|MON]]<br>{{flagicon|MCO}}
+! colspan="2" |[[2026 Barcelona Formula 2 round|CAT]]<br>{{flagicon|ESP}}
+! colspan="2" |[[2026 Spielberg Formula 2 round|RBR]]<br>{{flagicon|AUT}}
+! colspan="2" |[[2026 Silverstone Formula 2 round|SIL]]<br>{{flagicon|GBR}}
+! colspan="2" |[[2026 Spa-Francorchamps Formula 2 round|SPA]]<br>{{flagicon|BEL}}
+! colspan="2" |[[2026 Budapest Formula 2 round|HUN]]<br>{{flagicon|HUN}}
+! colspan="2" |[[2026 Monza Formula 2 round|MNZ]]<br>{{flagicon|ITA}}
+! colspan="2" |[[2026 Madrid Formula 2 round|MAD]]<br>{{flagicon|ESP}}
+! colspan="2" |[[2026 Baku Formula 2 round|BAK]]<br>{{flagicon|AZE}}
+! colspan="2" |[[2026 Lusail Formula 2 round|LUS]]<br>{{flagicon|QAT}}
+! colspan="2" |[[2026 Yas Island Formula 2 round|YAS]]<br>{{flagicon|ARE}}
+|-
+| colspan="31" align="bottom" style="background-color:#EAECF0;text-align:center" |'''Sources:<ref>{{cite web|title=Team Standings for the FIA Formula 2 2026 Championship|url=https://www.fiaformula2.com/Standings/Team?seasonId=183|work=FIA Formula 2 Championship|access-date=6 March 2026}}</ref>'''
+|}
+| style="vertical-align:top;" |{{F1 driver results legend 9}}
+{{dagger}}&nbsp;– Driver did not finish the race, but was classified as he completed more than 90% of the race distance.
+|}
+
+The standings are sorted by best result; the rows are not related to the drivers. In case of a tie on points, the best positions achieved determined the outcome.
+
+== Notes == 
+{{notelist}}
+
+== References ==
+{{reflist}}
+
+== External links ==
+* [http://www.fiaformula2.com/ FIA Formula 2 Championship official website]
+{{Formula Two years}}
+{{List of FIA Formula 2 rounds}}
+[[Category:FIA Formula 2 Championship seasons]]
+[[Category:2026 in formula racing|Formula 2 Championship]]
+[[Category:Current motorsport seasons|Formula 2 Championship]]
