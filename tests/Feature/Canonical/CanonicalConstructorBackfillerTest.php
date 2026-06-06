@@ -26,7 +26,7 @@ it('създава 1 каноничен запис на отбор и свърз
     $r1 = Race::factory()->create(['season_id' => $s1->id]);
     Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $d1->id, 'grid_position' => 1]); // win + pole
     $r2 = Race::factory()->create(['season_id' => $s2->id]);
-    Result::factory()->position(2)->create(['race_id' => $r2->id, 'driver_id' => $d2->id]); // podium
+    Result::factory()->position(2)->create(['race_id' => $r2->id, 'driver_id' => $d2->id, 'grid_position' => 4]); // podium, не е pole
 
     backfillCanonicalConstructors();
 
