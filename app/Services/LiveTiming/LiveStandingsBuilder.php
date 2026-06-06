@@ -83,7 +83,12 @@ class LiveStandingsBuilder
         $sorted = $rows->sortBy(fn ($r) => $r['best_lap_seconds'] ?? PHP_FLOAT_MAX)->values();
         $leader = $sorted->first()['best_lap_seconds'] ?? null;
 
-        return $sorted->map(function ($row, $i) use ($leader) {
+        // Сесийно-най-добри сектори (за лилаво оцветяване).
+        $bestS1 = $this->sessionBest($sorted, 'sector1_best');
+        $bestS2 = $this->sessionBest($sorted, 'sector2_best');
+        $bestS3 = $this->sessionBest($sorted, 'sector3_best');
+
+        return $sorted->map(function ($row, $i) use ($leader, $bestS1, $bestS2, $bestS3) {
             $row['position'] = $i + 1;
 
             if ($leader !== null && $row['best_lap_seconds'] !== null && $i > 0) {
@@ -92,8 +97,24 @@ class LiveStandingsBuilder
                 $row['gap_to_leader'] = '—';
             }
 
+            // Флагове за оцветяване: лилаво = сесиен рекорд за обиколката/сектора.
+            $row['is_overall_best'] = $leader !== null && $row['best_lap_seconds'] === $leader;
+            $row['sector1_overall'] = $bestS1 !== null && $row['sector1_best'] === $bestS1;
+            $row['sector2_overall'] = $bestS2 !== null && $row['sector2_best'] === $bestS2;
+            $row['sector3_overall'] = $bestS3 !== null && $row['sector3_best'] === $bestS3;
+
             return $row;
         });
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     */
+    private function sessionBest(Collection $rows, string $key): ?float
+    {
+        $values = $rows->pluck($key)->filter(fn ($v) => $v !== null);
+
+        return $values->isEmpty() ? null : (float) $values->min();
     }
 
     /**

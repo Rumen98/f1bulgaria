@@ -8,6 +8,7 @@ const user = computed(() => page.props.auth?.user);
 const flashSuccess = computed(() => page.props.flash?.success);
 
 const navItems = [
+    { label: 'На живо 🔴', route: 'live' },
     { label: 'Новини', route: 'news.index' },
     { label: 'Календар', route: 'calendar' },
     { label: 'Класиране', route: 'standings' },

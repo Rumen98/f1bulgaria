@@ -79,6 +79,16 @@ const tire = (compound) => {
     return map[compound] ?? null;
 };
 
+const fmtSector = (v) => (v ? v.toFixed(3) : '—');
+
+// Лилаво = сесиен рекорд за сектора; зелено = лично най-добро (показваме него); иначе сиво.
+const sectorClass = (row, n) => {
+    if (row[`sector${n}_overall`]) {
+        return 'text-purple-400';
+    }
+    return row[`sector${n}_best`] ? 'text-emerald-400' : 'text-zinc-600';
+};
+
 const nextRaceCountdown = computed(() => {
     if (!props.nextRace?.starts_at) {
         return null;
@@ -127,6 +137,9 @@ const nextRaceCountdown = computed(() => {
                             <th class="hidden px-3 py-2 text-left lg:table-cell">Отбор</th>
                             <th class="px-2 py-2 text-right sm:px-3">Най-добра</th>
                             <th class="hidden px-3 py-2 text-right md:table-cell">Последна</th>
+                            <th class="hidden px-2 py-2 text-right xl:table-cell">С1</th>
+                            <th class="hidden px-2 py-2 text-right xl:table-cell">С2</th>
+                            <th class="hidden px-2 py-2 text-right xl:table-cell">С3</th>
                             <th class="hidden px-2 py-2 text-right lg:table-cell">Инт.</th>
                             <th class="px-2 py-2 text-center">Гума</th>
                             <th class="hidden px-2 py-2 text-right sm:table-cell">Об.</th>
@@ -142,8 +155,11 @@ const nextRaceCountdown = computed(() => {
                                 </span>
                             </td>
                             <td class="hidden px-3 py-2.5 text-zinc-400 lg:table-cell">{{ row.team_name }}</td>
-                            <td class="px-2 py-2.5 text-right font-bold tabular-nums text-white sm:px-3">{{ row.best_lap_time ?? '—' }}</td>
+                            <td class="px-2 py-2.5 text-right font-bold tabular-nums sm:px-3" :class="row.is_overall_best ? 'text-purple-400' : 'text-white'">{{ row.best_lap_time ?? '—' }}</td>
                             <td class="hidden px-3 py-2.5 text-right tabular-nums text-zinc-400 md:table-cell">{{ row.last_lap_time ?? '—' }}</td>
+                            <td class="hidden px-2 py-2.5 text-right tabular-nums xl:table-cell" :class="sectorClass(row, 1)">{{ fmtSector(row.sector1_best) }}</td>
+                            <td class="hidden px-2 py-2.5 text-right tabular-nums xl:table-cell" :class="sectorClass(row, 2)">{{ fmtSector(row.sector2_best) }}</td>
+                            <td class="hidden px-2 py-2.5 text-right tabular-nums xl:table-cell" :class="sectorClass(row, 3)">{{ fmtSector(row.sector3_best) }}</td>
                             <td class="hidden px-2 py-2.5 text-right tabular-nums text-zinc-400 lg:table-cell">{{ row.gap_to_leader ?? '' }}</td>
                             <td class="px-2 py-2.5 text-center">
                                 <span v-if="tire(row.current_tire)" class="inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold" :class="tire(row.current_tire).c">
