@@ -24,13 +24,10 @@ class OpenF1Client
 
     private int $timeout;
 
-    private ?string $apiKey;
-
-    public function __construct()
+    public function __construct(private readonly OpenF1TokenManager $tokens)
     {
         $this->baseUrl = rtrim((string) config('services.openf1.base_url'), '/');
         $this->timeout = (int) config('services.openf1.timeout', 10);
-        $this->apiKey = config('services.openf1.key') ?: null;
     }
 
     /**
@@ -147,12 +144,18 @@ class OpenF1Client
         try {
             $request = Http::acceptJson()->timeout($this->timeout);
 
-            // OpenF1 изисква Bearer токен по време на живи сесии (иначе 401).
-            if ($this->apiKey !== null) {
-                $request = $request->withToken($this->apiKey);
+            // OpenF1 изисква OAuth2 Bearer токен по време на живи сесии (иначе 401).
+            $token = $this->tokens->getToken();
+            if ($token !== null) {
+                $request = $request->withToken($token);
             }
 
             $response = $request->get("{$this->baseUrl}/{$endpoint}", $query);
+
+            // 401 → токенът може да е изтекъл; изчистваме го за следващия опит.
+            if ($response->status() === 401) {
+                $this->tokens->forget();
+            }
 
             if (! $response->successful()) {
                 Log::warning('OpenF1 заявка неуспешна', ['endpoint' => $endpoint, 'status' => $response->status()]);

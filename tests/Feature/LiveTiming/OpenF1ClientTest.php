@@ -81,17 +81,21 @@ it('връща празна колекция при HTTP 500 (graceful)', functi
         ->and(client()->getCurrentSession())->toBeNull();
 });
 
-it('праща Bearer токен когато е конфигуриран ключ (за живи сесии)', function () {
-    config(['services.openf1.key' => 'secret-token']);
-    Http::fake(['*/laps*' => Http::response([['driver_number' => 1, 'lap_number' => 1]])]);
+it('праща OAuth Bearer токен когато има кредитали (за живи сесии)', function () {
+    config(['services.openf1.username' => 'u@x.bg', 'services.openf1.password' => 'p']);
+    Http::fake([
+        '*/token' => Http::response(['access_token' => 'oauth-token', 'expires_in' => 3600]),
+        '*/laps*' => Http::response([['driver_number' => 1, 'lap_number' => 1]]),
+    ]);
 
     client()->getLatestLaps(9999);
 
-    Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer secret-token'));
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/laps')
+        && $request->hasHeader('Authorization', 'Bearer oauth-token'));
 });
 
-it('НЕ праща Authorization когато няма ключ', function () {
-    config(['services.openf1.key' => null]);
+it('НЕ праща Authorization когато няма кредитали', function () {
+    config(['services.openf1.username' => null, 'services.openf1.password' => null]);
     Http::fake(['*/laps*' => Http::response([])]);
 
     client()->getLatestLaps(9999);
