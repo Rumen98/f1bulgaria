@@ -38,6 +38,8 @@ Route::get('/circuits/{slug}', [CircuitsController::class, 'show'])->name('circu
 Route::get('/compare', [CompareController::class, 'index'])->name('compare.index');
 Route::get('/compare/{slug1}/{slug2}', [CompareController::class, 'show'])->name('compare.show');
 Route::get('/istoria', [HistoryController::class, 'index'])->name('history');
+Route::get('/istoria/svetovna', [HistoryController::class, 'world'])->name('history.world');
+Route::get('/istoria/bulgaria', [HistoryController::class, 'bulgaria'])->name('history.bulgaria');
 Route::get('/rivalries', [RivalriesController::class, 'index'])->name('rivalries.index');
 Route::middleware('auth')->group(function () {
     Route::get('/rivalries/create', [RivalriesController::class, 'create'])->name('rivalries.create');
