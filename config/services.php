@@ -51,4 +51,9 @@ return [
         'timeout' => (int) env('ANTHROPIC_TIMEOUT', 120),
     ],
 
+    'openf1' => [
+        'base_url' => env('OPENF1_BASE_URL', 'https://api.openf1.org/v1'),
+        'timeout' => (int) env('OPENF1_TIMEOUT', 10),
+    ],
+
 ];
