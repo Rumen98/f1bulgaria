@@ -56,6 +56,19 @@ const photo = computed(() => props.profile.photos?.[0] ?? null);
             </div>
         </section>
 
+        <!-- Титли (акценти) -->
+        <section v-if="profile.titles?.length" class="mx-auto mt-8 max-w-3xl">
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div v-for="(t, i) in profile.titles" :key="i" class="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                    <span class="text-3xl">🏆</span>
+                    <div>
+                        <div class="text-lg font-black tabular-nums text-amber-300">{{ t.year }}</div>
+                        <div class="text-sm font-semibold text-white">{{ t.title }}</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Кариерна линия -->
         <section v-if="profile.milestones?.length" class="mx-auto mt-8 max-w-3xl">
             <h2 class="mb-4 text-lg font-bold text-white">Кариерен път</h2>
