@@ -71,7 +71,12 @@ it('връща индекс на каноничните отбори с акти
     $current = Season::factory()->current()->create(['year' => 2024]);
     $old = Season::factory()->create(['year' => 1990, 'is_current' => false]);
     Constructor::factory()->create(['season_id' => $current->id, 'name' => 'Ferrari', 'slug' => 'ferrari']);
-    Constructor::factory()->create(['season_id' => $old->id, 'name' => 'Team Lotus', 'slug' => 'lotus']);
+    $lotus = Constructor::factory()->create(['season_id' => $old->id, 'name' => 'Team Lotus', 'slug' => 'lotus']);
+
+    // Lotus има поне едно състезание, за да мине филтъра „races>0".
+    $driver = Driver::factory()->create(['season_id' => $old->id, 'constructor_id' => $lotus->id]);
+    $race = Race::factory()->create(['season_id' => $old->id]);
+    Result::factory()->position(1)->create(['race_id' => $race->id, 'driver_id' => $driver->id]);
 
     app(CanonicalConstructorBackfiller::class)->backfill();
 
@@ -81,4 +86,20 @@ it('връща индекс на каноничните отбори с акти
         ->and($index->firstWhere('slug', 'ferrari')['is_active'])->toBeTrue()
         ->and($index->firstWhere('slug', 'lotus')['is_active'])->toBeFalse()
         ->and($index->firstWhere('slug', 'lotus')['seasons'])->toBe(1);
+});
+
+it('скрива отбори без състезания (освен ако са активни)', function () {
+    $current = Season::factory()->current()->create(['year' => 2024]);
+    $old = Season::factory()->create(['year' => 1960, 'is_current' => false]);
+    // Активен отбор без състезания (нов за сезона) → показва се.
+    Constructor::factory()->create(['season_id' => $current->id, 'name' => 'Cadillac', 'slug' => 'cadillac']);
+    // Обскурен исторически без състезания → скрива се.
+    Constructor::factory()->create(['season_id' => $old->id, 'name' => 'Politoys', 'slug' => 'politoys']);
+
+    app(CanonicalConstructorBackfiller::class)->backfill();
+
+    $index = app(TeamStatsService::class)->getTeamIndex();
+
+    expect($index->pluck('slug'))->toContain('cadillac')
+        ->and($index->pluck('slug'))->not->toContain('politoys');
 });

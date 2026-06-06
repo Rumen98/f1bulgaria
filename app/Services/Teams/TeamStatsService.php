@@ -96,6 +96,9 @@ class TeamStatsService
                 ->pluck('c', 'canonical_id');
 
             return ConstructorCanonical::query()
+                // Скриваме записи без нито едно състезание (освен ако са активни в
+                // текущия сезон) — изчиства обскурни/непълни исторически записи.
+                ->where(fn ($q) => $q->where('total_races', '>', 0)->orWhere('is_active', true))
                 ->orderByDesc('total_wins')
                 ->orderByDesc('total_poles')
                 ->get()
