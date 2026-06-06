@@ -81,7 +81,7 @@ const filtered = computed(() => {
                     </div>
                     <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
-                            <span class="truncate text-lg font-bold text-white">{{ team.name }}</span>
+                            <span class="truncate text-lg font-bold text-white">{{ team.name_bg ?? team.name }}</span>
                             <span v-if="!team.is_active" class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">Легенда</span>
                         </div>
                         <div class="text-sm text-zinc-500">

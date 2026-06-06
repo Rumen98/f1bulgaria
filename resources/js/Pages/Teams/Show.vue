@@ -33,7 +33,7 @@ const props = defineProps({
                 </div>
                 <div>
                     <div class="flex flex-wrap items-center gap-3">
-                        <h1 class="text-3xl font-black sm:text-4xl">{{ team.name }}</h1>
+                        <h1 class="text-3xl font-black sm:text-4xl">{{ team.name_bg ?? team.name }}</h1>
                         <span
                             class="rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide"
                             :class="team.is_active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'"

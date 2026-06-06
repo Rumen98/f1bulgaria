@@ -88,7 +88,7 @@ const tab = ref('drivers');
                                 <span class="h-6 w-6 shrink-0">
                                     <TeamBrand :name="row.constructor.name" :slug="row.constructor.slug" :color="row.constructor.color_hex ?? '#52525b'" variant="emblem" />
                                 </span>
-                                {{ row.constructor.name }}
+                                {{ row.constructor.name_bg ?? row.constructor.name }}
                             </span>
                         </td>
                         <td class="px-4 py-3 text-center tabular-nums text-zinc-300">{{ row.wins }}</td>

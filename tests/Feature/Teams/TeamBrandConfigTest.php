@@ -22,15 +22,27 @@ it('споделя team-brands конфигурацията към фронте�
             ->has('teamBrands.mercedes'));
 });
 
-it('конфигът съдържа всичките 10 текущи отбора с валидни форми', function () {
+it('конфигът ползва реалните slug-ове на текущите отбори с валидни форми', function () {
     $brands = config('team-brands');
     $validShapes = ['shield', 'hexagon', 'angular', 'classic', 'circle'];
 
-    expect($brands)->toHaveKeys(['ferrari', 'mercedes', 'red_bull', 'mclaren', 'williams', 'aston_martin', 'alpine', 'haas', 'rb', 'kick_sauber']);
+    // Ключовете трябва да съвпадат с реалните slug-ове в базата (както са от Jolpica).
+    expect($brands)->toHaveKeys([
+        'ferrari', 'mercedes', 'red-bull', 'mclaren', 'williams',
+        'aston-martin', 'alpine-f1-team', 'haas-f1-team', 'rb-f1-team', 'audi', 'cadillac-f1-team',
+    ]);
 
     foreach ($brands as $slug => $cfg) {
         expect($cfg['shape'])->toBeIn($validShapes, "shape за {$slug}")
+            ->and($cfg['name_bg'])->toBeString()
             ->and($cfg['colors'])->toBeArray()
             ->and(count($cfg['colors']))->toBe(2);
     }
+});
+
+it('изписва правилните български имена на отборите (Алпин, не Алпайн)', function () {
+    expect(config('team-brands.alpine-f1-team.name_bg'))->toBe('Алпин')
+        ->and(config('team-brands.ferrari.name_bg'))->toBe('Ферари')
+        ->and(config('team-brands.red-bull.name_bg'))->toBe('Ред Бул')
+        ->and(config('team-brands.aston-martin.name_bg'))->toBe('Астън Мартин');
 });

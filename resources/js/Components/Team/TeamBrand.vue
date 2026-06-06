@@ -25,7 +25,7 @@ const secondary = computed(() => brand.value?.colors?.[1] ?? '#0a0a0a');
 const shape = computed(() => brand.value?.shape ?? 'circle');
 const font = computed(() => brand.value?.font ?? 'sans');
 
-const wordmark = computed(() => (props.name ?? '').toUpperCase());
+const wordmark = computed(() => (brand.value?.name_bg ?? props.name ?? '').toUpperCase());
 
 // До 2 инициала за вътре в badge-а (Ferrari → F, Red Bull Racing → RB).
 const initials = computed(() => {

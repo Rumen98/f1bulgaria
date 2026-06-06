@@ -95,6 +95,7 @@ class TeamStatsService
                 ->map(fn (ConstructorCanonical $c) => [
                     'slug' => $c->slug,
                     'name' => $c->name,
+                    'name_bg' => config("team-brands.{$c->slug}.name_bg"),
                     'color_hex' => $c->color_hex ?? '#e10600',
                     'wins' => $c->total_wins,
                     'poles' => $c->total_poles,

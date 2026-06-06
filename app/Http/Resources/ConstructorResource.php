@@ -21,6 +21,7 @@ class ConstructorResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'name_bg' => config("team-brands.{$this->slug}.name_bg"),
             'slug' => $this->slug,
             'color_hex' => $this->color_hex,
         ];
