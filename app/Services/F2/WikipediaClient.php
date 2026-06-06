@@ -18,6 +18,9 @@ use Throwable;
  */
 class WikipediaClient
 {
+    /** Sentinel за кеширане на липсваща статия (negative cache). */
+    private const MISS = '__f2_miss__';
+
     public function getSeasonPage(int $year): ?string
     {
         return $this->getPage("{$year} Formula 2 Championship");
@@ -29,16 +32,28 @@ class WikipediaClient
     }
 
     /**
-     * Връща raw wikitext на статия по точно заглавие (кеширано 24h). null при
-     * липса/грешка/disambiguation.
+     * Връща raw wikitext на статия по точно заглавие. null при
+     * липса/грешка/disambiguation. Кеширано: успехи 24h (минали състезания
+     * не се менят), липси 6h (бъдещ кръг да се появи щом бъде публикуван).
      */
     public function getPage(string $title): ?string
     {
-        return Cache::remember(
-            'wikipedia:wikitext:'.md5($title),
-            now()->addDay(),
-            fn () => $this->fetchWikitext($title),
+        $key = 'wikipedia:wikitext:'.md5($title);
+        $cached = Cache::get($key);
+
+        if ($cached !== null) {
+            return $cached === self::MISS ? null : $cached;
+        }
+
+        $wikitext = $this->fetchWikitext($title);
+
+        Cache::put(
+            $key,
+            $wikitext ?? self::MISS,
+            $wikitext !== null ? now()->addDay() : now()->addHours(6),
         );
+
+        return $wikitext;
     }
 
     private function fetchWikitext(string $title): ?string

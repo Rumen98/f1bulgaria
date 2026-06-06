@@ -97,3 +97,23 @@ it('изчислява класиране (точки + позиция) за т�
         ->and($tsolov->position)->not->toBeNull()
         ->and($tsolov->is_champion)->toBeFalse(); // текущ сезон → няма шампион още
 });
+
+it('записва pole позицията в главното състезание (Pole_driver_r2)', function () {
+    sync()->syncYear(2026);
+
+    $feature = F2RaceSession::query()->where('session_type', 'feature_race')->first();
+    expect($feature->pole_position_driver_id)->not->toBeNull()
+        ->and($feature->poleDriver->slug)->toBe('dino-beganovic');
+});
+
+it('записва датите на кръга и сесиите', function () {
+    sync()->syncYear(2026);
+
+    $race = F2Race::first();
+    expect($race->race_datetime_utc?->toDateString())->toBe('2026-03-08');
+
+    $sprint = F2RaceSession::query()->where('session_type', 'sprint_race')->first();
+    $feature = F2RaceSession::query()->where('session_type', 'feature_race')->first();
+    expect($sprint->date?->toDateString())->toBe('2026-03-07')
+        ->and($feature->date?->toDateString())->toBe('2026-03-08');
+});

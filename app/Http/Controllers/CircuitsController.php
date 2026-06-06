@@ -25,6 +25,10 @@ class CircuitsController extends Controller
         $currentYear = Season::current()?->year ?? (int) Season::query()->max('year');
         $activeThreshold = $currentYear - 2; // последни 3 сезона (текущ + 2)
 
+        // Една директорийна проверка вместо File::exists() в цикъла.
+        $tracks = collect(File::glob(resource_path('svg/circuits/*.svg')))
+            ->mapWithKeys(fn ($p) => [pathinfo($p, PATHINFO_FILENAME) => true]);
+
         $circuits = Race::query()
             ->whereNotNull('races.jolpica_id')
             ->join('seasons', 'seasons.id', '=', 'races.season_id')
@@ -37,7 +41,7 @@ class CircuitsController extends Controller
                 'country' => $r->country,
                 'last_race_year' => (int) $r->last_year,
                 'is_active' => (int) $r->last_year >= $activeThreshold,
-                'has_track' => File::exists(resource_path("svg/circuits/{$r->slug}.svg")),
+                'has_track' => $tracks->has($r->slug),
             ])
             // Активни първо, после по година на последното състезание (низходящо).
             ->sortByDesc(fn ($c) => ($c['is_active'] ? 1 : 0) * 100000 + $c['last_race_year'])

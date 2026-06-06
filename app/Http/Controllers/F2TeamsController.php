@@ -38,7 +38,7 @@ class F2TeamsController extends Controller
 
     public function show(string $slug): Response
     {
-        $entries = F2Team::query()->where('slug', $slug)->with(['season', 'drivers'])->get();
+        $entries = F2Team::query()->where('slug', $slug)->with(['season', 'drivers.season'])->get();
 
         abort_if($entries->isEmpty(), 404);
 

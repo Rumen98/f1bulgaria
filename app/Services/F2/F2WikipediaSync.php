@@ -11,8 +11,10 @@ use App\Models\F2RaceSession;
 use App\Models\F2Result;
 use App\Models\F2Season;
 use App\Models\F2Team;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Синхронизира F2 сезон от Wikipedia (season page → round pages → results).
@@ -89,6 +91,9 @@ class F2WikipediaSync
         $parsed = $this->parser->parseRoundPage($wikitext);
         $location = $this->locationFromTitle($title, $season->year);
 
+        $featureDate = $this->resolveDate($parsed['feature']['date'] ?? null, $season->year);
+        $sprintDate = $this->resolveDate($parsed['sprint']['date'] ?? null, $season->year);
+
         $race = F2Race::query()->updateOrCreate(
             ['f2_season_id' => $season->id, 'round' => $roundNo],
             [
@@ -96,6 +101,7 @@ class F2WikipediaSync
                 'circuit_jolpica_id' => config("f2-circuit-map.{$location}"),
                 'slug' => Str::slug("{$season->year}-{$location}"),
                 'wikipedia_url' => 'https://en.wikipedia.org/wiki/'.str_replace(' ', '_', $title),
+                'race_datetime_utc' => $featureDate ?? $sprintDate,
             ],
         );
 
@@ -106,7 +112,7 @@ class F2WikipediaSync
     }
 
     /**
-     * @param  array{results:Collection<int,array<string,mixed>>, fastest_driver:?string, fastest_time:?string}  $data
+     * @param  array{results:Collection<int,array<string,mixed>>, fastest_driver:?string, fastest_time:?string, date:?string}  $data
      */
     private function syncSession(F2Season $season, F2Race $race, F2SessionType $type, array $data, ?string $poleDriver = null): void
     {
@@ -117,6 +123,7 @@ class F2WikipediaSync
         $session = F2RaceSession::query()->updateOrCreate(
             ['f2_race_id' => $race->id, 'session_type' => $type->value],
             [
+                'date' => $this->resolveDate($data['date'] ?? null, $season->year),
                 'laps' => $data['results']->max('laps'),
                 'fastest_lap_driver_id' => $data['fastest_driver'] ? $this->driver($season, $data['fastest_driver'])->id : null,
                 'fastest_lap_time' => $data['fastest_time'],
@@ -205,6 +212,29 @@ class F2WikipediaSync
                 'position' => $rank === false ? null : $rank + 1,
                 'is_champion' => $rank === 0 && ! $season->is_current,
             ]);
+        }
+    }
+
+    /**
+     * Дата от Wikipedia (напр. „8 March“) + сезонна година → Carbon. null при
+     * липса/непарсваема стойност (бъдещ кръг) — без измисляне.
+     */
+    private function resolveDate(?string $raw, int $year): ?Carbon
+    {
+        $raw = trim((string) $raw);
+
+        if ($raw === '') {
+            return null;
+        }
+
+        if (! preg_match('/\d{4}/', $raw)) {
+            $raw .= ' '.$year;
+        }
+
+        try {
+            return Carbon::parse($raw);
+        } catch (Throwable) {
+            return null;
         }
     }
 

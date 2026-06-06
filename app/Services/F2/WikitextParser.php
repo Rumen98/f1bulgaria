@@ -22,25 +22,28 @@ class WikitextParser
      */
     public function parseRoundPage(string $wikitext): array
     {
+        // Sprint = състезание 1 от уикенда (Date_r1), Feature = състезание 2 (Date_r2).
         return [
             'round_no' => $this->intOrNull($this->infoboxField($wikitext, 'Round_No')),
-            'pole_driver' => $this->firstLink($this->infoboxField($wikitext, 'Pole_driver') ?? ''),
-            'sprint' => $this->parseSession($wikitext, 'Sprint race'),
-            'feature' => $this->parseSession($wikitext, 'Feature race'),
+            'pole_driver' => $this->firstLink($this->poleField($wikitext) ?? ''),
+            'sprint' => $this->parseSession($wikitext, 'Sprint race', $this->infoboxField($wikitext, 'Date_r1')),
+            'feature' => $this->parseSession($wikitext, 'Feature race', $this->infoboxField($wikitext, 'Date_r2')),
         ];
     }
 
     /**
-     * @return array{results:Collection<int,array<string,mixed>>, fastest_driver:?string, fastest_time:?string}
+     * @return array{results:Collection<int,array<string,mixed>>, fastest_driver:?string, fastest_time:?string, date:?string}
      */
-    private function parseSession(string $wikitext, string $heading): array
+    private function parseSession(string $wikitext, string $heading, ?string $date = null): array
     {
         $section = $this->extractSection($wikitext, $heading);
+        $fastest = $this->fastestLap($section);
 
         return [
             'results' => $this->parseResultsTable($section),
-            'fastest_driver' => $this->fastestLap($section)['driver'],
-            'fastest_time' => $this->fastestLap($section)['time'],
+            'fastest_driver' => $fastest['driver'],
+            'fastest_time' => $fastest['time'],
+            'date' => $date !== null ? trim($this->stripWiki($date)) ?: null : null,
         ];
     }
 
@@ -92,13 +95,13 @@ class WikitextParser
             'position' => $isNumeric ? (int) $posToken : null,
             'status' => $isNumeric ? 'Finished' : ($timeOrGap ?: strtoupper($posToken)),
             'car_number' => $this->intOrNull($this->stripWiki($cells[1])),
-            'driver' => $this->firstLink($driverCell) ?? trim($this->stripWiki($driverCell)),
+            'driver' => $this->displayName($driverCell),
             'driver_flag' => $this->flag($driverCell),
-            'team' => $this->firstLink($cells[3]) ?? trim($this->stripWiki($cells[3])),
+            'team' => $this->displayName($cells[3]),
             'laps' => $this->intOrNull($this->stripWiki($cells[4])),
             'time_or_gap' => $timeOrGap,
             'grid' => $this->intOrNull($this->stripWiki($cells[6])),
-            'points' => (float) ($this->stripWiki($cells[7]) !== '' ? str_replace(',', '.', trim($this->stripWiki($cells[7]))) : 0),
+            'points' => $this->parsePoints($this->stripWiki($cells[7])),
         ];
     }
 
@@ -113,7 +116,12 @@ class WikitextParser
 
         foreach (explode("\n", $block) as $line) {
             $line = rtrim($line);
-            if ($line === '' || str_starts_with($line, '{|') || str_starts_with($line, '|}') || str_starts_with($line, '|+')) {
+            if ($line === '' || str_starts_with($line, '{|') || str_starts_with($line, '|}')) {
+                continue;
+            }
+            // Само истински caption `|+` (intervala/текст), но НЕ клетка-стойност като `|+5 Laps` / `|+1 Lap`.
+            // Caption-ите се срещат само в table-open блока, който и без това отпада (липсват 8 клетки).
+            if (str_starts_with($line, '|+') && ! preg_match('/^\|\+\s*[+\d]/', $line)) {
                 continue;
             }
 
@@ -167,7 +175,7 @@ class WikitextParser
 
     private function extractSection(string $wikitext, string $heading): string
     {
-        $pattern = '/={2,}\s*'.preg_quote($heading, '/').'\s*={2,}(.*?)(?=\n={2,}[^=])/s';
+        $pattern = '/={2,}\s*'.preg_quote($heading, '/').'\s*={2,}(.*?)(?=\n={2,}[^=]|\z)/s';
 
         return preg_match($pattern, $wikitext, $m) ? $m[1] : '';
     }
@@ -205,9 +213,49 @@ class WikitextParser
         return null;
     }
 
+    /**
+     * Дисплей-текстът на първата wiki-връзка: `[[target|label]] → label`, `[[plain]] → plain`.
+     */
     private function firstLink(string $text): ?string
     {
-        return preg_match('/\[\[([^\]|]+)/', $text, $m) ? trim($m[1]) : null;
+        return preg_match('/\[\[(?:[^\]|]*\|)?([^\]|]+)/', $text, $m) ? trim($m[1]) : null;
+    }
+
+    /**
+     * Човешко име (пилот/отбор) от клетка — дисплей-текст без флагове/шаблони.
+     */
+    private function displayName(string $cell): ?string
+    {
+        return trim($this->stripWiki($cell)) ?: null;
+    }
+
+    /**
+     * Сумира точки, вкл. адитивни нотации като `15+1` (бонус за най-бърза обиколка) → 16.0.
+     */
+    private function parsePoints(string $clean): float
+    {
+        $clean = str_replace(',', '.', trim($clean));
+
+        if ($clean === '') {
+            return 0.0;
+        }
+
+        return array_sum(array_map('floatval', preg_split('/\s*\+\s*/', $clean)));
+    }
+
+    /**
+     * Стойност на pole полето — Wikipedia ползва суфикс по състезание (`Pole_driver_r2`).
+     */
+    private function poleField(string $wikitext): ?string
+    {
+        foreach (['Pole_driver_r2', 'Pole_driver_r1', 'Pole_driver'] as $field) {
+            $value = $this->infoboxField($wikitext, $field);
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     private function flag(string $text): ?string

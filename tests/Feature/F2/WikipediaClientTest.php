@@ -60,6 +60,15 @@ it('връща null при липсваща статия', function () {
     expect(wikiClient()->getPage('Nonexistent Article'))->toBeNull();
 });
 
+it('кешира и липсващите статии — не удря API повторно (#6)', function () {
+    Http::fake(['*' => Http::response(['error' => ['code' => 'missingtitle', 'info' => 'no']])]);
+
+    expect(wikiClient()->getPage('Future Round'))->toBeNull()
+        ->and(wikiClient()->getPage('Future Round'))->toBeNull();
+
+    Http::assertSentCount(1); // вторият път идва от negative cache
+});
+
 it('връща null при disambiguation', function () {
     Http::fake(['*' => Http::response(fakeParse('{{disambiguation}}\nMultiple meanings'))]);
 

@@ -106,3 +106,140 @@ WIKI;
 it('връща празна колекция при липсваща таблица', function () {
     expect(parser()->parseResultsTable('no table here'))->toBeEmpty();
 });
+
+// --- регресии от adversarial review ---
+
+it('извлича pole от полето Pole_driver_r2 (не Pole_driver)', function () {
+    $r = parser()->parseRoundPage(melbourneFixture());
+
+    expect($r['pole_driver'])->toBe('Dino Beganovic');
+});
+
+it('извлича датите на сесиите от инфобокса (Date_r1/Date_r2)', function () {
+    $r = parser()->parseRoundPage(melbourneFixture());
+
+    expect($r['sprint']['date'])->toBe('7 March')
+        ->and($r['feature']['date'])->toBe('8 March');
+});
+
+it('връща дисплей-текста на piped wiki-връзки за пилот и отбор', function () {
+    $table = <<<'WIKI'
+{| class="wikitable"
+! Pos !! No !! Driver !! Entrant !! Laps !! Time/Retired !! Grid !! Points
+|-
+!1
+| align="center" |11
+|{{Flagicon|GBR}} [[John Bennett (racing driver)|John Bennett]]
+|[[DAMS|DAMS Lucas Oil]]
+| align="center" |40
+|1:00:00.000
+| align="center" |1
+| align="center" |25
+|-
+!2
+| align="center" |21
+|{{Flagicon|GBR}} [[Some Driver]]
+|[[Trident Motorsport|Trident]]
+| align="center" |40
+|+2.139
+| align="center" |2
+| align="center" |18
+|}
+WIKI;
+
+    $rows = parser()->parseResultsTable($table);
+
+    expect($rows[0]['driver'])->toBe('John Bennett')   // не „John Bennett (racing driver)“
+        ->and($rows[0]['team'])->toBe('DAMS Lucas Oil') // не „DAMS“
+        ->and($rows[1]['team'])->toBe('Trident');       // не „Trident Motorsport“
+});
+
+it('не изпуска редове, чиято gap-клетка започва с + (+5 Laps, +9.519)', function () {
+    $table = <<<'WIKI'
+{| class="wikitable"
+! Pos !! No !! Driver !! Entrant !! Laps !! Time/Retired !! Grid !! Points
+|-
+!1
+| align="center" |6
+|{{Flagicon|BUL}} [[Nikola Tsolov]]
+|[[Campos Racing]]
+| align="center" |40
+|1:00:00.000
+| align="center" |1
+| align="center" |25
+|-
+!2
+| align="center" |9
+|{{Flagicon|GBR}} [[Driver Two]]
+|[[Team Two]]
+| align="center" |40
+|+9.519
+| align="center" |2
+| align="center" |18
+|-
+!18
+| align="center" |20
+|{{Flagicon|FRA}} [[Driver Three]]
+|[[Team Three]]
+| align="center" |39
+|+5 Laps
+| align="center" |20
+| align="center" |
+|}
+WIKI;
+
+    $rows = parser()->parseResultsTable($table);
+
+    expect($rows)->toHaveCount(3)
+        ->and($rows[1]['time_or_gap'])->toBe('+9.519')
+        ->and($rows[2]['position'])->toBe(18)
+        ->and($rows[2]['time_or_gap'])->toBe('+5 Laps');
+});
+
+it('сумира адитивни точки 15+1 (бонус за най-бърза обиколка) → 16.0', function () {
+    $table = <<<'WIKI'
+{| class="wikitable"
+! Pos !! No !! Driver !! Entrant !! Laps !! Time/Retired !! Grid !! Points
+|-
+!1
+| align="center" |6
+|{{Flagicon|BUL}} [[Nikola Tsolov]]
+|[[Campos Racing]]
+| align="center" |40
+|1:00:00.000
+| align="center" |1
+| align="center" |15+1
+|}
+WIKI;
+
+    $rows = parser()->parseResultsTable($table);
+
+    expect($rows[0]['points'])->toBe(16.0);
+});
+
+it('извлича секция, дори когато е последна на страницата', function () {
+    $wikitext = <<<'WIKI'
+{{Infobox}}
+== Report ==
+Описание.
+
+=== Feature race ===
+{| class="wikitable"
+! Pos !! No !! Driver !! Entrant !! Laps !! Time/Retired !! Grid !! Points
+|-
+!1
+| align="center" |6
+|{{Flagicon|BUL}} [[Nikola Tsolov]]
+|[[Campos Racing]]
+| align="center" |40
+|1:00:00.000
+| align="center" |1
+| align="center" |25
+|}
+WIKI;
+
+    $feature = parser()->parseRoundPage($wikitext)['feature'];
+
+    expect($feature['results'])->toHaveCount(1)
+        ->and($feature['results'][0]['driver'])->toBe('Nikola Tsolov');
+});
