@@ -17,13 +17,13 @@ const finished = computed(() => props.race.results && props.race.results.length 
 </script>
 
 <template>
-    <Head :title="race.name" />
+    <Head :title="race.name_bg ?? race.name" />
 
     <PublicLayout>
         <div class="mb-6">
             <Link :href="route('calendar')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Календар</Link>
             <h1 class="mt-2 text-2xl font-black sm:text-3xl">
-                <span class="text-red-600">Кръг {{ race.round }}</span> — {{ race.name }}
+                <span class="text-red-600">Кръг {{ race.round }}</span> — {{ race.name_bg ?? race.name }}
             </h1>
             <p class="text-zinc-500">{{ race.circuit }}, {{ race.country }}</p>
         </div>

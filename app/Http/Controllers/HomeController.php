@@ -12,6 +12,7 @@ use App\Services\Hero\NextRaceResolver;
 use App\Services\Homepage\ThisDayInF1Service;
 use App\Services\LiveTiming\OpenF1Client;
 use App\Services\LiveTiming\OpenF1TokenManager;
+use App\Services\Races\RaceNameLocalizer;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -93,7 +94,7 @@ class HomeController extends Controller
             'race' => $ctx->race ? [
                 'id' => $ctx->race->id,
                 'round' => $ctx->race->round,
-                'name' => $ctx->race->name,
+                'name' => app(RaceNameLocalizer::class)->localize($ctx->race->jolpica_id, $ctx->race->name),
                 'circuit' => $ctx->race->circuit,
                 'country' => $ctx->race->country,
                 'race_at_sofia' => $ctx->race->race_datetime_utc

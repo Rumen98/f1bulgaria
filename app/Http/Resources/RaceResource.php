@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\Race;
+use App\Services\Races\RaceNameLocalizer;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
@@ -23,6 +24,7 @@ class RaceResource extends JsonResource
             'id' => $this->id,
             'round' => $this->round,
             'name' => $this->name,
+            'name_bg' => app(RaceNameLocalizer::class)->localize($this->jolpica_id, $this->name),
             'circuit' => $this->circuit,
             'country' => $this->country,
             'has_sprint' => $this->has_sprint,

@@ -40,7 +40,7 @@ defineProps({
                     </span>
                     <div>
                         <div class="font-semibold text-white">
-                            {{ race.name }}
+                            {{ race.name_bg ?? race.name }}
                             <span v-if="race.has_sprint" class="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-400">
                                 Спринт
                             </span>
