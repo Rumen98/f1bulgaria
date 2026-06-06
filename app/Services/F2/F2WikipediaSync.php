@@ -44,9 +44,13 @@ class F2WikipediaSync
 
         $rounds = $this->parser->parseSeasonPage($seasonWikitext)['rounds'];
 
-        // Текущ сезон = най-новата година (другите не са current).
+        // Текущ сезон = най-новата година; гарантираме точно един current.
         $isCurrent = $year >= (int) (F2Season::query()->max('year') ?? $year);
         $season = F2Season::query()->updateOrCreate(['year' => $year], ['is_current' => $isCurrent]);
+
+        if ($isCurrent) {
+            F2Season::query()->where('id', '!=', $season->id)->update(['is_current' => false]);
+        }
 
         foreach ($rounds as $index => $title) {
             $roundNo = $index + 1;
