@@ -14,7 +14,16 @@ defineProps({
     lastWinners: Array,
     records: Object,
     lastRace: Object,
+    f2Winners: { type: Array, default: () => [] },
 });
+
+const has = (name) => {
+    try {
+        return route().has(name);
+    } catch (e) {
+        return false;
+    }
+};
 </script>
 
 <template>
@@ -40,6 +49,30 @@ defineProps({
         <div class="mt-8">
             <CircuitRecords :records="records" />
         </div>
+
+        <!-- Формула 2 на тази писта -->
+        <section v-if="f2Winners.length" class="mt-8">
+            <h2 class="mb-3 text-lg font-bold text-white">Формула 2 на тази писта</h2>
+            <div class="overflow-hidden rounded-xl border border-zinc-800">
+                <table class="w-full text-sm">
+                    <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
+                        <tr><th class="px-4 py-2 text-left">Сезон</th><th class="px-4 py-2 text-left">Победител (главно)</th><th class="px-4 py-2 text-right"></th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60">
+                        <tr v-for="w in f2Winners" :key="w.year" class="bg-zinc-900/40">
+                            <td class="px-4 py-2.5 font-bold tabular-nums text-white">{{ w.year }}</td>
+                            <td class="px-4 py-2.5 text-zinc-200">
+                                <Link v-if="has('f2.drivers.show')" :href="route('f2.drivers.show', w.slug)" class="transition hover:text-red-400">{{ w.flag }} {{ w.driver }}</Link>
+                                <span v-else>{{ w.flag }} {{ w.driver }}</span>
+                            </td>
+                            <td class="px-4 py-2.5 text-right">
+                                <Link v-if="has('f2.race')" :href="route('f2.race', [w.race_slug, 'feature'])" class="text-xs text-zinc-500 transition hover:text-zinc-300">Резултати →</Link>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
         <div class="mt-8 grid gap-8 lg:grid-cols-2">
             <RecentWinners :winners="lastWinners" />

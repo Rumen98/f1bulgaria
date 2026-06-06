@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\F2Race;
 use App\Models\Race;
 use App\Models\Season;
 use App\Services\Circuits\CircuitStatsService;
+use App\Support\CountryFlag;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -92,7 +95,37 @@ class CircuitsController extends Controller
             'lastWinners' => $this->stats->getLastWinners($slug),
             'records' => $this->stats->getRecords($slug),
             'lastRace' => $this->stats->getLastRace($slug),
+            'f2Winners' => $this->f2Winners($slug),
         ]);
+    }
+
+    /**
+     * Победители във F2 главните състезания на тази писта (по сезони, най-новите
+     * първо). Празно ако няма F2 данни за пистата.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function f2Winners(string $slug): Collection
+    {
+        return F2Race::query()
+            ->where('circuit_jolpica_id', $slug)
+            ->with(['season', 'sessions' => fn ($q) => $q->where('session_type', 'feature_race')
+                ->with(['results' => fn ($r) => $r->where('position', 1)->with('driver')])])
+            ->get()
+            ->map(function (F2Race $race) {
+                $winner = $race->sessions->first()?->results->first()?->driver;
+
+                return $winner === null ? null : [
+                    'year' => $race->season?->year,
+                    'driver' => $winner->fullName(),
+                    'slug' => $winner->slug,
+                    'flag' => CountryFlag::emoji($winner->country_code),
+                    'race_slug' => $race->slug,
+                ];
+            })
+            ->filter()
+            ->sortByDesc('year')
+            ->values();
     }
 
     /**
