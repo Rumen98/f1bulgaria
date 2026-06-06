@@ -87,6 +87,7 @@ class CircuitsController extends Controller
                 'next_or_last_label' => $next ? 'Следващо състезание' : 'Последно състезание',
                 'next_or_last_date' => $refRace->race_datetime_utc?->copy()->setTimezone('Europe/Sofia')->format('d.m.Y'),
             ],
+            'technical' => config("circuit-data.{$slug}"),
             'standings' => $this->stats->getAllTimeDriverStandings($slug),
             'lastWinners' => $this->stats->getLastWinners($slug),
             'records' => $this->stats->getRecords($slug),

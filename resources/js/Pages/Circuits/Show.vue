@@ -2,12 +2,14 @@
 import AllTimeLeaderboard from '@/Components/Circuit/AllTimeLeaderboard.vue';
 import CircuitHero from '@/Components/Circuit/CircuitHero.vue';
 import CircuitRecords from '@/Components/Circuit/CircuitRecords.vue';
+import CircuitTechnical from '@/Components/Circuit/CircuitTechnical.vue';
 import RecentWinners from '@/Components/Circuit/RecentWinners.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
 defineProps({
     circuit: Object,
+    technical: { type: Object, default: null },
     standings: Array,
     lastWinners: Array,
     records: Object,
@@ -22,7 +24,12 @@ defineProps({
         <Link :href="route('circuits.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички писти</Link>
 
         <div class="mt-3">
-            <CircuitHero :circuit="circuit" />
+            <CircuitHero :circuit="circuit" :technical="technical" />
+        </div>
+
+        <!-- Технически данни -->
+        <div v-if="technical" class="mt-8">
+            <CircuitTechnical :tech="technical" />
         </div>
 
         <!-- Сигнатурата: all-time класиране -->

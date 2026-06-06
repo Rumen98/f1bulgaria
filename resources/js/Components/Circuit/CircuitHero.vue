@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 const props = defineProps({
     circuit: { type: Object, required: true },
+    technical: { type: Object, default: null },
 });
 
 const svgs = import.meta.glob('../../../svg/circuits/*.svg', { query: '?raw', import: 'default', eager: true });
@@ -44,6 +45,12 @@ const meta = computed(() => [
                 <div>
                     <div class="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">{{ circuit.country }}</div>
                     <h1 class="mt-1 text-3xl font-black sm:text-4xl">{{ circuit.name }}</h1>
+                    <p v-if="technical && (technical.length_km || technical.lap_record_time)" class="mt-1 text-sm text-zinc-300">
+                        <span v-if="technical.length_km" class="tabular-nums">{{ technical.length_km }} км</span>
+                        <span v-if="technical.lap_record_time" class="text-zinc-500">
+                            · ⏱️ {{ technical.lap_record_time }} ({{ technical.lap_record_driver }})
+                        </span>
+                    </p>
                     <p v-if="circuit.next_or_last_date" class="mt-1 text-sm text-zinc-400">
                         {{ circuit.next_or_last_label }}: {{ circuit.next_or_last_date }}
                     </p>

@@ -60,6 +60,30 @@ it('показва детайлната страница на писта с all-
             ->has('lastWinners'));
 });
 
+it('включва технически данни за позната писта', function () {
+    $this->get('/circuits/monaco')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('technical.length_km', 3.337)
+            ->where('technical.turns_count', 19)
+            ->where('technical.type', 'street')
+            ->where('technical.lap_record_driver', 'Lewis Hamilton'));
+});
+
+it('връща null технически данни за непозната писта', function () {
+    Race::factory()->create(['season_id' => $this->season->id, 'jolpica_id' => 'estoril', 'circuit' => 'Estoril']);
+
+    $this->get('/circuits/estoril')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('technical', null));
+});
+
+it('конфигът съдържа технически данни за активните писти', function () {
+    expect(config('circuit-data.monaco.length_km'))->toBe(3.337)
+        ->and(config('circuit-data.spa.turns_count'))->toBe(19)
+        ->and(config('circuit-data.nonexistent'))->toBeNull();
+});
+
 it('връща 404 за несъществуваща писта', function () {
     $this->get('/circuits/nonexistent')->assertNotFound();
 });
