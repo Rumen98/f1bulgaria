@@ -44,6 +44,13 @@ const posClass = (p) => ({ 1: 'text-amber-300', 2: 'text-zinc-300', 3: 'text-ora
             </select>
         </div>
 
+        <!-- F2 под-навигация -->
+        <div class="mb-6 flex flex-wrap gap-2">
+            <Link v-if="has('f2.calendar')" :href="route('f2.calendar')" class="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-red-600 hover:text-white">Календар</Link>
+            <Link v-if="has('f2.drivers.index')" :href="route('f2.drivers.index')" class="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-red-600 hover:text-white">Пилоти</Link>
+            <Link v-if="has('f2.teams.index')" :href="route('f2.teams.index')" class="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-red-600 hover:text-white">Отбори</Link>
+        </div>
+
         <!-- Български състезател spotlight -->
         <Link
             v-if="bulgarianSpotlight && has('f2.drivers.show')"
