@@ -19,6 +19,7 @@ use App\Http\Controllers\RaceController;
 use App\Http\Controllers\RivalriesController;
 use App\Http\Controllers\StandingsController;
 use App\Http\Controllers\TeamsController;
+use App\Http\Controllers\TerminologyController;
 use App\Http\Controllers\TsolovController;
 use Illuminate\Support\Facades\Route;
 
@@ -43,6 +44,7 @@ Route::get('/circuits/{slug}', [CircuitsController::class, 'show'])->name('circu
 Route::get('/compare', [CompareController::class, 'index'])->name('compare.index');
 Route::get('/compare/{slug1}/{slug2}', [CompareController::class, 'show'])->name('compare.show');
 Route::get('/tsolov', [TsolovController::class, 'index'])->name('tsolov');
+Route::get('/terminologiya', [TerminologyController::class, 'index'])->name('terminology');
 Route::get('/istoria', [HistoryController::class, 'index'])->name('history');
 Route::get('/istoria/svetovna', [HistoryController::class, 'world'])->name('history.world');
 Route::get('/istoria/bulgaria', [HistoryController::class, 'bulgaria'])->name('history.bulgaria');

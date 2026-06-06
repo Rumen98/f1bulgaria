@@ -22,6 +22,7 @@ const secondaryNav = [
     { label: 'Дуели', route: 'rivalries.index' },
     { label: 'Прогнози', route: 'leaderboard' },
     { label: 'История', route: 'history' },
+    { label: 'Речник', route: 'terminology' },
 ];
 
 const mobileOpen = ref(false);
