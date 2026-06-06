@@ -7,7 +7,16 @@ const props = defineProps({
     seasons: { type: Array, default: () => [] },
     standings: { type: Array, default: () => [] },
     champions: { type: Array, default: () => [] },
+    bulgarianSpotlight: { type: Object, default: null },
 });
+
+const has = (name) => {
+    try {
+        return route().has(name);
+    } catch (e) {
+        return false;
+    }
+};
 
 const goToSeason = (e) => {
     router.visit(route('f2.season', e.target.value));
@@ -34,6 +43,23 @@ const posClass = (p) => ({ 1: 'text-amber-300', 2: 'text-zinc-300', 3: 'text-ora
                 <option v-for="y in seasons" :key="y" :value="y">{{ y }}</option>
             </select>
         </div>
+
+        <!-- Български състезател spotlight -->
+        <Link
+            v-if="bulgarianSpotlight && has('f2.drivers.show')"
+            :href="route('f2.drivers.show', bulgarianSpotlight.slug)"
+            class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/40 bg-gradient-to-r from-emerald-500/10 to-zinc-950 p-5 transition hover:border-emerald-500"
+        >
+            <div>
+                <div class="text-xs font-bold uppercase tracking-[0.2em] text-emerald-400">Български състезател в F2 🇧🇬</div>
+                <div class="mt-1 text-xl font-black text-white">{{ bulgarianSpotlight.flag }} {{ bulgarianSpotlight.name }}</div>
+                <div class="text-sm text-zinc-400">{{ bulgarianSpotlight.team }}</div>
+            </div>
+            <div class="text-right">
+                <div class="text-2xl font-black tabular-nums text-white">{{ bulgarianSpotlight.position ? 'P' + bulgarianSpotlight.position : '—' }}</div>
+                <div class="text-sm tabular-nums text-zinc-400">{{ bulgarianSpotlight.points }} т.</div>
+            </div>
+        </Link>
 
         <!-- Класиране -->
         <div class="overflow-hidden rounded-xl border border-zinc-800">

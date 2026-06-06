@@ -33,7 +33,31 @@ class F2Controller extends Controller
             'seasons' => F2Season::query()->orderByDesc('year')->pluck('year')->map(fn ($y) => (int) $y),
             'standings' => $season ? $this->standings($season) : collect(),
             'champions' => $this->champions(),
+            'bulgarianSpotlight' => $season ? $this->bulgarianSpotlight($season) : null,
         ]);
+    }
+
+    /**
+     * Български състезател в сезона (за spotlight widget). null ако няма.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function bulgarianSpotlight(F2Season $season): ?array
+    {
+        $driver = $season->drivers()->where('country_code', 'BUL')->with('team')->first();
+
+        if ($driver === null) {
+            return null;
+        }
+
+        return [
+            'slug' => $driver->slug,
+            'name' => $driver->fullName(),
+            'flag' => CountryFlag::emoji($driver->country_code),
+            'team' => $driver->team?->name,
+            'position' => $driver->position,
+            'points' => $driver->points,
+        ];
     }
 
     /**

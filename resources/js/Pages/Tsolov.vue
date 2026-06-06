@@ -5,7 +5,7 @@ import { computed } from 'vue';
 
 const props = defineProps({
     profile: { type: Object, required: true },
-    f2Season: { type: Number, default: null },
+    f2: { type: Object, default: null },
 });
 
 const age = computed(() => {
@@ -84,6 +84,42 @@ const photo = computed(() => props.profile.photos?.[0] ?? null);
             </div>
         </section>
 
+        <!-- В момента в F2 (синхронизирано от Wikipedia) -->
+        <section v-if="f2" class="mx-auto mt-8 max-w-3xl rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 class="text-lg font-bold text-white">В момента във Формула 2 — {{ f2.team }}</h2>
+                <span class="text-sm text-zinc-500">Сезон {{ f2.season }}</span>
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div class="rounded-xl border border-zinc-800 bg-zinc-950/50 p-3 text-center">
+                    <div class="text-2xl font-black tabular-nums text-white">{{ f2.position ?? '—' }}</div>
+                    <div class="text-xs uppercase tracking-wide text-zinc-500">Позиция</div>
+                </div>
+                <div class="rounded-xl border border-zinc-800 bg-zinc-950/50 p-3 text-center">
+                    <div class="text-2xl font-black tabular-nums text-white">{{ f2.points }}</div>
+                    <div class="text-xs uppercase tracking-wide text-zinc-500">Точки</div>
+                </div>
+                <div class="rounded-xl border border-zinc-800 bg-zinc-950/50 p-3 text-center">
+                    <div class="text-2xl font-black tabular-nums text-white">{{ f2.wins }}</div>
+                    <div class="text-xs uppercase tracking-wide text-zinc-500">Победи</div>
+                </div>
+                <div class="rounded-xl border border-zinc-800 bg-zinc-950/50 p-3 text-center">
+                    <div class="text-2xl font-black tabular-nums text-white">{{ f2.podiums }}</div>
+                    <div class="text-xs uppercase tracking-wide text-zinc-500">Подиуми</div>
+                </div>
+            </div>
+
+            <div v-if="f2.latest" class="mt-3 rounded-xl border border-zinc-800 bg-zinc-950/50 p-3 text-sm text-zinc-300">
+                Последно: <span class="font-semibold text-white">{{ f2.latest.location }}</span> ({{ f2.latest.session }}) —
+                <span class="font-bold">{{ f2.latest.position ? 'P' + f2.latest.position : '—' }}</span>
+            </div>
+
+            <Link :href="route('f2.drivers.show', 'nikola-tsolov')" class="mt-4 inline-block text-sm font-medium text-emerald-400 transition hover:text-emerald-300">
+                Виж пълните F2 резултати →
+            </Link>
+        </section>
+
         <!-- Подкрепи -->
         <section class="mx-auto mt-8 max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-center">
             <h2 class="text-lg font-bold text-white">Подкрепи Цолов</h2>
@@ -94,14 +130,6 @@ const photo = computed(() => props.profile.photos?.[0] ?? null);
                     {{ link.label }}
                 </a>
             </div>
-
-            <Link
-                v-if="f2Season"
-                :href="route('f2.season', f2Season)"
-                class="mt-4 inline-block rounded-lg bg-red-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-red-500"
-            >
-                Виж го във Формула 2 →
-            </Link>
         </section>
     </PublicLayout>
 </template>
