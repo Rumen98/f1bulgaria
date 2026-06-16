@@ -36,6 +36,14 @@ it('отхвърля празен имейл', function () {
         ->assertSessionHasErrors('email');
 });
 
+it('ограничава честотата на записванията (anti-spam throttle)', function () {
+    for ($i = 0; $i < 5; $i++) {
+        $this->post('/newsletter/subscribe', ['email' => "fan{$i}@example.bg"]);
+    }
+
+    $this->post('/newsletter/subscribe', ['email' => 'spam@example.bg'])->assertStatus(429);
+});
+
 it('потвърждава абонамента чрез токен', function () {
     $sub = NewsletterSubscriber::create([
         'email' => 'fan@example.bg',
