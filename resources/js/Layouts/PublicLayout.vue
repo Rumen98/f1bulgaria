@@ -8,21 +8,22 @@ const user = computed(() => page.props.auth?.user);
 const flashSuccess = computed(() => page.props.flash?.success);
 
 // Основна навигация (винаги видима на десктоп) + второстепенна (под „Повече ▾").
+// Елементите с `feature` се показват само ако флагът е включен (config/features.php).
 const primaryNav = [
-    { label: 'На живо', route: 'live', live: true },
+    { label: 'На живо', route: 'live', live: true, feature: 'live_timing' },
     { label: 'Новини', route: 'news.index' },
     { label: 'Календар', route: 'calendar' },
     { label: 'Класиране', route: 'standings' },
     { label: 'Отбори', route: 'teams.index' },
     { label: 'Пилоти', route: 'drivers.index' },
-    { label: 'Писти', route: 'circuits.index' },
-    { label: 'Цолов 🇧🇬', route: 'tsolov' },
+    { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
+    { label: 'Цолов 🇧🇬', route: 'tsolov', feature: 'tsolov' },
 ];
 const secondaryNav = [
-    { label: 'Формула 2', route: 'f2' },
-    { label: 'Дуели', route: 'rivalries.index' },
+    { label: 'Формула 2', route: 'f2', feature: 'f2' },
+    { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'Прогнози', route: 'leaderboard' },
-    { label: 'История', route: 'history' },
+    { label: 'История', route: 'history', feature: 'history' },
     { label: 'Речник', route: 'terminology' },
 ];
 
@@ -31,6 +32,7 @@ const moreOpen = ref(false);
 const moreRef = ref(null);
 
 // Ziggy може да не познава всички routes по време на изграждане — пазим се.
+const features = computed(() => page.props.features ?? {});
 const has = (name) => {
     try {
         return route().has(name);
@@ -38,8 +40,10 @@ const has = (name) => {
         return false;
     }
 };
-const primary = computed(() => primaryNav.filter((i) => has(i.route)));
-const secondary = computed(() => secondaryNav.filter((i) => has(i.route)));
+// Показваме елемент само ако рутът съществува И (няма feature ИЛИ флагът е включен).
+const visible = (i) => has(i.route) && (!i.feature || features.value[i.feature]);
+const primary = computed(() => primaryNav.filter(visible));
+const secondary = computed(() => secondaryNav.filter(visible));
 const allItems = computed(() => [...primary.value, ...secondary.value]);
 
 const onClickOutside = (e) => {
@@ -155,8 +159,16 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                 <p class="mb-3 font-semibold text-zinc-300">Бюлетин с най-важното от F1</p>
                 <NewsletterForm source="footer" />
             </div>
-            F1 България — общност на българските фенове на Формула 1.
-            Live чатът е в нашия <a href="#" class="text-red-500 transition hover:text-red-400">Telegram канал</a>.
+            <p class="mx-auto max-w-xl">
+                F1 България — независима общност на българските фенове на Формула 1.
+            </p>
+            <nav class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-zinc-600">
+                <Link :href="route('privacy')" class="transition hover:text-zinc-400">Поверителност</Link>
+                <span class="text-zinc-700">·</span>
+                <Link :href="route('terms')" class="transition hover:text-zinc-400">Условия за ползване</Link>
+                <span class="text-zinc-700">·</span>
+                <Link :href="route('contact')" class="transition hover:text-zinc-400">Контакт</Link>
+            </nav>
         </footer>
     </div>
 </template>

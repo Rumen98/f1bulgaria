@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\NewsStatus;
 use App\Models\ConstructorCanonical;
 use App\Models\DriverCanonical;
 use App\Models\Race;
 use App\Models\Rivalry;
+use App\Models\TeamNewsItem;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 
@@ -39,24 +41,50 @@ class GenerateSitemapCommand extends Command
      */
     public function urls(): Collection
     {
-        $static = collect([
-            'home', 'calendar', 'standings', 'leaderboard', 'teams.index', 'drivers.index',
-            'circuits.index', 'compare.index', 'rivalries.index', 'history', 'history.world',
-            'history.bulgaria', 'tsolov', 'terminology', 'news.index', 'f2', 'live',
-        ])->map(fn ($name) => route($name));
+        // V1 статични страници — винаги в sitemap.
+        $names = collect([
+            'home', 'calendar', 'standings', 'leaderboard', 'teams.index',
+            'drivers.index', 'news.index', 'terminology', 'privacy', 'terms', 'contact',
+        ]);
 
-        $drivers = DriverCanonical::query()->pluck('slug')->map(fn ($s) => route('drivers.show', $s));
-        $teams = ConstructorCanonical::query()->where('total_races', '>', 0)->pluck('slug')->map(fn ($s) => route('teams.show', $s));
-        $circuits = Race::query()->whereNotNull('jolpica_id')->distinct()->pluck('jolpica_id')->map(fn ($s) => route('circuits.show', $s));
-        $rivalries = Rivalry::query()->pluck('slug')->map(fn ($s) => route('rivalries.show', $s));
+        // V2 страници — само ако флагът е включен (иначе рутът връща 404).
+        $featureStatic = [
+            'circuits' => ['circuits.index'],
+            'compare' => ['compare.index'],
+            'rivalries' => ['rivalries.index'],
+            'tsolov' => ['tsolov'],
+            'history' => ['history', 'history.world', 'history.bulgaria'],
+            'f2' => ['f2'],
+            'live_timing' => ['live'],
+        ];
+        foreach ($featureStatic as $flag => $routes) {
+            if (config("features.{$flag}")) {
+                $names = $names->concat($routes);
+            }
+        }
 
-        return $static
-            ->concat($drivers)
-            ->concat($teams)
-            ->concat($circuits)
-            ->concat($rivalries)
-            ->unique()
-            ->values();
+        $urls = $names->map(fn ($name) => route($name));
+
+        // V1 динамични същности.
+        $urls = $urls
+            ->concat(DriverCanonical::query()->pluck('slug')->map(fn ($s) => route('drivers.show', $s)))
+            ->concat(ConstructorCanonical::query()->where('total_races', '>', 0)->pluck('slug')->map(fn ($s) => route('teams.show', $s)))
+            ->concat(
+                TeamNewsItem::query()
+                    ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+                    ->pluck('slug')
+                    ->map(fn ($s) => route('news.show', $s))
+            );
+
+        // V2 динамични същности — само при включен флаг.
+        if (config('features.circuits')) {
+            $urls = $urls->concat(Race::query()->whereNotNull('jolpica_id')->distinct()->pluck('jolpica_id')->map(fn ($s) => route('circuits.show', $s)));
+        }
+        if (config('features.rivalries')) {
+            $urls = $urls->concat(Rivalry::query()->pluck('slug')->map(fn ($s) => route('rivalries.show', $s)));
+        }
+
+        return $urls->unique()->values();
     }
 
     /**

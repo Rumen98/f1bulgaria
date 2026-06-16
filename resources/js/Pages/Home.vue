@@ -4,7 +4,7 @@ import ThisDayWidget from '@/Components/Homepage/ThisDayWidget.vue';
 import LiveSessionBanner from '@/Components/LiveSessionBanner.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 defineProps({
@@ -14,14 +14,17 @@ defineProps({
     topNews: { type: Array, default: () => [] },
 });
 
+const page = usePage();
+const features = computed(() => page.props.features ?? {});
+
 const allLinks = [
     { label: 'Календар', desc: 'Всички състезания за сезона', route: 'calendar' },
     { label: 'Класиране', desc: 'Пилоти и конструктори', route: 'standings' },
     { label: 'Отбори', desc: '10-те отбора с branding и статистика', route: 'teams.index' },
     { label: 'Пилоти', desc: 'Профили, статистика, head-to-head', route: 'drivers.index' },
-    { label: 'Писти', desc: 'История и all-time класирания', route: 'circuits.index' },
-    { label: 'Сравни пилоти', desc: 'Двама пилоти един до друг', route: 'compare.index' },
-    { label: 'Съперничества', desc: 'Великите дуели в историята', route: 'rivalries.index' },
+    { label: 'Писти', desc: 'История и all-time класирания', route: 'circuits.index', feature: 'circuits' },
+    { label: 'Сравни пилоти', desc: 'Двама пилоти един до друг', route: 'compare.index', feature: 'compare' },
+    { label: 'Съперничества', desc: 'Великите дуели в историята', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'Prediction League', desc: 'Познай и събирай точки', route: 'leaderboard' },
 ];
 
@@ -32,19 +35,19 @@ const has = (name) => {
         return false;
     }
 };
-const links = computed(() => allLinks.filter((l) => has(l.route)));
+const links = computed(() => allLinks.filter((l) => has(l.route) && (!l.feature || features.value[l.feature])));
 </script>
 
 <template>
     <Head title="F1 България" />
 
     <PublicLayout>
-        <LiveSessionBanner :session="liveSession" />
+        <LiveSessionBanner v-if="features.live_timing" :session="liveSession" />
 
         <HeroSection :hero="hero" />
 
-        <!-- На този ден във F1 -->
-        <ThisDayWidget :events="thisDay" />
+        <!-- На този ден във F1 (V2) -->
+        <ThisDayWidget v-if="features.this_day" :events="thisDay" />
 
         <!-- Топ новини -->
         <section v-if="topNews.length" class="mt-10">

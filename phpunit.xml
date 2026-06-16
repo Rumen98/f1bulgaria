@@ -29,5 +29,14 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <!-- V2 feature flags ON in tests, за да се тества кодът зад тях. -->
+        <env name="FEATURE_COMPARE" value="true"/>
+        <env name="FEATURE_RIVALRIES" value="true"/>
+        <env name="FEATURE_CIRCUITS" value="true"/>
+        <env name="FEATURE_TSOLOV" value="true"/>
+        <env name="FEATURE_HISTORY" value="true"/>
+        <env name="FEATURE_F2" value="true"/>
+        <env name="FEATURE_LIVE_TIMING" value="true"/>
+        <env name="FEATURE_THIS_DAY" value="true"/>
     </php>
 </phpunit>

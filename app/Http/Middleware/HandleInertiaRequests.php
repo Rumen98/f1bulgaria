@@ -38,6 +38,7 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
             ],
             'teamBrands' => fn () => config('team-brands'),
+            'features' => fn () => config('features'),
         ];
     }
 }
