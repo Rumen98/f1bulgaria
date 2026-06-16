@@ -5,6 +5,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#e10600">
 
+        <link rel="icon" href="/favicon.ico" sizes="48x48">
+        <link rel="apple-touch-icon" href="/favicon.ico">
+
         <title inertia>{{ config('app.name', 'F1 България') }}</title>
 
         <!-- SEO / Open Graph (по подразбиране; Inertia <Head> презаписва title-а на отделните страници) -->

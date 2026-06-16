@@ -20,7 +20,9 @@ const goToSeason = (e) => {
 </script>
 
 <template>
-    <Head title="Класиране" />
+    <Head title="Класиране">
+        <meta head-key="description" name="description" content="Класиране във Формула 1 — пилоти и конструктори по сезони, точки, победи и подиуми." />
+    </Head>
 
     <PublicLayout>
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">

@@ -37,7 +37,9 @@ const filtered = computed(() => {
 </script>
 
 <template>
-    <Head title="Отбори" />
+    <Head title="Отбори">
+        <meta head-key="description" name="description" content="Всички отбори (конструктори) от Формула 1 — статистика, пилоти, титли и история. Българският справочник за отборите във F1." />
+    </Head>
 
     <PublicLayout>
         <h1 class="mb-6 text-2xl font-black sm:text-3xl">Отбори</h1>

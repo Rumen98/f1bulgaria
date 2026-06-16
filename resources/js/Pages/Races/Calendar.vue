@@ -10,7 +10,9 @@ defineProps({
 </script>
 
 <template>
-    <Head title="Календар" />
+    <Head title="Календар">
+        <meta head-key="description" name="description" content="Календар на Формула 1 — всички състезания за сезона с дати, писти и часове в българско време." />
+    </Head>
 
     <PublicLayout>
         <div class="mb-6 flex items-center justify-between gap-3">

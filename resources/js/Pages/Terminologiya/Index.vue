@@ -22,7 +22,9 @@ const filtered = computed(() => {
 </script>
 
 <template>
-    <Head title="Терминология" />
+    <Head title="Терминология">
+        <meta head-key="description" name="description" content="Речник на термините във Формула 1 на български — обяснения на основните понятия от спорта." />
+    </Head>
 
     <PublicLayout>
         <h1 class="mb-2 text-2xl font-black sm:text-3xl">Речник на Формула 1</h1>

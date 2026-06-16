@@ -28,7 +28,9 @@ const goToSeason = (e) => {
 </script>
 
 <template>
-    <Head :title="driver.name" />
+    <Head :title="driver.name">
+        <meta head-key="description" name="description" :content="`Статистика и кариера на ${driver.name} във Формула 1 — победи, подиуми, поул позиции и класиране по сезони.`" />
+    </Head>
 
     <PublicLayout>
         <div class="flex items-center justify-between gap-3">

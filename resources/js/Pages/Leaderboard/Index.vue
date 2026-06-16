@@ -15,7 +15,9 @@ const podium = (pos) => ({
 </script>
 
 <template>
-    <Head title="Класиране на прогнозите" />
+    <Head title="Класиране на прогнозите">
+        <meta head-key="description" name="description" content="Класиране на играта с прогнози — познай резултатите от Формула 1 и събирай точки." />
+    </Head>
 
     <PublicLayout>
         <h1 class="mb-2 text-2xl font-black sm:text-3xl">Prediction League <span class="text-red-600">{{ season }}</span></h1>

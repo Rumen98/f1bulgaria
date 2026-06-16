@@ -21,7 +21,9 @@ const tabs = computed(() => [
 </script>
 
 <template>
-    <Head title="Пилоти" />
+    <Head title="Пилоти">
+        <meta head-key="description" name="description" content="Всички пилоти от Формула 1 — профили, статистика, победи, подиуми и класиране. Български справочник за пилотите във F1." />
+    </Head>
 
     <PublicLayout>
         <h1 class="mb-4 text-2xl font-black sm:text-3xl">Пилоти <span class="text-red-600">{{ season }}</span></h1>
