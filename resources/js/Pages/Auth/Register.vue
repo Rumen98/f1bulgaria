@@ -50,7 +50,7 @@ const submit = () => {
             </div>
 
             <div class="mt-6">
-                <PrimaryButton class="w-full justify-center py-3" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                <PrimaryButton class="w-full justify-center" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
                     Регистрирай се
                 </PrimaryButton>
             </div>

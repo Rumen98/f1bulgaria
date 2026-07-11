@@ -1,4 +1,5 @@
 <script setup>
+import Card from '@/Components/UI/Card.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
@@ -40,21 +41,21 @@ const better = (a, b) => (a > b ? 'a' : b > a ? 'b' : 'tie');
                     <div v-else class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-zinc-800 text-3xl sm:h-28 sm:w-28">🏎️</div>
                     <div class="mt-2 font-bold text-white">{{ a.name }} {{ a.flag }}</div>
                 </Link>
-                <span class="text-2xl font-black text-red-600 sm:text-4xl">VS</span>
+                <span class="font-display text-2xl font-black text-red-600 sm:text-4xl">VS</span>
                 <Link :href="route('drivers.show', b.slug)" class="text-center">
                     <img v-if="b.photo" :src="b.photo" :alt="b.name" loading="lazy" referrerpolicy="no-referrer" class="mx-auto h-20 w-20 rounded-full object-cover object-top sm:h-28 sm:w-28" />
                     <div v-else class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-zinc-800 text-3xl sm:h-28 sm:w-28">🏎️</div>
                     <div class="mt-2 font-bold text-white">{{ b.name }} {{ b.flag }}</div>
                 </Link>
             </div>
-            <h1 class="mt-6 text-center text-2xl font-black sm:text-3xl">{{ rivalry.title }}</h1>
+            <h1 class="mt-6 text-center font-display text-2xl font-black sm:text-3xl">{{ rivalry.title }}</h1>
             <p v-if="rivalry.era" class="text-center text-sm tabular-nums text-zinc-500">{{ rivalry.era }}</p>
             <p class="mx-auto mt-4 max-w-2xl text-center text-zinc-300">{{ rivalry.description }}</p>
         </section>
 
         <!-- Career bars -->
         <section class="mt-8">
-            <h2 class="mb-4 text-lg font-bold text-white">Кариерен баланс</h2>
+            <h2 class="mb-4 font-display text-lg font-bold text-white">Кариерен баланс</h2>
             <div class="space-y-4">
                 <div v-for="row in statRows" :key="row.label">
                     <div class="mb-1 flex items-center justify-between text-sm">
@@ -69,21 +70,21 @@ const better = (a, b) => (a > b ? 'a' : b > a ? 'b' : 'tie');
                 </div>
             </div>
 
-            <div v-if="h2h" class="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400">
+            <Card v-if="h2h" muted class="mt-4 text-sm text-zinc-400">
                 В {{ h2h.races_together }} общи състезания:
                 квалификации <span class="font-bold text-white">{{ h2h.qualifying.a }}–{{ h2h.qualifying.b }}</span>,
                 финиш <span class="font-bold text-white">{{ h2h.race.a }}–{{ h2h.race.b }}</span>.
-            </div>
+            </Card>
         </section>
 
         <!-- Notable moments -->
         <section v-if="rivalry.moments.length" class="mt-8">
-            <h2 class="mb-4 text-lg font-bold text-white">Запомнящи се моменти</h2>
+            <h2 class="mb-4 font-display text-lg font-bold text-white">Запомнящи се моменти</h2>
             <div class="space-y-3">
-                <div v-for="(m, i) in rivalry.moments" :key="i" class="flex gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-                    <div class="shrink-0 text-xl font-black tabular-nums text-red-600">{{ m.year }}</div>
+                <Card v-for="(m, i) in rivalry.moments" :key="i" class="flex gap-4">
+                    <div class="shrink-0 font-display text-xl font-black tabular-nums text-red-600">{{ m.year }}</div>
                     <p class="text-zinc-300">{{ m.description }}</p>
-                </div>
+                </Card>
             </div>
         </section>
 

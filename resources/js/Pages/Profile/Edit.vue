@@ -29,7 +29,7 @@ defineProps({
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="text-xl font-black leading-tight text-white">Профил</h2>
+            <h2 class="font-display text-xl font-black leading-tight text-white">Профил</h2>
         </template>
 
         <div class="py-12">

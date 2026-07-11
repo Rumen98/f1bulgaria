@@ -1,10 +1,11 @@
 <script setup>
+import { TEAM_COLOR_FALLBACK } from '@/utils/racing';
 import { computed } from 'vue';
 
 const props = defineProps({
     h2h: { type: Object, required: true },
     driverName: String,
-    color: { type: String, default: '#e10600' },
+    color: { type: String, default: TEAM_COLOR_FALLBACK },
 });
 
 const rows = computed(() => [
@@ -37,7 +38,7 @@ const pct = (win, loss) => {
                     <span class="text-zinc-500">{{ row.label }}</span>
                     <span class="font-bold tabular-nums text-zinc-400">{{ row.loss }}</span>
                 </div>
-                <div class="h-2.5 overflow-hidden rounded-full bg-zinc-700">
+                <div class="h-2 overflow-hidden rounded-full bg-zinc-800">
                     <div class="h-full rounded-full transition-all duration-500" :style="{ width: pct(row.win, row.loss) + '%', backgroundColor: color }" />
                 </div>
             </div>

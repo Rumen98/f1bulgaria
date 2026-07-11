@@ -1,4 +1,5 @@
 <script setup>
+import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
@@ -13,11 +14,9 @@ defineProps({
 
     <PublicLayout>
         <Link :href="route('f2')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Формула 2</Link>
-        <h1 class="mb-6 mt-1 text-2xl font-black sm:text-3xl">Отбори F2 <span class="text-red-600">{{ season }}</span></h1>
+        <h1 class="mb-6 mt-1 font-display text-2xl font-black sm:text-3xl">Отбори F2 <span class="text-red-600">{{ season }}</span></h1>
 
-        <div v-if="teams.length === 0" class="rounded-xl border border-dashed border-zinc-800 p-10 text-center text-zinc-500">
-            Няма данни за отбори.
-        </div>
+        <EmptyState v-if="teams.length === 0">Няма данни за отбори.</EmptyState>
 
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Link

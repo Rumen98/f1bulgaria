@@ -3,7 +3,10 @@ import TeamBrand from '@/Components/Team/TeamBrand.vue';
 import TeamDriverCard from '@/Components/Team/TeamDriverCard.vue';
 import TeamNewsList from '@/Components/Team/TeamNewsList.vue';
 import TeamStatsBar from '@/Components/Team/TeamStatsBar.vue';
+import Card from '@/Components/UI/Card.vue';
+import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { TEAM_COLOR_FALLBACK } from '@/utils/racing';
 import { Head, Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -33,7 +36,8 @@ const goToSeason = (e) => {
             <select
                 v-if="seasons.length > 1"
                 :value="selectedSeason"
-                class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-white focus:border-red-600 focus:outline-none"
+                aria-label="Сезон"
+                class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
                 @change="goToSeason"
             >
                 <option v-for="y in seasons" :key="y" :value="y">Сезон {{ y }}</option>
@@ -43,15 +47,15 @@ const goToSeason = (e) => {
         <!-- Hero -->
         <section
             class="relative mt-3 overflow-hidden rounded-2xl border border-zinc-800 p-6 sm:p-8"
-            :style="{ background: `linear-gradient(110deg, ${team.color_hex}33, #0a0a0a 65%)` }"
+            :style="{ background: `linear-gradient(110deg, ${team.color_hex ?? TEAM_COLOR_FALLBACK}33, #0a0a0a 65%)` }"
         >
             <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <div class="h-20 w-20 shrink-0 sm:h-24 sm:w-24">
-                    <TeamBrand :name="team.name" :slug="team.slug" :color="team.color_hex" variant="emblem" />
+                    <TeamBrand :name="team.name" :slug="team.slug" :color="team.color_hex ?? TEAM_COLOR_FALLBACK" variant="emblem" />
                 </div>
                 <div>
                     <div class="flex flex-wrap items-center gap-3">
-                        <h1 class="text-3xl font-black sm:text-4xl">{{ team.name_bg ?? team.name }}</h1>
+                        <h1 class="font-display text-3xl font-black sm:text-4xl">{{ team.name_bg ?? team.name }}</h1>
                         <span
                             class="rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide"
                             :class="team.is_active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'"
@@ -75,20 +79,20 @@ const goToSeason = (e) => {
         </div>
 
         <!-- Пилоти -->
-        <h2 class="mb-3 mt-8 text-lg font-bold text-white">Пилоти</h2>
+        <h2 class="mb-3 mt-8 font-display text-lg font-bold text-white">Пилоти</h2>
         <div class="grid gap-4 sm:grid-cols-2">
-            <TeamDriverCard v-for="d in drivers" :key="d.slug" :driver="d" :color="team.color_hex" />
+            <TeamDriverCard v-for="d in drivers" :key="d.slug" :driver="d" :color="team.color_hex ?? TEAM_COLOR_FALLBACK" />
         </div>
 
         <div class="mt-8 grid gap-8 lg:grid-cols-2">
             <!-- Последни резултати -->
             <div>
-                <h2 class="mb-3 text-lg font-bold text-white">Последни състезания</h2>
-                <div v-if="recentResults.length === 0" class="rounded-xl border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
+                <h2 class="mb-3 font-display text-lg font-bold text-white">Последни състезания</h2>
+                <EmptyState v-if="recentResults.length === 0">
                     Няма резултати за сезона.
-                </div>
+                </EmptyState>
                 <div v-else class="space-y-3">
-                    <div v-for="(r, i) in recentResults" :key="i" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                    <Card v-for="(r, i) in recentResults" :key="i">
                         <div class="flex items-center justify-between">
                             <div class="font-semibold text-white">{{ r.race }}</div>
                             <div class="text-sm font-bold tabular-nums text-red-500">{{ r.points }} т.</div>
@@ -100,7 +104,7 @@ const goToSeason = (e) => {
                                 {{ f.driver }}
                             </span>
                         </div>
-                    </div>
+                    </Card>
                 </div>
             </div>
 

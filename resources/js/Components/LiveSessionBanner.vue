@@ -39,6 +39,7 @@ onBeforeUnmount(() => clearInterval(timer));
                 <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
                 <span class="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
             </span>
+            <span class="sr-only">на живо</span>
             <span class="font-bold text-white">
                 LIVE СЕГА: <span class="text-red-400">{{ session.circuit }}</span> · {{ session.name }}
             </span>

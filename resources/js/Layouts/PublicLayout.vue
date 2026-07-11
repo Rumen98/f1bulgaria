@@ -1,5 +1,6 @@
 <script setup>
 import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
+import { hasRoute } from '@/utils/routes';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -31,17 +32,9 @@ const mobileOpen = ref(false);
 const moreOpen = ref(false);
 const moreRef = ref(null);
 
-// Ziggy може да не познава всички routes по време на изграждане — пазим се.
 const features = computed(() => page.props.features ?? {});
-const has = (name) => {
-    try {
-        return route().has(name);
-    } catch (e) {
-        return false;
-    }
-};
 // Показваме елемент само ако рутът съществува И (няма feature ИЛИ флагът е включен).
-const visible = (i) => has(i.route) && (!i.feature || features.value[i.feature]);
+const visible = (i) => hasRoute(i.route) && (!i.feature || features.value[i.feature]);
 const primary = computed(() => primaryNav.filter(visible));
 const secondary = computed(() => secondaryNav.filter(visible));
 const allItems = computed(() => [...primary.value, ...secondary.value]);
@@ -59,7 +52,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
     <div class="min-h-screen bg-[#0a0a0a] text-zinc-100">
         <header class="sticky top-0 z-30 border-b border-zinc-800/80 bg-black/70 backdrop-blur">
             <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5">
-                <Link :href="route('home')" class="flex items-center gap-1.5 text-lg font-black tracking-tight">
+                <Link :href="route('home')" class="flex items-center gap-1.5 font-display text-lg font-black tracking-tight">
                     <span class="text-red-600">F1</span><span>България</span>
                 </Link>
 
@@ -82,6 +75,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                         <button
                             type="button"
                             class="flex items-center gap-1 whitespace-nowrap text-[13px] font-medium text-zinc-400 transition hover:text-white xl:text-sm"
+                            aria-haspopup="true"
+                            :aria-expanded="moreOpen"
                             @click="moreOpen = !moreOpen"
                         >
                             Повече ▾
@@ -120,6 +115,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                     <button
                         class="text-zinc-300 lg:hidden"
                         aria-label="Меню"
+                        :aria-expanded="mobileOpen"
                         @click="mobileOpen = !mobileOpen"
                     >
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -162,12 +158,12 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
             <p class="mx-auto max-w-xl">
                 F1 България — независима общност на българските фенове на Формула 1.
             </p>
-            <nav class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-zinc-600">
-                <Link :href="route('privacy')" class="transition hover:text-zinc-400">Поверителност</Link>
-                <span class="text-zinc-700">·</span>
-                <Link :href="route('terms')" class="transition hover:text-zinc-400">Условия за ползване</Link>
-                <span class="text-zinc-700">·</span>
-                <Link :href="route('contact')" class="transition hover:text-zinc-400">Контакт</Link>
+            <nav class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-zinc-500">
+                <Link :href="route('privacy')" class="transition hover:text-zinc-300">Поверителност</Link>
+                <span class="text-zinc-700" aria-hidden="true">·</span>
+                <Link :href="route('terms')" class="transition hover:text-zinc-300">Условия за ползване</Link>
+                <span class="text-zinc-700" aria-hidden="true">·</span>
+                <Link :href="route('contact')" class="transition hover:text-zinc-300">Контакт</Link>
             </nav>
         </footer>
     </div>

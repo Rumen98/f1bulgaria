@@ -4,7 +4,10 @@ import CircuitHero from '@/Components/Circuit/CircuitHero.vue';
 import CircuitRecords from '@/Components/Circuit/CircuitRecords.vue';
 import CircuitTechnical from '@/Components/Circuit/CircuitTechnical.vue';
 import RecentWinners from '@/Components/Circuit/RecentWinners.vue';
+import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { NEUTRAL_DOT_COLOR } from '@/utils/racing';
+import { hasRoute } from '@/utils/routes';
 import { Head, Link } from '@inertiajs/vue3';
 
 defineProps({
@@ -16,14 +19,6 @@ defineProps({
     lastRace: Object,
     f2Winners: { type: Array, default: () => [] },
 });
-
-const has = (name) => {
-    try {
-        return route().has(name);
-    } catch (e) {
-        return false;
-    }
-};
 </script>
 
 <template>
@@ -52,49 +47,49 @@ const has = (name) => {
 
         <!-- Формула 2 на тази писта -->
         <section v-if="f2Winners.length" class="mt-8">
-            <h2 class="mb-3 text-lg font-bold text-white">Формула 2 на тази писта</h2>
-            <div class="overflow-hidden rounded-xl border border-zinc-800">
+            <h2 class="mb-3 font-display text-lg font-bold text-white">Формула 2 на тази писта</h2>
+            <TableShell>
                 <table class="w-full text-sm">
                     <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
-                        <tr><th class="px-4 py-2 text-left">Сезон</th><th class="px-4 py-2 text-left">Победител (главно)</th><th class="px-4 py-2 text-right"></th></tr>
+                        <tr><th scope="col" class="px-4 py-2.5 text-left">Сезон</th><th scope="col" class="px-4 py-2.5 text-left">Победител (главно)</th><th scope="col" class="px-4 py-2.5 text-right"><span class="sr-only">Действия</span></th></tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-800/60">
                         <tr v-for="w in f2Winners" :key="w.year" class="bg-zinc-900/40">
                             <td class="px-4 py-2.5 font-bold tabular-nums text-white">{{ w.year }}</td>
                             <td class="px-4 py-2.5 text-zinc-200">
-                                <Link v-if="has('f2.drivers.show')" :href="route('f2.drivers.show', w.slug)" class="transition hover:text-red-400">{{ w.flag }} {{ w.driver }}</Link>
+                                <Link v-if="hasRoute('f2.drivers.show')" :href="route('f2.drivers.show', w.slug)" class="transition hover:text-red-400">{{ w.flag }} {{ w.driver }}</Link>
                                 <span v-else>{{ w.flag }} {{ w.driver }}</span>
                             </td>
                             <td class="px-4 py-2.5 text-right">
-                                <Link v-if="has('f2.race')" :href="route('f2.race', [w.race_slug, 'feature'])" class="text-xs text-zinc-500 transition hover:text-zinc-300">Резултати →</Link>
+                                <Link v-if="hasRoute('f2.race')" :href="route('f2.race', [w.race_slug, 'feature'])" class="text-sm text-zinc-500 transition hover:text-zinc-300">Резултати →</Link>
                             </td>
                         </tr>
                     </tbody>
                 </table>
-            </div>
+            </TableShell>
         </section>
 
         <div class="mt-8 grid gap-8 lg:grid-cols-2">
             <RecentWinners :winners="lastWinners" />
 
             <div v-if="lastRace">
-                <h2 class="mb-3 text-lg font-bold text-white">Последно състезание <span class="text-sm font-normal text-zinc-500">{{ lastRace.year }}</span></h2>
-                <div class="overflow-hidden rounded-xl border border-zinc-800">
+                <h2 class="mb-3 font-display text-lg font-bold text-white">Последно състезание <span class="text-sm font-normal text-zinc-500">{{ lastRace.year }}</span></h2>
+                <TableShell>
                     <table class="w-full text-sm">
-                        <tbody class="divide-y divide-zinc-800">
+                        <tbody class="divide-y divide-zinc-800/60">
                             <tr v-for="r in lastRace.top5" :key="r.position" class="bg-zinc-900/40">
                                 <td class="px-4 py-2.5 w-12 font-bold tabular-nums text-zinc-400">P{{ r.position }}</td>
                                 <td class="px-4 py-2.5 font-semibold text-white">{{ r.driver }}</td>
                                 <td class="px-4 py-2.5 text-right text-zinc-300">
                                     <span class="inline-flex items-center gap-2">
-                                        <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: r.color ?? '#52525b' }" />
+                                        <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: r.color ?? NEUTRAL_DOT_COLOR }" />
                                         {{ r.team ?? '—' }}
                                     </span>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
-                </div>
+                </TableShell>
             </div>
         </div>
     </PublicLayout>

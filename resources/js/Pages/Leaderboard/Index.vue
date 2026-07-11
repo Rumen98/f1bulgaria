@@ -1,4 +1,6 @@
 <script setup>
+import EmptyState from '@/Components/UI/EmptyState.vue';
+import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head } from '@inertiajs/vue3';
 
@@ -20,42 +22,45 @@ const podium = (pos) => ({
     </Head>
 
     <PublicLayout>
-        <h1 class="mb-2 text-2xl font-black sm:text-3xl">Prediction League <span class="text-red-600">{{ season }}</span></h1>
+        <h1 class="mb-2 font-display text-2xl font-black sm:text-3xl">Prediction League <span class="text-red-600">{{ season }}</span></h1>
         <p class="mb-6 text-sm text-zinc-500">
             Точкуване: точен подиум, pole, най-бърза обиколка, брой DNF и safety car.
         </p>
 
-        <div v-if="leaderboard.length === 0" class="rounded-xl border border-dashed border-zinc-800 p-12 text-center text-zinc-500">
+        <EmptyState v-if="leaderboard.length === 0">
             Все още няма точкувани прогнози.
-        </div>
+        </EmptyState>
 
-        <div v-else class="overflow-hidden rounded-xl border border-zinc-800">
+        <TableShell v-else>
             <table class="w-full text-sm">
-                <thead class="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-500">
+                <thead class="bg-zinc-900/80 text-left text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
-                        <th class="px-4 py-3 w-12">#</th>
-                        <th class="px-4 py-3">Играч</th>
-                        <th class="px-4 py-3 text-center">Прогнози</th>
-                        <th class="px-4 py-3 text-right">Точки</th>
+                        <th class="px-4 py-2.5 w-12">#</th>
+                        <th class="px-4 py-2.5">Играч</th>
+                        <th class="px-4 py-2.5 text-center">Прогнози</th>
+                        <th class="px-4 py-2.5 text-right">Точки</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-800">
+                <tbody class="divide-y divide-zinc-800/60">
                     <tr
                         v-for="row in leaderboard"
                         :key="row.position"
-                        class="transition duration-200 hover:bg-zinc-800/50"
+                        class="transition duration-200 hover:bg-zinc-800/40"
                         :class="podium(row.position)"
                     >
-                        <td class="px-4 py-3 font-bold tabular-nums text-zinc-400">
-                            <span v-if="row.position === 1">🏆</span>
+                        <td class="px-4 py-2.5 font-bold tabular-nums text-zinc-400">
+                            <template v-if="row.position === 1">
+                                <span aria-hidden="true">🏆</span>
+                                <span class="sr-only">1-во място</span>
+                            </template>
                             <span v-else>{{ row.position }}</span>
                         </td>
-                        <td class="px-4 py-3 font-semibold text-white">{{ row.name }}</td>
-                        <td class="px-4 py-3 text-center tabular-nums text-zinc-400">{{ row.predictions }}</td>
-                        <td class="px-4 py-3 text-right font-bold tabular-nums text-white">{{ row.points }}</td>
+                        <td class="px-4 py-2.5 font-semibold text-white">{{ row.name }}</td>
+                        <td class="px-4 py-2.5 text-center tabular-nums text-zinc-400">{{ row.predictions }}</td>
+                        <td class="px-4 py-2.5 text-right font-bold tabular-nums text-white">{{ row.points }}</td>
                     </tr>
                 </tbody>
             </table>
-        </div>
+        </TableShell>
     </PublicLayout>
 </template>

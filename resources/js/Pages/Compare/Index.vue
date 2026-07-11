@@ -11,6 +11,7 @@ const props = defineProps({
 const pick = { a: ref(null), b: ref(null) };
 const queryA = ref('');
 const queryB = ref('');
+const highlighted = { a: ref(-1), b: ref(-1) };
 
 const filter = (q) => {
     const term = q.trim().toLowerCase();
@@ -25,10 +26,35 @@ const suggestionsB = computed(() => filter(queryB.value));
 
 const select = (side, driver) => {
     pick[side].value = driver;
+    highlighted[side].value = -1;
     if (side === 'a') {
         queryA.value = driver.name;
     } else {
         queryB.value = driver.name;
+    }
+};
+
+const onQueryInput = (side, value) => {
+    if (side === 'a') {
+        queryA.value = value;
+    } else {
+        queryB.value = value;
+    }
+    highlighted[side].value = -1;
+};
+
+const moveHighlight = (side, delta) => {
+    const list = side === 'a' ? suggestionsA.value : suggestionsB.value;
+    if (!list.length) {
+        return;
+    }
+    highlighted[side].value = Math.min(Math.max(highlighted[side].value + delta, 0), list.length - 1);
+};
+
+const pickHighlighted = (side) => {
+    const item = (side === 'a' ? suggestionsA.value : suggestionsB.value)[highlighted[side].value];
+    if (item) {
+        select(side, item);
     }
 };
 
@@ -47,25 +73,40 @@ const goPreset = (p) => router.visit(route('compare.show', [p.a, p.b]));
     <Head title="Сравнение на пилоти" />
 
     <PublicLayout>
-        <h1 class="mb-2 text-2xl font-black sm:text-3xl">Сравни пилоти</h1>
+        <h1 class="mb-2 font-display text-2xl font-black sm:text-3xl">Сравни пилоти</h1>
         <p class="mb-6 text-zinc-400">Избери двама пилоти и виж статистиката им един до друг.</p>
 
         <div class="grid gap-4 sm:grid-cols-2">
             <div v-for="side in ['a', 'b']" :key="side" class="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-                <label class="mb-2 block text-sm font-semibold text-zinc-400">{{ side === 'a' ? 'Пилот 1' : 'Пилот 2' }}</label>
+                <label :for="`driver-input-${side}`" class="mb-2 block text-sm font-semibold text-zinc-400">{{ side === 'a' ? 'Пилот 1' : 'Пилот 2' }}</label>
                 <input
+                    :id="`driver-input-${side}`"
                     :value="side === 'a' ? queryA : queryB"
                     type="search"
                     placeholder="Търси по име…"
-                    class="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-red-600 focus:outline-none"
-                    @input="side === 'a' ? (queryA = $event.target.value) : (queryB = $event.target.value)"
+                    class="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
+                    aria-autocomplete="list"
+                    :aria-expanded="(side === 'a' ? suggestionsA : suggestionsB).length > 0"
+                    :aria-controls="`driver-listbox-${side}`"
+                    :aria-activedescendant="highlighted[side].value >= 0 ? `driver-option-${side}-${highlighted[side].value}` : undefined"
+                    @input="onQueryInput(side, $event.target.value)"
+                    @keydown.down.prevent="moveHighlight(side, 1)"
+                    @keydown.up.prevent="moveHighlight(side, -1)"
+                    @keydown.enter.prevent="pickHighlighted(side)"
+                    @keydown.esc="highlighted[side].value = -1"
                 />
-                <ul class="mt-2 max-h-60 overflow-auto">
+                <ul :id="`driver-listbox-${side}`" role="listbox" class="mt-2 max-h-60 overflow-auto">
                     <li
-                        v-for="d in (side === 'a' ? suggestionsA : suggestionsB)"
+                        v-for="(d, i) in (side === 'a' ? suggestionsA : suggestionsB)"
                         :key="d.slug"
-                        class="flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm transition hover:bg-zinc-800/60"
-                        :class="(side === 'a' ? pick.a.value?.slug : pick.b.value?.slug) === d.slug ? 'bg-red-600/20 text-white' : 'text-zinc-300'"
+                        :id="`driver-option-${side}-${i}`"
+                        role="option"
+                        :aria-selected="(side === 'a' ? pick.a.value?.slug : pick.b.value?.slug) === d.slug"
+                        class="flex cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-sm transition hover:bg-zinc-800/60"
+                        :class="[
+                            (side === 'a' ? pick.a.value?.slug : pick.b.value?.slug) === d.slug ? 'bg-red-600/20 text-white' : 'text-zinc-300',
+                            highlighted[side].value === i ? 'bg-zinc-800/60' : '',
+                        ]"
                         @click="select(side, d)"
                     >
                         <span>{{ d.name }}</span>

@@ -1,4 +1,5 @@
 <script setup>
+import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -26,7 +27,7 @@ const tabs = computed(() => [
     </Head>
 
     <PublicLayout>
-        <h1 class="mb-4 text-2xl font-black sm:text-3xl">Пилоти <span class="text-red-600">{{ season }}</span></h1>
+        <h1 class="mb-4 font-display text-2xl font-black sm:text-3xl">Пилоти <span class="text-red-600">{{ season }}</span></h1>
 
         <!-- Табове -->
         <div class="mb-6 flex flex-wrap gap-2">
@@ -34,8 +35,9 @@ const tabs = computed(() => [
                 v-for="t in tabs"
                 :key="t.key"
                 type="button"
-                class="rounded-full border px-3 py-1.5 text-sm font-medium transition duration-200"
+                class="rounded-full border px-3 py-2 text-sm font-medium transition duration-200"
                 :class="tab === t.key ? 'border-red-600 bg-red-600 text-white' : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-white'"
+                :aria-pressed="tab === t.key"
                 @click="tab = t.key"
             >
                 {{ t.label }} <span class="tabular-nums opacity-60">{{ t.count }}</span>
@@ -51,7 +53,7 @@ const tabs = computed(() => [
                 class="group relative flex items-center gap-4 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 transition duration-200 hover:border-zinc-600 hover:bg-zinc-900"
             >
                 <div class="absolute inset-y-0 left-0 w-1" :style="{ backgroundColor: d.color_hex }" />
-                <div class="w-10 text-center text-2xl font-black tabular-nums text-zinc-600 group-hover:text-zinc-400">{{ d.number ?? '—' }}</div>
+                <div class="w-10 text-center text-2xl font-black tabular-nums text-zinc-500 group-hover:text-zinc-400">{{ d.number ?? '—' }}</div>
                 <div class="min-w-0 flex-1">
                     <div class="truncate font-bold text-white"><span v-if="d.flag">{{ d.flag }} </span>{{ d.name }}</div>
                     <div class="truncate text-sm text-zinc-500">{{ d.team ?? '—' }}</div>
@@ -83,8 +85,8 @@ const tabs = computed(() => [
             </Link>
         </div>
 
-        <div v-if="(tab === 'legends' ? legends : tab === 'all' ? allTime : drivers).length === 0" class="rounded-xl border border-dashed border-zinc-800 p-12 text-center text-zinc-500">
+        <EmptyState v-if="(tab === 'legends' ? legends : tab === 'all' ? allTime : drivers).length === 0">
             Няма пилоти в тази категория все още.
-        </div>
+        </EmptyState>
     </PublicLayout>
 </template>

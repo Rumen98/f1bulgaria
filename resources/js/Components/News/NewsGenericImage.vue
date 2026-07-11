@@ -18,7 +18,7 @@ const accent = computed(
             technical: '#2dd4bf',
             rumor: '#8b5cf6',
             business: '#f5c518',
-            other: '#ef4444',
+            other: '#ff2d1f',
         })[props.classification] ?? props.color ?? '#e10600',
 );
 
@@ -28,7 +28,7 @@ const gearTeeth = Array.from({ length: 8 }, (_, i) => i * 45);
 
 <template>
     <div class="relative h-full w-full overflow-hidden">
-        <svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" class="h-full w-full" :aria-label="label">
+        <svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" class="h-full w-full" role="img" :aria-label="label">
             <defs>
                 <linearGradient :id="`${gid}-bg`" x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0%" stop-color="#18181b" />
@@ -97,7 +97,7 @@ const gearTeeth = Array.from({ length: 8 }, (_, i) => i * 45);
         <!-- „СЛУХ" badge за rumor -->
         <span
             v-if="classification === 'rumor'"
-            class="absolute right-2 top-2 rounded bg-violet-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow"
+            class="absolute right-2 top-2 rounded bg-violet-500/90 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-white shadow"
         >Слух</span>
 
         <!-- Заглавие overlay -->

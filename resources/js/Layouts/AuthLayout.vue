@@ -12,12 +12,12 @@ defineProps({
         <!-- Форма -->
         <div class="flex w-full flex-col justify-center px-6 py-12 sm:px-12 lg:w-1/2 lg:px-16">
             <div class="mx-auto w-full max-w-md">
-                <Link href="/" class="inline-flex items-center text-2xl font-black tracking-tight">
+                <Link href="/" class="inline-flex items-center font-display text-2xl font-black tracking-tight">
                     F1 <span class="ml-1.5 text-red-600">България</span>
                 </Link>
 
                 <div class="mt-8">
-                    <h1 v-if="title" class="text-2xl font-black sm:text-3xl">{{ title }}</h1>
+                    <h1 v-if="title" class="font-display text-2xl font-black sm:text-3xl">{{ title }}</h1>
                     <p v-if="subtitle" class="mt-2 text-sm text-zinc-400">{{ subtitle }}</p>
                 </div>
 
@@ -51,7 +51,7 @@ defineProps({
             </svg>
 
             <div class="relative mt-auto p-12">
-                <div class="text-3xl font-black leading-tight">
+                <div class="font-display text-3xl font-black leading-tight">
                     Прогнози.<br />Класирания.<br /><span class="text-red-600">История.</span>
                 </div>
                 <p class="mt-4 max-w-sm text-sm text-zinc-400">

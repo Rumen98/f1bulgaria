@@ -34,6 +34,7 @@ const meta = computed(() => [
                 <div
                     v-if="trackSvg"
                     class="relative w-full text-zinc-200 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-h-[40vh] [&_svg]:w-auto [&_svg]:max-w-full"
+                    aria-hidden="true"
                     v-html="trackSvg"
                 />
                 <div v-else class="flex h-40 w-full items-center justify-center rounded-lg border border-dashed border-zinc-700 text-zinc-500">
@@ -44,7 +45,7 @@ const meta = computed(() => [
             <div class="flex flex-col justify-center gap-4 p-6 lg:p-10">
                 <div>
                     <div class="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">{{ circuit.country }}</div>
-                    <h1 class="mt-1 text-3xl font-black sm:text-4xl">{{ circuit.name }}</h1>
+                    <h1 class="mt-1 font-display text-3xl font-black sm:text-4xl">{{ circuit.name }}</h1>
                     <p v-if="technical && (technical.length_km || technical.lap_record_time)" class="mt-1 text-sm text-zinc-300">
                         <span v-if="technical.length_km" class="tabular-nums">{{ technical.length_km }} км</span>
                         <span v-if="technical.lap_record_time" class="text-zinc-500">
@@ -58,7 +59,7 @@ const meta = computed(() => [
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <div v-for="m in meta" :key="m.label" class="rounded-lg border border-zinc-800 bg-black/30 p-3">
                         <div class="text-base font-bold text-white">{{ m.value }}</div>
-                        <div class="text-[11px] uppercase tracking-wide text-zinc-500">{{ m.label }}</div>
+                        <div class="text-xs uppercase tracking-wide text-zinc-500">{{ m.label }}</div>
                     </div>
                 </div>
             </div>

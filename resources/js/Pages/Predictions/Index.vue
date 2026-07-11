@@ -1,4 +1,5 @@
 <script setup>
+import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
@@ -11,11 +12,11 @@ defineProps({
     <Head title="Моите прогнози" />
 
     <PublicLayout>
-        <h1 class="mb-6 text-2xl font-black sm:text-3xl">Моите прогнози</h1>
+        <h1 class="mb-6 font-display text-2xl font-black sm:text-3xl">Моите прогнози</h1>
 
-        <div v-if="predictions.length === 0" class="rounded-xl border border-dashed border-zinc-800 p-12 text-center text-zinc-500">
+        <EmptyState v-if="predictions.length === 0">
             Все още нямаш прогнози. Отвори <Link :href="route('calendar')" class="text-red-500 hover:text-red-400">календара</Link> и подай първата си.
-        </div>
+        </EmptyState>
 
         <div class="grid gap-3">
             <Link
@@ -31,7 +32,7 @@ defineProps({
                     </div>
                 </div>
                 <div class="text-right">
-                    <div v-if="prediction.points !== null && prediction.points !== undefined" class="text-xl font-bold tabular-nums text-red-600">
+                    <div v-if="prediction.points !== null && prediction.points !== undefined" class="font-display text-xl font-bold tabular-nums text-red-600">
                         {{ prediction.points }} т.
                     </div>
                     <div v-else class="text-xs text-zinc-500">Все още не е точкувана</div>

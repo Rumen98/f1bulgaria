@@ -1,4 +1,6 @@
 <script setup>
+import Card from '@/Components/UI/Card.vue';
+import StatTile from '@/Components/UI/StatTile.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -9,6 +11,8 @@ const typeLabel = computed(
     () => ({ street: 'Уличен', permanent: 'Постоянен', hybrid: 'Хибриден' })[props.tech?.type] ?? null,
 );
 const gripLabel = (v) => ({ low: 'Ниско', medium: 'Средно', high: 'Високо' })[v] ?? '—';
+// Отделна карта за трудност — женски род („Ниска трудност"), не съвпада със сцеплението.
+const difficultyLabel = (v) => ({ low: 'Ниска', medium: 'Средна', high: 'Висока' })[v] ?? '—';
 
 // Има ли изобщо смислени данни (поне дължина или брой завои)?
 const hasData = computed(() => props.tech && (props.tech.length_km || props.tech.turns_count));
@@ -43,36 +47,33 @@ const cornerCards = computed(() => {
 
 <template>
     <section v-if="hasData">
-        <h2 class="mb-3 text-lg font-bold text-white">Технически данни</h2>
+        <h2 class="mb-3 font-display text-lg font-bold text-white">Технически данни</h2>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <div v-for="c in cards" :key="c.label" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-center">
-                <div class="text-xl font-black tabular-nums text-white">{{ c.value }}</div>
-                <div class="mt-1 text-xs uppercase tracking-wide text-zinc-500">{{ c.label }}</div>
-            </div>
+            <StatTile v-for="c in cards" :key="c.label" :label="c.label">{{ c.value }}</StatTile>
         </div>
 
         <div v-if="cornerCards.length" class="mt-3 grid grid-cols-3 gap-3">
             <div v-for="c in cornerCards" :key="c.label" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-center">
-                <div class="text-2xl font-black tabular-nums" :class="c.color">{{ c.value }}</div>
+                <div class="font-display text-2xl font-black tabular-nums" :class="c.color">{{ c.value }}</div>
                 <div class="mt-1 text-xs uppercase tracking-wide text-zinc-500">{{ c.label }}</div>
             </div>
         </div>
 
         <div class="mt-3 flex flex-wrap gap-3">
-            <div v-if="tech.lap_record_time" class="flex-1 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+            <Card v-if="tech.lap_record_time" class="flex-1">
                 <div class="text-xs uppercase tracking-wide text-zinc-500">⏱️ Рекорд на пистата</div>
-                <div class="mt-1 text-lg font-black tabular-nums text-white">{{ tech.lap_record_time }}</div>
+                <div class="mt-1 font-display text-lg font-black tabular-nums text-white">{{ tech.lap_record_time }}</div>
                 <div class="text-sm text-zinc-400">{{ tech.lap_record_driver }} · {{ tech.lap_record_year }}</div>
-            </div>
-            <div v-if="tech.surface_grip" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+            </Card>
+            <Card v-if="tech.surface_grip">
                 <div class="text-xs uppercase tracking-wide text-zinc-500">Сцепление</div>
                 <div class="mt-1 font-semibold text-zinc-200">{{ gripLabel(tech.surface_grip) }}</div>
-            </div>
-            <div v-if="tech.overtaking_difficulty" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+            </Card>
+            <Card v-if="tech.overtaking_difficulty">
                 <div class="text-xs uppercase tracking-wide text-zinc-500">Изпреварване</div>
-                <div class="mt-1 font-semibold text-zinc-200">{{ gripLabel(tech.overtaking_difficulty) }}</div>
-            </div>
+                <div class="mt-1 font-semibold text-zinc-200">{{ difficultyLabel(tech.overtaking_difficulty) }}</div>
+            </Card>
         </div>
     </section>
 </template>

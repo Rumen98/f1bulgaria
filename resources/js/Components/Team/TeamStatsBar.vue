@@ -1,4 +1,5 @@
 <script setup>
+import StatTile from '@/Components/UI/StatTile.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -19,9 +20,6 @@ const items = computed(() => [
 
 <template>
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <div v-for="item in items" :key="item.label" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-center">
-            <div class="text-2xl font-black tabular-nums text-white">{{ item.value }}</div>
-            <div class="mt-1 text-xs uppercase tracking-wide text-zinc-500">{{ item.label }}</div>
-        </div>
+        <StatTile v-for="item in items" :key="item.label" :label="item.label">{{ item.value }}</StatTile>
     </div>
 </template>

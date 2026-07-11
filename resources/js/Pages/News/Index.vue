@@ -1,5 +1,6 @@
 <script setup>
 import NewsCard from '@/Components/News/NewsCard.vue';
+import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
@@ -18,7 +19,7 @@ defineProps({
 
     <PublicLayout>
         <div class="mb-6 flex items-baseline justify-between">
-            <h1 class="text-2xl font-black sm:text-3xl">Новини<span class="text-red-600">.</span></h1>
+            <h1 class="font-display text-2xl font-black sm:text-3xl">Новини<span class="text-red-600">.</span></h1>
             <span class="text-sm text-zinc-500">F1 на български</span>
         </div>
 
@@ -28,7 +29,7 @@ defineProps({
                 v-for="cat in categories"
                 :key="cat.key"
                 :href="route('news.index', cat.key === 'all' ? {} : { cat: cat.key })"
-                class="rounded-full border px-3 py-1.5 text-sm font-medium transition duration-200"
+                class="rounded-full border px-3 py-2 text-sm font-medium transition duration-200"
                 :class="activeCat === cat.key
                     ? 'border-red-600 bg-red-600 text-white'
                     : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-white'"
@@ -37,9 +38,9 @@ defineProps({
             </Link>
         </div>
 
-        <div v-if="!featured && items.length === 0" class="rounded-xl border border-dashed border-zinc-800 p-12 text-center text-zinc-500">
+        <EmptyState v-if="!featured && items.length === 0">
             Все още няма одобрени новини в тази категория.
-        </div>
+        </EmptyState>
 
         <!-- Featured -->
         <div v-if="featured" class="mb-6">

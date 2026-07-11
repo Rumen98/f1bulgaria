@@ -1,7 +1,9 @@
 <script setup>
+import ImportanceDots from '@/Components/News/ImportanceDots.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
 import NewsImage from '@/Components/News/NewsImage.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { NEUTRAL_DOT_COLOR } from '@/utils/racing';
 import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
@@ -42,17 +44,16 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                             {{ article.classification }}
                         </span>
                         <span v-if="article.team" class="inline-flex items-center gap-1 text-zinc-400">
-                            <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: article.color ?? '#52525b' }" />
+                            <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: article.color ?? NEUTRAL_DOT_COLOR }" />
                             {{ article.team }}
                         </span>
                         <span class="ml-auto text-zinc-500">{{ article.published_at }}</span>
                     </div>
 
-                    <h1 class="mt-3 text-3xl font-black leading-tight text-white sm:text-4xl">{{ article.title }}</h1>
+                    <h1 class="mt-3 font-display text-3xl font-black leading-tight text-white sm:text-4xl">{{ article.title }}</h1>
 
                     <div v-if="article.importance" class="mt-3 flex items-center gap-1 text-xs text-zinc-600">
-                        <span v-for="n in 5" :key="n" :class="n <= article.importance ? 'text-red-500' : 'text-zinc-700'">●</span>
-                        <span class="ml-2">важност</span>
+                        <ImportanceDots :value="article.importance" />
                     </div>
                 </header>
 
@@ -78,7 +79,7 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
 
                 <!-- Нашият анализ -->
                 <div v-if="analysisParagraphs.length" class="mt-8 border-l-2 border-red-600 pl-5">
-                    <h2 class="mb-2 text-lg font-black text-white">Нашият анализ</h2>
+                    <h2 class="mb-2 font-display text-lg font-bold text-white">Нашият анализ</h2>
                     <div class="space-y-3 leading-relaxed text-zinc-300">
                         <p v-for="(p, i) in analysisParagraphs" :key="i">{{ p }}</p>
                     </div>
@@ -105,7 +106,7 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
 
             <!-- Свързани новини -->
             <aside v-if="related.length" class="lg:col-span-1">
-                <h2 class="mb-3 text-lg font-bold text-white">Свързани новини</h2>
+                <h2 class="mb-3 font-display text-lg font-bold text-white">Свързани новини</h2>
                 <div class="grid gap-4">
                     <NewsCard v-for="(item, i) in related" :key="i" :item="item" />
                 </div>

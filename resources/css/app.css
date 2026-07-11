@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+    /* Тъмен фон и на root елемента — без бял flash при първоначален paint/overscroll. */
+    html {
+        background-color: #0a0a0a;
+    }
+
+    /*
+     * Глобален видим клавиатурен фокус: компонентите дефинират само hover
+     * стилове, а дефолтният UA outline е почти невидим върху #0a0a0a.
+     * :focus-visible не се показва при клик с мишка — само при клавиатура.
+     */
+    :focus-visible {
+        outline: 2px solid theme('colors.red.500');
+        outline-offset: 2px;
+    }
+}
+
 /*
  * Болидът на пистата (hero/track SVG) се движи по CSS motion-path.
  * CSS анимациите рестартират автоматично при mount/remount — за разлика от

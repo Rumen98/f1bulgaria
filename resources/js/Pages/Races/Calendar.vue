@@ -1,5 +1,6 @@
 <script setup>
 import CalendarSubscribe from '@/Components/Calendar/CalendarSubscribe.vue';
+import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
@@ -16,7 +17,7 @@ defineProps({
 
     <PublicLayout>
         <div class="mb-6 flex items-center justify-between gap-3">
-            <h1 class="text-2xl font-black sm:text-3xl">Календар <span class="text-red-600">{{ season }}</span></h1>
+            <h1 class="font-display text-2xl font-black sm:text-3xl">Календар <span class="text-red-600">{{ season }}</span></h1>
             <div class="flex items-center gap-3">
                 <CalendarSubscribe />
                 <Link :href="route('standings')" class="hidden text-sm font-medium text-red-500 transition hover:text-red-400 sm:inline">
@@ -25,9 +26,9 @@ defineProps({
             </div>
         </div>
 
-        <div v-if="races.length === 0" class="rounded-xl border border-dashed border-zinc-800 p-12 text-center text-zinc-500">
+        <EmptyState v-if="races.length === 0">
             Все още няма синхронизиран календар.
-        </div>
+        </EmptyState>
 
         <div class="grid gap-3">
             <Link
@@ -52,7 +53,7 @@ defineProps({
                 </div>
                 <div class="text-right">
                     <div class="text-sm font-medium tabular-nums text-zinc-200">{{ race.race_at_sofia ?? 'TBC' }}</div>
-                    <div v-if="race.finished" class="text-xs font-medium text-green-500">Завършено</div>
+                    <div v-if="race.finished" class="text-xs font-medium text-emerald-400">Завършено</div>
                     <div v-else class="text-xs text-zinc-500">Предстои</div>
                 </div>
             </Link>

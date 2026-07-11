@@ -2,10 +2,11 @@
 import { usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import TeamMonogram from '@/Components/Team/TeamMonogram.vue';
+import { TEAM_COLOR_FALLBACK } from '@/utils/racing';
 
 const props = defineProps({
     name: { type: String, default: '' },
-    color: { type: String, default: '#e10600' },
+    color: { type: String, default: TEAM_COLOR_FALLBACK },
     slug: { type: String, default: '' },
     // 'emblem' = квадратен badge (за списъци/карти/hero); 'wordmark' = широк лого-лок.
     variant: { type: String, default: 'emblem' },
@@ -20,7 +21,7 @@ const brands = computed(() => usePage().props.teamBrands ?? {});
 const brand = computed(() => brands.value[props.slug] ?? null);
 const hasBrand = computed(() => brand.value !== null);
 
-const primary = computed(() => brand.value?.colors?.[0] ?? props.color ?? '#e10600');
+const primary = computed(() => brand.value?.colors?.[0] ?? props.color ?? TEAM_COLOR_FALLBACK);
 const secondary = computed(() => brand.value?.colors?.[1] ?? '#0a0a0a');
 const shape = computed(() => brand.value?.shape ?? 'circle');
 const font = computed(() => brand.value?.font ?? 'sans');

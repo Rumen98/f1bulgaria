@@ -1,6 +1,7 @@
 <script setup>
 import NewsGenericImage from '@/Components/News/NewsGenericImage.vue';
 import TeamBrand from '@/Components/Team/TeamBrand.vue';
+import { TEAM_COLOR_FALLBACK } from '@/utils/racing';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -37,7 +38,7 @@ const data = computed(() => props.image?.data ?? {});
         <div
             v-else-if="type === 'team_banner'"
             class="relative flex h-full w-full items-center justify-center overflow-hidden"
-            :style="{ background: `linear-gradient(135deg, ${data.color ?? '#e10600'}, #0a0a0a 70%)` }"
+            :style="{ background: `linear-gradient(135deg, ${data.color ?? TEAM_COLOR_FALLBACK}, #0a0a0a 70%)` }"
         >
             <svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" class="absolute inset-0 h-full w-full opacity-20">
                 <g stroke="#ffffff" stroke-width="6" stroke-linecap="round">
@@ -47,11 +48,11 @@ const data = computed(() => props.image?.data ?? {});
                     <line x1="-40" y1="160" x2="150" y2="160" />
                 </g>
             </svg>
-            <TeamBrand :name="data.name ?? '?'" :slug="data.slug ?? ''" :color="data.color ?? '#e10600'" variant="wordmark" size="lg" class="relative px-6 opacity-95" />
+            <TeamBrand :name="data.name ?? '?'" :slug="data.slug ?? ''" :color="data.color ?? TEAM_COLOR_FALLBACK" variant="wordmark" size="lg" class="relative px-6 opacity-95" />
         </div>
 
         <!-- Очертание на писта -->
-        <div v-else-if="type === 'circuit_outline'" class="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-4">
+        <div v-else-if="type === 'circuit_outline'" aria-hidden="true" class="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-4">
             <div
                 v-if="trackSvg(data.slug)"
                 class="h-full text-zinc-300 [&_svg]:mx-auto [&_svg]:h-full [&_svg]:max-h-full [&_svg]:w-auto"
@@ -64,7 +65,7 @@ const data = computed(() => props.image?.data ?? {});
         <NewsGenericImage
             v-else
             :classification="data.classification ?? 'other'"
-            :color="data.color ?? '#e10600'"
+            :color="data.color ?? TEAM_COLOR_FALLBACK"
             :label="data.label ?? 'F1'"
             :title="title"
         />

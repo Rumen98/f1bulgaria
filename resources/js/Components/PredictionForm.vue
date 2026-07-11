@@ -20,14 +20,14 @@ const form = useForm({
 });
 
 const driverFields = [
-    { key: 'p1_driver_id', label: '🥇 Победител (P1)' },
-    { key: 'p2_driver_id', label: '🥈 Втори (P2)' },
-    { key: 'p3_driver_id', label: '🥉 Трети (P3)' },
-    { key: 'pole_driver_id', label: '⏱️ Pole позиция' },
-    { key: 'fastest_lap_driver_id', label: '🔥 Най-бърза обиколка' },
+    { key: 'p1_driver_id', emoji: '🥇', label: 'Победител (P1)' },
+    { key: 'p2_driver_id', emoji: '🥈', label: 'Втори (P2)' },
+    { key: 'p3_driver_id', emoji: '🥉', label: 'Трети (P3)' },
+    { key: 'pole_driver_id', emoji: '⏱️', label: 'Pole позиция' },
+    { key: 'fastest_lap_driver_id', emoji: '🔥', label: 'Най-бърза обиколка' },
 ];
 
-const fieldClass = 'mt-1 block w-full rounded-md border-zinc-700 bg-zinc-800 text-sm text-zinc-100 shadow-sm transition focus:border-red-500 focus:ring-red-500 disabled:opacity-50';
+const fieldClass = 'mt-1 block w-full rounded-lg border-zinc-800 bg-zinc-950 text-sm text-white placeholder-zinc-500 transition focus:border-red-600 focus:ring-1 focus:ring-red-600 disabled:opacity-50';
 
 const submit = () => {
     form.post(route('predictions.store', props.raceId), {
@@ -39,7 +39,7 @@ const submit = () => {
 <template>
     <form class="space-y-4" @submit.prevent="submit">
         <div v-for="field in driverFields" :key="field.key">
-            <label :for="field.key" class="text-sm font-medium text-zinc-400">{{ field.label }}</label>
+            <label :for="field.key" class="text-sm font-medium text-zinc-400"><span aria-hidden="true">{{ field.emoji }}</span> {{ field.label }}</label>
             <select :id="field.key" v-model="form[field.key]" :disabled="locked" :class="fieldClass">
                 <option :value="null">— избери пилот —</option>
                 <option v-for="driver in drivers" :key="driver.id" :value="driver.id">

@@ -1,5 +1,7 @@
 <script setup>
+import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { podiumClass } from '@/utils/racing';
 import { Head, Link } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -70,14 +72,14 @@ const updatedLabel = computed(() => {
 const isQualifying = computed(() => session.value?.is_qualifying ?? false);
 const cutoffs = computed(() => session.value?.cutoffs ?? []);
 
-const posClass = (p) => ({ 1: 'text-amber-300', 2: 'text-zinc-300', 3: 'text-orange-400' })[p] ?? 'text-zinc-500';
+const posClass = (p) => podiumClass(p) || 'text-zinc-500';
 
 const tire = (compound) => {
     const map = {
         SOFT: { l: 'S', c: 'text-red-500 border-red-500' },
         MEDIUM: { l: 'M', c: 'text-yellow-400 border-yellow-400' },
         HARD: { l: 'H', c: 'text-zinc-200 border-zinc-200' },
-        INTERMEDIATE: { l: 'I', c: 'text-green-400 border-green-400' },
+        INTERMEDIATE: { l: 'I', c: 'text-emerald-400 border-emerald-400' },
         WET: { l: 'W', c: 'text-sky-400 border-sky-400' },
     };
     return map[compound] ?? null;
@@ -90,7 +92,7 @@ const sectorClass = (row, n) => {
     if (row[`sector${n}_overall`]) {
         return 'text-purple-400';
     }
-    return row[`sector${n}_best`] ? 'text-emerald-400' : 'text-zinc-600';
+    return row[`sector${n}_best`] ? 'text-emerald-400' : 'text-zinc-500';
 };
 
 const nextRaceCountdown = computed(() => {
@@ -119,8 +121,8 @@ const nextRaceCountdown = computed(() => {
                         <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
                         <span class="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
                     </span>
-                    <h1 class="text-xl font-black sm:text-2xl">
-                        LIVE — <span class="text-red-500">{{ session.circuit }}</span> · {{ session.name }}
+                    <h1 class="font-display text-2xl font-black sm:text-3xl">
+                        LIVE — <span class="text-red-600">{{ session.circuit }}</span> · {{ session.name }}
                     </h1>
                     <span v-if="isQualifying" class="rounded bg-purple-500/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-purple-300">Квалификация</span>
                 </div>
@@ -133,7 +135,7 @@ const nextRaceCountdown = computed(() => {
                 </div>
             </div>
 
-            <div class="overflow-x-auto rounded-xl border border-zinc-800">
+            <TableShell :scroll="true">
                 <table class="w-full text-sm">
                     <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                         <tr>
@@ -177,7 +179,7 @@ const nextRaceCountdown = computed(() => {
                             <td class="hidden px-2 py-2.5 text-right tabular-nums text-zinc-500 sm:table-cell">{{ row.laps_completed }}</td>
                         </tr>
                         <tr v-if="cutoffs.includes(row.position)" :key="`cut-${row.position}`" class="bg-red-950/30">
-                            <td colspan="11" class="px-3 py-1 text-center text-[10px] font-bold uppercase tracking-wider text-red-400">
+                            <td colspan="11" class="px-3 py-1 text-center text-xs font-bold uppercase tracking-wider text-red-400">
                                 ⸻ граница на отпадане (P{{ row.position }}) ⸻
                             </td>
                         </tr>
@@ -187,14 +189,14 @@ const nextRaceCountdown = computed(() => {
                 <div v-if="rows.length === 0" class="p-8 text-center text-zinc-500">
                     Изчакване на данни от сесията…
                 </div>
-            </div>
-            <p class="mt-3 text-xs text-zinc-600">Данни: OpenF1 · обновяване на всеки 5 секунди</p>
+            </TableShell>
+            <p class="mt-3 text-xs text-zinc-500">Данни: OpenF1 · обновяване на всеки 5 секунди</p>
         </template>
 
         <!-- Няма активна сесия -->
-        <div v-else class="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-10 text-center">
+        <div v-else class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-10 text-center">
             <div class="text-4xl">🏁</div>
-            <h1 class="mt-3 text-2xl font-black">Няма активна сесия в момента</h1>
+            <h1 class="mt-3 font-display text-2xl font-black">Няма активна сесия в момента</h1>
             <p class="mt-2 text-zinc-400">Live таймингът се появява по време на тренировки, квалификации и състезания.</p>
 
             <p v-if="!credentialsConfigured" class="mx-auto mt-4 max-w-md rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
@@ -204,7 +206,7 @@ const nextRaceCountdown = computed(() => {
             <div v-if="nextRace" class="mx-auto mt-6 max-w-sm rounded-xl border border-zinc-800 bg-zinc-950 p-5">
                 <div class="text-xs uppercase tracking-wide text-zinc-500">Следващо състезание</div>
                 <div class="mt-1 font-bold text-white">{{ nextRace.name }}</div>
-                <div v-if="nextRaceCountdown" class="mt-1 text-sm tabular-nums text-red-500">след {{ nextRaceCountdown }}</div>
+                <div v-if="nextRaceCountdown" class="mt-1 font-display text-sm tabular-nums text-red-500">след {{ nextRaceCountdown }}</div>
             </div>
 
             <Link :href="route('calendar')" class="mt-6 inline-block text-sm font-medium text-red-500 transition hover:text-red-400">

@@ -10,7 +10,6 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -30,7 +29,8 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->colors([
-                'primary' => Color::Red,
+                // Официалното F1 червено (Filament генерира палитрата от hex).
+                'primary' => '#e10600',
             ])
             // Брандиран тъмен панел — форсиран dark mode (без toggle).
             ->darkMode(isForced: true)

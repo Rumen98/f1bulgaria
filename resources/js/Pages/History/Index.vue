@@ -23,7 +23,7 @@ const cards = [
 
     <PublicLayout>
         <header class="relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-br from-red-950/40 via-zinc-950 to-black p-8 sm:p-12">
-            <svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" class="absolute inset-0 h-full w-full opacity-10">
+            <svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true" class="absolute inset-0 h-full w-full opacity-10">
                 <g stroke="#e10600" stroke-width="3" stroke-linecap="round">
                     <line x1="-20" y1="50" x2="160" y2="50" />
                     <line x1="-20" y1="100" x2="240" y2="100" />
@@ -31,7 +31,7 @@ const cards = [
                 </g>
             </svg>
             <div class="relative">
-                <h1 class="text-3xl font-black sm:text-5xl">Историята на Формула 1</h1>
+                <h1 class="font-display text-3xl font-black sm:text-5xl">Историята на Формула 1</h1>
                 <p class="mt-4 max-w-2xl text-zinc-300 sm:text-lg">Над седем десетилетия скорост, легенди и драма — и мястото на България в тази страст.</p>
             </div>
         </header>
@@ -44,7 +44,7 @@ const cards = [
                 class="group rounded-2xl border border-zinc-800 bg-zinc-900/60 p-8 transition duration-200 hover:border-red-600/50 hover:bg-zinc-900"
             >
                 <div class="text-4xl">{{ c.emoji }}</div>
-                <h2 class="mt-4 text-2xl font-black text-white">{{ c.title }}</h2>
+                <h2 class="mt-4 font-display text-2xl font-black text-white">{{ c.title }}</h2>
                 <p class="mt-2 text-zinc-400">{{ c.desc }}</p>
                 <span class="mt-4 inline-block text-sm font-medium text-red-500 transition group-hover:text-red-400">Прочети →</span>
             </Link>

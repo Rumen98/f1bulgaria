@@ -1,4 +1,5 @@
 <script setup>
+import Card from '@/Components/UI/Card.vue';
 import { useCountdown } from '@/composables/useCountdown';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
@@ -64,6 +65,7 @@ const countdownText = computed(() => {
                 <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(225,6,0,0.18),transparent_60%)]" />
                 <div
                     v-if="trackSvg"
+                    aria-hidden="true"
                     class="relative w-full text-zinc-200 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-h-[50vh] [&_svg]:w-auto [&_svg]:max-w-full"
                     v-html="trackSvg"
                 />
@@ -76,27 +78,27 @@ const countdownText = computed(() => {
             <div class="flex flex-col justify-center gap-5 p-6 lg:p-12">
                 <div>
                     <div class="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">{{ kicker }}</div>
-                    <h1 class="mt-2 text-3xl font-black leading-tight sm:text-4xl">
+                    <h2 class="mt-2 font-display text-3xl font-black leading-tight sm:text-4xl">
                         {{ hero.race?.name ?? 'Сезонът приключи' }}
-                    </h1>
+                    </h2>
                     <p v-if="hero.race" class="mt-1 text-zinc-400">
                         {{ hero.race.circuit }}<span v-if="hero.race.country"> · {{ hero.race.country }}</span>
                     </p>
                     <p v-if="hero.race?.race_at_sofia" class="mt-1 text-sm text-zinc-500">
-                        🏁 Състезание: {{ hero.race.race_at_sofia }} (Sofia)
+                        <span aria-hidden="true">🏁</span> Състезание: {{ hero.race.race_at_sofia }} (Sofia)
                     </p>
                 </div>
 
-                <div v-if="hero.countdown_to" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                <Card v-if="hero.countdown_to">
                     <div class="text-xs uppercase tracking-wide text-zinc-400">{{ hero.countdown_label }}</div>
-                    <div class="mt-1 font-mono text-2xl font-bold sm:text-3xl">{{ countdownText }}</div>
+                    <div class="mt-1 font-display text-2xl font-black tabular-nums sm:text-3xl">{{ countdownText }}</div>
                     <div v-if="hero.countdown_at_sofia" class="mt-1 text-xs text-zinc-500">
                         {{ hero.countdown_at_sofia }} (Sofia)
                     </div>
-                </div>
+                </Card>
 
                 <div v-if="winner" class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-                    🏆 Победител: <span class="font-semibold">{{ winner.name }}</span>
+                    <span aria-hidden="true">🏆</span> Победител: <span class="font-semibold">{{ winner.name }}</span>
                 </div>
 
                 <div v-if="sessions.length" class="space-y-1">

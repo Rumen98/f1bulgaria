@@ -1,4 +1,5 @@
 <script setup>
+import StatTile from '@/Components/UI/StatTile.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -30,22 +31,16 @@ const allTimeItems = computed(() => [
 <template>
     <div class="space-y-6">
         <div>
-            <h2 class="mb-3 text-lg font-bold text-white">Сезон {{ seasonYear }}</h2>
+            <h2 class="mb-3 font-display text-lg font-bold text-white">Сезон {{ seasonYear }}</h2>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-                <div v-for="item in seasonItems" :key="item.label" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-center">
-                    <div class="text-xl font-black tabular-nums text-white">{{ item.value }}</div>
-                    <div class="mt-1 text-[11px] uppercase tracking-wide text-zinc-500">{{ item.label }}</div>
-                </div>
+                <StatTile v-for="item in seasonItems" :key="item.label" :label="item.label">{{ item.value }}</StatTile>
             </div>
         </div>
 
         <div>
-            <h2 class="mb-3 text-lg font-bold text-white">За всички сезони <span class="text-xs font-normal text-zinc-500">(в нашата база)</span></h2>
+            <h2 class="mb-3 font-display text-lg font-bold text-white">За всички сезони <span class="text-xs font-normal text-zinc-500">(в нашата база)</span></h2>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <div v-for="item in allTimeItems" :key="item.label" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-center">
-                    <div class="text-xl font-black tabular-nums text-white">{{ item.value }}</div>
-                    <div class="mt-1 text-[11px] uppercase tracking-wide text-zinc-500">{{ item.label }}</div>
-                </div>
+                <StatTile v-for="item in allTimeItems" :key="item.label" :label="item.label">{{ item.value }}</StatTile>
             </div>
         </div>
     </div>

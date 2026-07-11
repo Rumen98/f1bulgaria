@@ -1,4 +1,5 @@
 <script setup>
+import { hasRoute } from '@/utils/routes';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
@@ -24,18 +25,12 @@ const cards = computed(() => [
     { label: 'Победи %', value: props.achievements.win_rate + '%', accent: 'text-emerald-400', ring: 'border-emerald-500/30', glow: 'from-emerald-500/15' },
 ]);
 
-const hasRoute = (() => {
-    try {
-        return route().has('circuits.show');
-    } catch (e) {
-        return false;
-    }
-})();
+const canLinkCircuits = hasRoute('circuits.show');
 </script>
 
 <template>
     <section>
-        <h2 class="mb-4 text-xl font-black text-white sm:text-2xl">🏅 Постижения</h2>
+        <h2 class="mb-4 font-display text-xl font-black text-white sm:text-2xl">🏅 Постижения</h2>
 
         <!-- Кариерни числа -->
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -46,22 +41,22 @@ const hasRoute = (() => {
                 :class="card.ring"
             >
                 <div class="pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent" :class="card.glow" />
-                <div class="relative text-3xl font-black tabular-nums sm:text-4xl" :class="card.accent">{{ card.value }}</div>
+                <div class="relative font-display text-3xl font-black tabular-nums sm:text-4xl" :class="card.accent">{{ card.value }}</div>
                 <div class="relative mt-1 text-[11px] uppercase tracking-wide text-zinc-400">{{ card.label }}</div>
             </div>
         </div>
 
         <!-- Победи на писти -->
         <div v-if="circuitWins.length" class="mt-8">
-            <h3 class="mb-3 text-lg font-bold text-white">Победи на писти</h3>
+            <h3 class="mb-3 font-display text-lg font-bold text-white">Победи на писти</h3>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 <component
-                    :is="hasRoute ? Link : 'div'"
+                    :is="canLinkCircuits ? Link : 'div'"
                     v-for="win in circuitWins"
                     :key="win.circuit_slug"
-                    :href="hasRoute ? route('circuits.show', win.circuit_slug) : undefined"
+                    :href="canLinkCircuits ? route('circuits.show', win.circuit_slug) : undefined"
                     class="group relative flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 transition duration-200"
-                    :class="hasRoute ? 'hover:border-red-600/50 hover:bg-zinc-900' : ''"
+                    :class="canLinkCircuits ? 'hover:border-red-600/50 hover:bg-zinc-900' : ''"
                 >
                     <span class="absolute right-3 top-3 rounded-full bg-red-600/90 px-2 py-0.5 text-xs font-bold tabular-nums text-white">
                         {{ win.wins }}×

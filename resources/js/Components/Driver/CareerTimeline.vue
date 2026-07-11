@@ -12,7 +12,7 @@ const rows = computed(() => [...props.timeline].reverse());
 
 <template>
     <section v-if="rows.length">
-        <h2 class="mb-3 text-lg font-bold text-white">Кариера по сезони</h2>
+        <h2 class="mb-3 font-display text-lg font-bold text-white">Кариера по сезони</h2>
         <div class="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/40">
             <div
                 v-for="row in rows"

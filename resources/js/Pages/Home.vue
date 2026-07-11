@@ -4,6 +4,7 @@ import ThisDayWidget from '@/Components/Homepage/ThisDayWidget.vue';
 import LiveSessionBanner from '@/Components/LiveSessionBanner.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { hasRoute } from '@/utils/routes';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
@@ -28,14 +29,7 @@ const allLinks = [
     { label: 'Prediction League', desc: 'Познай и събирай точки', route: 'leaderboard' },
 ];
 
-const has = (name) => {
-    try {
-        return route().has(name);
-    } catch (e) {
-        return false;
-    }
-};
-const links = computed(() => allLinks.filter((l) => has(l.route) && (!l.feature || features.value[l.feature])));
+const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.feature || features.value[l.feature])));
 </script>
 
 <template>
@@ -56,8 +50,8 @@ const links = computed(() => allLinks.filter((l) => has(l.route) && (!l.feature 
         <!-- Топ новини -->
         <section v-if="topNews.length" class="mt-10">
             <div class="mb-4 flex items-baseline justify-between">
-                <h2 class="text-xl font-black sm:text-2xl">Топ новини</h2>
-                <Link v-if="has('news.index')" :href="route('news.index')" class="text-sm font-medium text-red-500 transition hover:text-red-400">
+                <h2 class="font-display text-xl font-black sm:text-2xl">Топ новини</h2>
+                <Link v-if="hasRoute('news.index')" :href="route('news.index')" class="text-sm font-medium text-red-500 transition hover:text-red-400">
                     Всички новини →
                 </Link>
             </div>
@@ -68,7 +62,7 @@ const links = computed(() => allLinks.filter((l) => has(l.route) && (!l.feature 
 
         <!-- Разделите на платформата -->
         <section class="mt-10">
-            <h2 class="mb-4 text-xl font-black sm:text-2xl">Разгледай</h2>
+            <h2 class="mb-4 font-display text-xl font-black sm:text-2xl">Разгледай</h2>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Link
                     v-for="link in links"

@@ -38,7 +38,8 @@ const goToSeason = (e) => {
             <select
                 v-if="seasons.length > 1"
                 :value="selectedSeason"
-                class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-white focus:border-red-600 focus:outline-none"
+                aria-label="Сезон"
+                class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
                 @change="goToSeason"
             >
                 <option v-for="y in seasons" :key="y" :value="y">Сезон {{ y }}</option>
@@ -63,7 +64,7 @@ const goToSeason = (e) => {
                 />
                 <div
                     v-else
-                    class="select-none text-6xl font-black leading-none tabular-nums sm:text-8xl"
+                    class="select-none font-display text-6xl font-black leading-none tabular-nums sm:text-8xl"
                     :style="{ color: driver.color_hex, textShadow: '0 2px 0 rgba(0,0,0,0.4), 0 0 24px ' + driver.color_hex + '55' }"
                 >
                     {{ driver.number ?? '' }}
@@ -72,7 +73,7 @@ const goToSeason = (e) => {
                     <span v-if="isHistorical" class="mb-2 inline-block rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-400">
                         Легенда · последен сезон {{ season }}
                     </span>
-                    <h1 class="text-3xl font-black sm:text-4xl">
+                    <h1 class="font-display text-3xl font-black sm:text-4xl">
                         <span v-if="driver.flag">{{ driver.flag }} </span>{{ driver.name }}
                     </h1>
                     <div class="mt-2 flex flex-wrap items-center gap-3 text-zinc-300">

@@ -17,13 +17,13 @@ defineProps({
                 <div class="text-sm text-zinc-500">{{ circuit.country }}</div>
             </div>
             <span
-                class="flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide"
+                class="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide"
                 :class="circuit.is_active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-700/40 text-zinc-400'"
             >
                 {{ circuit.is_active ? 'Активна' : 'Историческа' }}
             </span>
         </div>
-        <div class="mt-3 flex items-center justify-between text-xs text-zinc-600">
+        <div class="mt-3 flex items-center justify-between text-xs text-zinc-500">
             <span>Последно: {{ circuit.last_race_year }}</span>
             <span v-if="circuit.has_track">🏁 track</span>
         </div>

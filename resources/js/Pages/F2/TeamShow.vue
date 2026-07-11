@@ -1,4 +1,5 @@
 <script setup>
+import StatTile from '@/Components/UI/StatTile.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
@@ -22,17 +23,14 @@ const statCards = [
 
     <PublicLayout>
         <Link :href="route('f2.teams.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Отбори F2</Link>
-        <h1 class="mb-6 mt-1 text-3xl font-black sm:text-4xl">{{ team.name }}</h1>
+        <h1 class="mb-6 mt-1 font-display text-3xl font-black sm:text-4xl">{{ team.name }}</h1>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div v-for="c in statCards" :key="c.key" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-center">
-                <div class="text-2xl font-black tabular-nums text-white">{{ stats[c.key] }}</div>
-                <div class="mt-1 text-xs uppercase tracking-wide text-zinc-500">{{ c.label }}</div>
-            </div>
+            <StatTile v-for="c in statCards" :key="c.key" :label="c.label">{{ stats[c.key] }}</StatTile>
         </div>
 
         <section v-if="currentDrivers.length" class="mt-8">
-            <h2 class="mb-3 text-lg font-bold text-white">Настоящи пилоти</h2>
+            <h2 class="mb-3 font-display text-lg font-bold text-white">Настоящи пилоти</h2>
             <div class="flex flex-wrap gap-2">
                 <Link
                     v-for="d in currentDrivers"
@@ -41,13 +39,13 @@ const statCards = [
                     class="rounded-full border px-4 py-2 text-sm font-medium transition"
                     :class="d.is_bulgarian ? 'border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10' : 'border-zinc-700 text-zinc-200 hover:border-red-600 hover:text-white'"
                 >
-                    {{ d.flag }} {{ d.name }}
+                    <span aria-hidden="true">{{ d.flag }}</span> {{ d.name }}
                 </Link>
             </div>
         </section>
 
         <section v-if="alumni.length" class="mt-8">
-            <h2 class="mb-3 text-lg font-bold text-white">Пилоти през годините</h2>
+            <h2 class="mb-3 font-display text-lg font-bold text-white">Пилоти през годините</h2>
             <div class="grid gap-2 sm:grid-cols-2">
                 <Link
                     v-for="a in alumni"
@@ -55,7 +53,7 @@ const statCards = [
                     :href="route('f2.drivers.show', a.slug)"
                     class="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2.5 text-sm transition hover:border-zinc-600"
                 >
-                    <span class="text-zinc-200">{{ a.flag }} {{ a.name }}</span>
+                    <span class="text-zinc-200"><span aria-hidden="true">{{ a.flag }}</span> {{ a.name }}</span>
                     <span class="tabular-nums text-zinc-500">{{ a.years.join(', ') }}</span>
                 </Link>
             </div>
