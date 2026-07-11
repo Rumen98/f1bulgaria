@@ -7,10 +7,10 @@
 - Никакви фийчъри, изискващи real-time човешка модерация в MVP
 
 ## Стак (непроменим)
-- Laravel 11 (последна стабилна)
+- Laravel 13 (последна стабилна)
 - Inertia.js + Vue 3 (Composition API, `<script setup>`)
 - Tailwind CSS v3
-- Filament 3 за админ панел
+- Filament 4 за админ панел (v4 конвенции: nested resource директории, `Filament\Schemas`)
 - MySQL 8
 - Pest за тестове
 - Деплой: Hetzner Cloud (Ubuntu 22.04)
@@ -23,7 +23,7 @@
 - ИЗКЛЮЧЕНИЕ: разрешено е да предлагаш commit съобщения като текст (за копиране), но не ги изпълнявай.
 
 ## Конвенции
-- PHP 8.3, PSR-12, strict types където е разумно
+- PHP 8.3+ (`^8.3` в composer.json, локално 8.5), PSR-12, strict types където е разумно
 - Използвай Laravel Boost MCP за справки по Laravel документация
 - Използвай Context7 MCP за справки по библиотеки от трети страни (Inertia, Filament и т.н.) — никога не разчитай на памет за API-та на библиотеки
 - Form Requests за цялата валидация
@@ -58,7 +58,7 @@
 - `drivers` (first_name, last_name, slug, permanent_number, constructor_id, country_code, season_id)
 - `races` (season_id, round, name, circuit, country, race_datetime_utc, qualifying_datetime_utc, sprint_datetime_utc nullable, has_sprint bool)
 - `sessions` (race_id, type [fp1|fp2|fp3|qualifying|sprint_quali|sprint|race], scheduled_at_utc)
-- `results` (
+- `results` (race_id, driver_id, session_type [race|sprint], position nullable при DNF, points decimal(5,2), dnf bool, fastest_lap bool, grid_position, unique [race_id, driver_id, session_type])
 
 ===
 
