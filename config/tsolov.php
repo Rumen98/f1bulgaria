@@ -11,6 +11,8 @@ declare(strict_types=1);
 | широко отразени публични факти. Където няма сигурна конкретика (точни
 | резултати по състезания), текстът остава общ. Редактирай тук при новини.
 |
+| Last updated: 11.07.2026 — Post-Silverstone leadership.
+|
 */
 
 return [
@@ -21,6 +23,32 @@ return [
     'nationality' => 'Българин',
     'current_series' => 'FIA Формула 2',
     'current_team' => 'Campos Racing',
+    'car_number' => 6,
+
+    // Актуален статус в шампионата — обновявай при промяна.
+    'current_position' => 'P1 в шампионата на Формула 2',
+
+    // Статистика за текущия сезон (2026).
+    'season_stats' => [
+        'wins' => 6,
+        'points' => 141,
+        'championship_position' => 1,
+        'championship_lead' => 17, // точки пред Minì (2-ри в класирането)
+    ],
+
+    // Заглавни варианти за начална страница / герой секция.
+    'headline_options' => [
+        'primary' => 'Лидерът на Формула 2',
+        'secondary' => 'Българският Лъв на върха',
+        'record' => '3 поредни победи — първо в историята на F2',
+    ],
+
+    // Ключови постижения от сезон 2026 (highlight ред).
+    'career_highlights' => [
+        '3 поредни победи (Австрия Feature + Silverstone Sprint + Feature) — първи в F2 history',
+        'Първо Silverstone F2 double weekend от 2024',
+        'Лидер на шампионата 2026 с 141 точки',
+    ],
 
     // Шампионски акценти (за highlight ред).
     'titles' => [
