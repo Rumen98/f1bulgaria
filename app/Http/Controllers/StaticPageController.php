@@ -25,7 +25,7 @@ class StaticPageController extends Controller
 
     public function contact(): Response
     {
-        return $this->page('Контакт', 'Свържете се с екипа на F1 България.');
+        return $this->page('Контакт', 'Свържете се с екипа на Падок.');
     }
 
     private function page(string $title, string $intro): Response

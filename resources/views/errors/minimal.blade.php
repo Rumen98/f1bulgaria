@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#e10600">
 
-        <title>@yield('code') · @yield('title') — F1 България</title>
+        <title>@yield('code') · @yield('title') — Падок</title>
 
         {{-- Нарочно без Vite/външни асети: error страницата трябва да работи и когато app-ът е счупен. --}}
         <style>
@@ -51,7 +51,7 @@
     </head>
     <body>
         <main class="wrap" role="main">
-            <div class="brand"><span>F1</span> България</div>
+            <div class="brand">Падок<span>.</span></div>
             <div class="code">@yield('code')</div>
             <p class="message">@yield('message')</p>
             <a class="home" href="/">← Към началото</a>

@@ -26,7 +26,7 @@ class IcsCalendarBuilder
         $lines = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//F1 България//Календар//BG',
+            'PRODID:-//Падок//Календар//BG',
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
             'X-WR-CALNAME:'.$this->escape($calendarName),
@@ -60,7 +60,7 @@ class IcsCalendarBuilder
                 }
 
                 $events[] = [
-                    'uid' => "f1bg-{$race->id}-{$session->type->value}@f1bulgaria.bg",
+                    'uid' => "padok-{$race->id}-{$session->type->value}@padok.bg",
                     'start' => $session->scheduled_at_utc,
                     'summary' => "{$race->name} — {$session->type->label()}",
                     'description' => "{$race->circuit}, {$race->country}\\n{$link}",
@@ -74,7 +74,7 @@ class IcsCalendarBuilder
         // Резерв: ако няма сесии — поне състезанието от race_datetime_utc.
         if ($race->race_datetime_utc !== null) {
             $events[] = [
-                'uid' => "f1bg-{$race->id}-race@f1bulgaria.bg",
+                'uid' => "padok-{$race->id}-race@padok.bg",
                 'start' => $race->race_datetime_utc,
                 'summary' => "{$race->name} — Състезание",
                 'description' => "{$race->circuit}, {$race->country}\\n{$link}",

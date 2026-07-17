@@ -41,7 +41,7 @@ it('връща валиден iCalendar с правилен content-type', funct
     expect($body)->toContain('BEGIN:VCALENDAR')
         ->and($body)->toContain('END:VCALENDAR')
         ->and($body)->toContain('BEGIN:VEVENT')
-        ->and($body)->toContain('UID:f1bg-'.$this->race->id.'-race@f1bulgaria.bg')
+        ->and($body)->toContain('UID:padok-'.$this->race->id.'-race@padok.bg')
         ->and($body)->toContain('CATEGORIES:F1')
         ->and($body)->toContain('DTSTART:20260308T150000Z');
 });
@@ -50,8 +50,8 @@ it('включва събитие за всяка сесия на състеза
     $body = $this->get('/calendar.ics')->getContent();
 
     expect(substr_count($body, 'BEGIN:VEVENT'))->toBe(2) // квалификация + състезание
-        ->and($body)->toContain('-qualifying@f1bulgaria.bg')
-        ->and($body)->toContain('-race@f1bulgaria.bg');
+        ->and($body)->toContain('-qualifying@padok.bg')
+        ->and($body)->toContain('-race@padok.bg');
 });
 
 it('връща .ics за конкретен пилот от текущия сезон', function () {

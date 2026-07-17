@@ -88,7 +88,7 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                 <!-- Източник / attribution -->
                 <div class="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
                     <p class="text-sm text-zinc-400">
-                        Резюмето и преводът са изготвени от F1 България. Пълната оригинална статия е публикувана от
+                        Резюмето и преводът са изготвени от Падок. Пълната оригинална статия е публикувана от
                         <span v-if="article.source" class="font-semibold text-zinc-200">{{ article.source }}</span>
                         <span v-else>първоизточника</span>.
                     </p>

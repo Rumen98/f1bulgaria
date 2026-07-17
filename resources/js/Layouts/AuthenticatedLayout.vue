@@ -20,7 +20,7 @@ const showingNavigationDropdown = ref(false);
                             <!-- Logo -->
                             <div class="flex shrink-0 items-center">
                                 <Link :href="route('dashboard')" class="font-display text-lg font-black tracking-tight">
-                                    <span class="text-red-600">F1</span> България
+                                    Падок<span class="text-red-600">.</span>
                                 </Link>
                             </div>
 

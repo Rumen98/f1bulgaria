@@ -70,7 +70,7 @@ const countdownText = computed(() => {
                     v-html="trackSvg"
                 />
                 <div v-else class="relative flex h-44 w-full items-center justify-center rounded-lg border border-dashed border-zinc-700 text-zinc-500">
-                    <span class="text-sm">{{ hero.race?.circuit ?? 'F1 България' }}</span>
+                    <span class="text-sm">{{ hero.race?.circuit ?? 'Падок' }}</span>
                 </div>
             </div>
 

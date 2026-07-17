@@ -53,7 +53,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
         <header class="sticky top-0 z-30 border-b border-zinc-800/80 bg-black/70 backdrop-blur">
             <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5">
                 <Link :href="route('home')" class="flex items-center gap-1.5 font-display text-lg font-black tracking-tight">
-                    <span class="text-red-600">F1</span><span>България</span>
+                    <span>Падок</span><span class="text-red-600">.</span>
                 </Link>
 
                 <div class="hidden items-center gap-3 lg:flex xl:gap-5">
@@ -156,7 +156,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                 <NewsletterForm source="footer" />
             </div>
             <p class="mx-auto max-w-xl">
-                F1 България — независима общност на българските фенове на Формула 1.
+                Падок — независима общност на българските фенове на Формула 1.
             </p>
             <nav class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-zinc-500">
                 <Link :href="route('privacy')" class="transition hover:text-zinc-300">Поверителност</Link>

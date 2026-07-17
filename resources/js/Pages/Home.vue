@@ -33,12 +33,12 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
 </script>
 
 <template>
-    <Head title="F1 България — Формула 1 на български">
+    <Head title="Падок — Формула 1 на български">
         <meta head-key="description" name="description" content="Формула 1 на български: новини, календар на състезанията, класиране на пилоти и конструктори, статистика и профили. Независима общност на българските F1 фенове." />
     </Head>
 
     <PublicLayout>
-        <h1 class="sr-only">F1 България — новини, календар и класиране от Формула 1 на български</h1>
+        <h1 class="sr-only">Падок — новини, календар и класиране от Формула 1 на български</h1>
 
         <LiveSessionBanner v-if="features.live_timing" :session="liveSession" />
 

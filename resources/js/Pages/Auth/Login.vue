@@ -26,7 +26,7 @@ const submit = () => {
 </script>
 
 <template>
-    <AuthLayout title="Влез в F1 България" subtitle="Прогнози. Класирания. История.">
+    <AuthLayout title="Влез в Падок" subtitle="Прогнози. Класирания. История.">
         <Head title="Вход" />
 
         <div v-if="status" class="mb-4 text-sm font-medium text-green-400">

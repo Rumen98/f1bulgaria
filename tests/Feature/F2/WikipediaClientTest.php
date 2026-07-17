@@ -42,7 +42,7 @@ it('праща правилен User-Agent', function () {
 
     wikiClient()->getPage('Test');
 
-    Http::assertSent(fn ($req) => str_contains($req->header('User-Agent')[0] ?? '', 'F1Bulgaria'));
+    Http::assertSent(fn ($req) => str_contains($req->header('User-Agent')[0] ?? '', 'Padok'));
 });
 
 it('кешира — втора заявка не удря API', function () {

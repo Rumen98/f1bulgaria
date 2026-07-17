@@ -66,7 +66,7 @@ class DriverPhotoFetcher
         try {
             $response = Http::acceptJson()
                 ->timeout(10)
-                ->withHeaders(['User-Agent' => 'F1Bulgaria/1.0 (https://f1bulgaria.bg; itcashbroker@gmail.com)'])
+                ->withHeaders(['User-Agent' => 'Padok/1.0 (https://padok.bg; itcashbroker@gmail.com)'])
                 ->get(self::SUMMARY_URL.rawurlencode($title));
         } catch (ConnectionException) {
             return null;

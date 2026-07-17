@@ -13,7 +13,7 @@ defineProps({
         <div class="flex w-full flex-col justify-center px-6 py-12 sm:px-12 lg:w-1/2 lg:px-16">
             <div class="mx-auto w-full max-w-md">
                 <Link href="/" class="inline-flex items-center font-display text-2xl font-black tracking-tight">
-                    F1 <span class="ml-1.5 text-red-600">България</span>
+                    Падок<span class="text-red-600">.</span>
                 </Link>
 
                 <div class="mt-8">

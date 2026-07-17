@@ -9,7 +9,7 @@ V2 модули са скрити зад feature flags (виж [config/features.
 ## 1. Pre-launch checklist
 
 **Сървър / среда**
-- [ ] PHP 8.3+, MySQL 8 (или 5.7), Nginx, Composer, Node 20+ инсталирани
+- [ ] PHP 8.4+ (препоръчително 8.5, както на dev машината — [config/database.php](config/database.php) ползва `Pdo\Mysql`, наличен от 8.4), MySQL 8 (или 5.7), Nginx, Composer, Node 20+ инсталирани
 - [ ] `.env` създаден от [.env.production.example](.env.production.example), `APP_DEBUG=false`, `APP_ENV=production`
 - [ ] `php artisan key:generate` (ако `APP_KEY` е празен)
 - [ ] `APP_URL=https://f1bulgaria.bg` и реален SMTP за поща (newsletter/верификация)
@@ -37,7 +37,7 @@ V2 модули са скрити зад feature flags (виж [config/features.
 - [ ] `/admin` достъпен само за `is_admin` (вече е gated в кода)
 
 **Съдържание (виж раздел 11)**
-- [ ] og:image социален банер (1200×630)
+- [x] og:image социален банер — генериран (`public/images/og-default.png` + мета тагове в app.blade.php)
 - [ ] Телефон/имейл в страницата Контакт; текст на Поверителност и Условия
 - [ ] Telegram линк (в момента сочи към `#` във футъра — добави реалния URL)
 
@@ -165,6 +165,6 @@ php artisan tinker --execute 'App\Models\User::where("email","ti@f1bulgaria.bg")
 ## 12. Изоставащи задачи преди launch (съдържание, не код)
 
 Маркирани в [AUDIT.md](AUDIT.md):
-- [ ] og:image социален банер (1200×630) + `<meta property="og:image">` в [app.blade.php](resources/views/app.blade.php)
+- [x] og:image социален банер (1200×630) + `<meta property="og:image">` в [app.blade.php](resources/views/app.blade.php) — готово
 - [ ] Реален текст за Поверителност / Условия / Контакт ([StaticPageController](app/Http/Controllers/StaticPageController.php) + [Static/Page.vue](resources/js/Pages/Static/Page.vue))
 - [ ] Telegram URL във футъра (виж [PublicLayout.vue](resources/js/Layouts/PublicLayout.vue))

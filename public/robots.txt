@@ -5,4 +5,4 @@ Disallow: /register
 Disallow: /dashboard
 Disallow: /profile
 
-Sitemap: https://f1bulgaria.bg/sitemap.xml
+Sitemap: https://padok.bg/sitemap.xml
