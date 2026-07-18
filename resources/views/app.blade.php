@@ -5,7 +5,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#e10600">
 
-        <link rel="icon" href="/favicon.ico" sizes="48x48">
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="icon" href="/favicon.ico" sizes="32x32">
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
         <title inertia>{{ config('app.name', 'Падок') }}</title>
@@ -28,6 +29,28 @@
         <meta name="twitter:description" content="Формула 1 на български — новини, календар, класирания и статистика.">
         <meta name="twitter:image" content="{{ asset('og-image.jpg') }}">
         <meta name="twitter:image:alt" content="Падок — Формула 1 на български">
+        <meta property="og:locale" content="bg_BG">
+
+        {{-- Структурирани данни за търсачките. Генерира се с json_encode, а не
+             в markup — "@context" се сблъсква с Blade директивата @context. --}}
+        <script type="application/ld+json">{!! json_encode([
+            '@context' => 'https://schema.org',
+            '@graph' => [
+                [
+                    '@type' => 'Organization',
+                    'name' => 'Падок',
+                    'url' => config('app.url'),
+                    'logo' => asset('icon-512.png'),
+                    'description' => 'Независима общност на българските фенове на Формула 1.',
+                ],
+                [
+                    '@type' => 'WebSite',
+                    'name' => 'Падок',
+                    'url' => config('app.url'),
+                    'inLanguage' => 'bg',
+                ],
+            ],
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
 
         <!-- PWA -->
         <link rel="manifest" href="/manifest.webmanifest">
