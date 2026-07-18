@@ -76,6 +76,12 @@ class SyncHistoryCommand extends Command
 
         $this->renderSummary($summary);
 
+        // Без канонични записи новите пилоти/отбори връщат 404 на профилите
+        // си — затова backfill-ът върви автоматично след всеки исторически sync.
+        $this->info('Изграждам каноничните записи…');
+        $this->call('constructors:backfill-canonical');
+        $this->call('drivers:backfill-canonical');
+
         return self::SUCCESS;
     }
 

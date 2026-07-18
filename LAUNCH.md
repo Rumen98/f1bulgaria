@@ -18,6 +18,7 @@ V2 модули са скрити зад feature flags (виж [config/features.
 **База данни**
 - [ ] `php artisan migrate --force`
 - [ ] Backfill на F1 данните: `php artisan f1:sync-history 1950 2025` (минали сезони; бавно — пусни в nohup/screen) + `php artisan f1:sync-season` (текущ)
+- [ ] СЛЕД всеки sync на нови сезони: `php artisan constructors:backfill-canonical && php artisan drivers:backfill-canonical` — иначе профилите на новите пилоти/отбори връщат 404 (канонични записи)
 - [ ] (по избор) F2 данни: `php artisan f2:sync-wikipedia --year=all` — само ако `FEATURE_F2=true`
 - [ ] Поне един админ: потребител с `is_admin=true` (виж раздел 9)
 
