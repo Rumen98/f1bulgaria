@@ -140,7 +140,17 @@ php artisan queue:work --tries=3 --max-time=3600
 
 ## 9. Админ достъп
 
-`/admin` (Filament) изисква `is_admin=true && banned_at IS NULL`. Промотиране:
+Задай `ADMIN_EMAIL` и `ADMIN_PASSWORD` в `.env` и пусни:
+
+```bash
+php artisan padok:sync-admin
+```
+
+Командата създава/обновява акаунта (парола като hash, `is_admin=true`, потвърден имейл).
+Пускай я след всяка промяна на креденшълите. Логваш се на `/admin` с тях.
+
+По избор: `ADMIN_ACCESS_KEY` активира „скрита врата" — без `?key=` панелът връща 404
+(празна стойност = изключена). Ръчно промотиране на друг акаунт:
 
 ```bash
 php artisan tinker --execute 'App\Models\User::where("email","ti@f1bulgaria.bg")->update(["is_admin"=>true]);'
