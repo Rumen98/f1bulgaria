@@ -52,7 +52,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
     <div class="min-h-screen bg-[#0a0a0a] text-zinc-100">
         <header class="sticky top-0 z-30 border-b border-zinc-800/80 bg-black/70 backdrop-blur">
             <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5">
-                <Link :href="route('home')" class="flex items-center gap-1.5 font-display text-lg font-black tracking-tight">
+                <Link :href="route('home')" class="flex items-center font-display text-lg font-black tracking-tight">
                     <span>Падок</span><span class="text-red-600">.</span>
                 </Link>
 

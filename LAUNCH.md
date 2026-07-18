@@ -17,7 +17,7 @@ V2 модули са скрити зад feature flags (виж [config/features.
 
 **База данни**
 - [ ] `php artisan migrate --force`
-- [ ] Backfill на F1 данните: `php artisan f1:sync-history` (минали сезони) + `php artisan f1:sync-season` (текущ)
+- [ ] Backfill на F1 данните: `php artisan f1:sync-history 1950 2025` (минали сезони; бавно — пусни в nohup/screen) + `php artisan f1:sync-season` (текущ)
 - [ ] (по избор) F2 данни: `php artisan f2:sync-wikipedia --year=all` — само ако `FEATURE_F2=true`
 - [ ] Поне един админ: потребител с `is_admin=true` (виж раздел 9)
 
@@ -58,7 +58,7 @@ npm ci && npm run build
 php artisan key:generate                   # ако APP_KEY е празен
 php artisan storage:link
 php artisan migrate --force
-php artisan f1:sync-history                 # backfill минали сезони
+php artisan f1:sync-history 1950 2025       # backfill минали сезони (бавно; nohup/screen)
 php artisan f1:sync-season                  # текущ сезон
 php artisan sitemap:generate
 php artisan config:cache route:cache view:cache event:cache
