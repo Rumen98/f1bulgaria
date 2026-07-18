@@ -113,4 +113,21 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Markdown Mail Settings
+    |--------------------------------------------------------------------------
+    |
+    | Брандираната Падок тема за всички markdown имейли (бутони в F1 червено,
+    | wordmark в header-а, disclaimer във footer-а).
+    |
+    */
+
+    'markdown' => [
+        'theme' => 'padok',
+        'paths' => [
+            resource_path('views/vendor/mail'),
+        ],
+    ],
+
 ];

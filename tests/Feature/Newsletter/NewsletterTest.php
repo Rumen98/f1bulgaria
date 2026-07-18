@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Mail\ConfirmSubscriptionMail;
 use App\Models\NewsletterSubscriber;
+use Illuminate\Support\Facades\Mail;
 
 it('записва имейл за бюлетина', function () {
     $this->post('/newsletter/subscribe', ['email' => 'fan@example.bg', 'source' => 'footer'])
@@ -14,6 +16,38 @@ it('записва имейл за бюлетина', function () {
         ->and($sub->source)->toBe('footer')
         ->and($sub->confirmation_token)->not->toBeNull()
         ->and($sub->confirmed_at)->toBeNull(); // double opt-in: още непотвърден
+});
+
+it('праща потвърждаващ имейл при записване (double opt-in)', function () {
+    Mail::fake();
+
+    $this->post('/newsletter/subscribe', ['email' => 'fan@example.bg']);
+
+    Mail::assertQueued(ConfirmSubscriptionMail::class, fn ($mail) => $mail->hasTo('fan@example.bg'));
+});
+
+it('праща потвърждението отново при повторно записване на непотвърден имейл', function () {
+    Mail::fake();
+
+    $this->post('/newsletter/subscribe', ['email' => 'fan@example.bg']);
+    $this->post('/newsletter/subscribe', ['email' => 'fan@example.bg']);
+
+    Mail::assertQueuedCount(2);
+});
+
+it('не праща потвърждение на вече потвърден абонат', function () {
+    Mail::fake();
+
+    NewsletterSubscriber::create([
+        'email' => 'fan@example.bg',
+        'confirmation_token' => 'tok789',
+        'subscribed_at' => now(),
+        'confirmed_at' => now(),
+    ]);
+
+    $this->post('/newsletter/subscribe', ['email' => 'fan@example.bg']);
+
+    Mail::assertNothingQueued();
 });
 
 it('нормализира имейла и не дублира при повторно записване', function () {
