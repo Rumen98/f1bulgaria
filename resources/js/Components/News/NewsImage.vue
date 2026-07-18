@@ -66,7 +66,7 @@ const data = computed(() => props.image?.data ?? {});
             v-else
             :classification="data.classification ?? 'other'"
             :color="data.color ?? TEAM_COLOR_FALLBACK"
-            :label="data.label ?? 'F1'"
+            :label="data.label ?? 'Падок'"
             :title="title"
         />
     </div>

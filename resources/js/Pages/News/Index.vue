@@ -20,7 +20,7 @@ defineProps({
     <PublicLayout>
         <div class="mb-6 flex items-baseline justify-between">
             <h1 class="font-display text-2xl font-black sm:text-3xl">Новини<span class="text-red-600">.</span></h1>
-            <span class="text-sm text-zinc-500">F1 на български</span>
+            <span class="text-sm text-zinc-500">Формула 1 на български</span>
         </div>
 
         <!-- Категории -->

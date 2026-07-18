@@ -4,7 +4,7 @@ import { computed } from 'vue';
 const props = defineProps({
     classification: { type: String, default: 'other' },
     color: { type: String, default: '#e10600' },
-    label: { type: String, default: 'F1' },
+    label: { type: String, default: 'Падок' },
     title: { type: String, default: '' },
 });
 

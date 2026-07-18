@@ -152,11 +152,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
 
         <footer class="mt-12 border-t border-zinc-800 py-8 text-center text-sm text-zinc-500">
             <div class="mb-6">
-                <p class="mb-3 font-semibold text-zinc-300">Бюлетин с най-важното от F1</p>
+                <p class="mb-3 font-semibold text-zinc-300">Бюлетин с най-важното от Формула 1</p>
                 <NewsletterForm source="footer" />
             </div>
             <p class="mx-auto max-w-xl">
                 Падок — независима общност на българските фенове на Формула 1.
+            </p>
+            <p class="mx-auto mt-2 max-w-xl text-xs text-zinc-500">
+                Падок е независим фен проект и не е свързан с Formula One Group, FIA или отборите.
+                F1® и FORMULA 1® са търговски марки на Formula One Licensing BV.
             </p>
             <nav class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-zinc-500">
                 <Link :href="route('privacy')" class="transition hover:text-zinc-300">Поверителност</Link>

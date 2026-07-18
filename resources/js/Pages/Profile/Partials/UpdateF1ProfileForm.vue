@@ -25,7 +25,7 @@ const submit = () => form.patch(route('profile.update'), { preserveScroll: true 
 <template>
     <section>
         <header>
-            <h2 class="text-lg font-bold text-white">F1 предпочитания</h2>
+            <h2 class="text-lg font-bold text-white">Предпочитания за Формула 1</h2>
             <p class="mt-1 text-sm text-zinc-400">
                 Любим пилот, отбор и кратко представяне за публичния ти профил.
             </p>
