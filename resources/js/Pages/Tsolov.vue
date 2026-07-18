@@ -24,27 +24,58 @@ const age = computed(() => {
     return years;
 });
 
-const photo = computed(() => props.profile.photos?.[0] ?? null);
+// Статистиката идва от config/tsolov.php, за да не се разминава с банера при обновяване.
+const stats = computed(() => props.profile.season_stats ?? null);
 </script>
 
 <template>
     <Head title="Никола Цолов" />
 
     <PublicLayout>
-        <!-- Hero с български акцент -->
-        <section class="relative overflow-hidden rounded-2xl border border-zinc-800 p-6 sm:p-10"
-            style="background: linear-gradient(110deg, rgba(0,150,110,0.25), #0a0a0a 55%, rgba(225,6,0,0.2))">
-            <div class="flex flex-col items-center gap-6 text-center sm:flex-row sm:text-left">
-                <img v-if="photo" :src="photo" :alt="profile.name" referrerpolicy="no-referrer" class="h-28 w-28 rounded-full object-cover object-top sm:h-36 sm:w-36" />
-                <div v-else class="flex h-28 w-28 items-center justify-center rounded-full bg-zinc-800 text-5xl sm:h-36 sm:w-36">🇧🇬</div>
-                <div>
-                    <div class="text-xs font-bold uppercase tracking-[0.2em] text-emerald-400">Българската надежда 🇧🇬</div>
-                    <h1 class="mt-1 font-display text-3xl font-black sm:text-5xl">{{ profile.name }}</h1>
-                    <div class="mt-2 flex flex-wrap items-center justify-center gap-3 text-zinc-300 sm:justify-start">
+        <!-- Hero банер — актуално позициониране като лидер във Формула 2 -->
+        <section class="relative overflow-hidden rounded-2xl">
+            <picture>
+                <source media="(max-width: 767px)" srcset="/images/banners/tsolov/tsolov-750x600.webp" type="image/webp" />
+                <source media="(max-width: 767px)" srcset="/images/banners/tsolov/tsolov-750x600.jpg" type="image/jpeg" />
+                <source media="(max-width: 1279px)" srcset="/images/banners/tsolov/tsolov-1280x500.webp" type="image/webp" />
+                <source media="(max-width: 1279px)" srcset="/images/banners/tsolov/tsolov-1280x500.jpg" type="image/jpeg" />
+                <source media="(min-width: 1280px)" srcset="/images/banners/tsolov/tsolov-1600x500.webp" type="image/webp" />
+                <img
+                    src="/images/banners/tsolov/tsolov-1600x500.jpg"
+                    :alt="`${profile.name} — лидер на Формула 2 2026`"
+                    class="block h-auto w-full object-cover"
+                    loading="eager"
+                    width="1600"
+                    height="500"
+                />
+            </picture>
+
+            <!-- Тъмен градиент — скрива остарелия надпис върху банера вляво -->
+            <div class="absolute inset-0 bg-gradient-to-r from-black/95 via-black/70 to-transparent" />
+
+            <div class="absolute inset-0 flex items-center">
+                <div class="relative max-w-3xl px-6 md:px-12 lg:px-20">
+                    <div class="mb-3 inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white md:text-sm">
+                        <span aria-hidden="true">🏆</span> Лидер 2026
+                    </div>
+                    <h1 class="font-display text-3xl font-black leading-tight tracking-tight text-white md:text-5xl lg:text-6xl">
+                        {{ profile.name }}
+                    </h1>
+                    <p class="mt-1 font-display text-xl font-black leading-tight tracking-tight text-white md:text-3xl lg:text-4xl">
+                        ЛИДЕРЪТ НА <span class="text-red-500">ФОРМУЛА 2</span>
+                    </p>
+                    <div v-if="stats" class="mt-4 flex flex-wrap items-center gap-2 text-sm font-semibold text-white/95 md:gap-3 md:text-base">
+                        <span>{{ stats.points }} точки</span>
+                        <span class="text-red-500" aria-hidden="true">·</span>
+                        <span>{{ stats.wins }} победи</span>
+                        <span class="text-red-500" aria-hidden="true">·</span>
+                        <span class="flex items-center gap-1">3 поредни <span class="text-yellow-400" aria-hidden="true">🔥</span></span>
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-white/80">
                         <span v-if="age">{{ age }} години</span>
-                        <span class="text-zinc-600">·</span>
+                        <span class="text-white/40" aria-hidden="true">·</span>
                         <span>{{ profile.hometown }}</span>
-                        <span v-if="profile.current_series" class="text-zinc-600">·</span>
+                        <span v-if="profile.current_series" class="text-white/40" aria-hidden="true">·</span>
                         <span v-if="profile.current_series" class="font-semibold text-white">{{ profile.current_series }}</span>
                     </div>
                 </div>

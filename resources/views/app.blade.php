@@ -18,13 +18,16 @@
         <meta property="og:title" content="Падок — Формула 1 на български">
         <meta property="og:description" content="Формула 1 на български — новини, календар, класирания и статистика.">
         <meta property="og:url" content="{{ url()->current() }}">
-        <meta property="og:image" content="{{ asset('images/og-default.png') }}">
+        <meta property="og:image" content="{{ asset('og-image.jpg') }}">
         <meta property="og:image:width" content="1200">
         <meta property="og:image:height" content="630">
+        <meta property="og:image:type" content="image/jpeg">
+        <meta property="og:image:alt" content="Падок — Формула 1 на български">
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:title" content="Падок — Формула 1 на български">
         <meta name="twitter:description" content="Формула 1 на български — новини, календар, класирания и статистика.">
-        <meta name="twitter:image" content="{{ asset('images/og-default.png') }}">
+        <meta name="twitter:image" content="{{ asset('og-image.jpg') }}">
+        <meta name="twitter:image:alt" content="Падок — Формула 1 на български">
 
         <!-- PWA -->
         <link rel="manifest" href="/manifest.webmanifest">

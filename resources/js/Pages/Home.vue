@@ -42,6 +42,38 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
 
         <LiveSessionBanner v-if="features.live_timing" :session="liveSession" />
 
+        <!-- Банер — визуален header над hero-а със състезанието -->
+        <div class="relative mb-6 overflow-hidden rounded-2xl">
+            <picture>
+                <source media="(max-width: 767px)" srcset="/images/banners/hero/hero-750x800.webp" type="image/webp" />
+                <source media="(max-width: 767px)" srcset="/images/banners/hero/hero-750x800.jpg" type="image/jpeg" />
+                <source media="(max-width: 1279px)" srcset="/images/banners/hero/hero-1280x500.webp" type="image/webp" />
+                <source media="(max-width: 1279px)" srcset="/images/banners/hero/hero-1280x500.jpg" type="image/jpeg" />
+                <source media="(min-width: 1280px)" srcset="/images/banners/hero/hero-1920x600.webp" type="image/webp" />
+                <img
+                    src="/images/banners/hero/hero-1920x600.jpg"
+                    alt="Падок — Формула 1 на български"
+                    class="block h-auto w-full object-cover"
+                    loading="eager"
+                    fetchpriority="high"
+                    width="1920"
+                    height="600"
+                />
+            </picture>
+
+            <div class="absolute inset-0 flex items-center">
+                <div class="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
+                <div class="relative max-w-4xl px-6 md:px-12 lg:px-20">
+                    <p class="font-display text-4xl font-black leading-none tracking-tight text-white md:text-6xl lg:text-7xl">
+                        Падок<span class="text-red-600">.</span>
+                    </p>
+                    <p class="mt-3 max-w-xl text-base font-medium text-white/90 md:text-xl lg:text-2xl">
+                        Мястото на всички фенове на Формула 1 в България
+                    </p>
+                </div>
+            </div>
+        </div>
+
         <HeroSection :hero="hero" />
 
         <!-- На този ден във F1 (V2) -->

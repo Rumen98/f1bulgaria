@@ -151,10 +151,33 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
         </main>
 
         <footer class="mt-12 border-t border-zinc-800 py-8 text-center text-sm text-zinc-500">
-            <div class="mb-6">
-                <p class="mb-3 font-semibold text-zinc-300">Бюлетин с най-важното от Формула 1</p>
-                <NewsletterForm source="footer" />
-            </div>
+            <section class="relative mb-8 overflow-hidden rounded-2xl py-10 md:py-14">
+                <picture class="absolute inset-0 z-0">
+                    <source media="(max-width: 767px)" srcset="/images/banners/newsletter/newsletter-750x400.webp" type="image/webp" />
+                    <source media="(max-width: 767px)" srcset="/images/banners/newsletter/newsletter-750x400.jpg" type="image/jpeg" />
+                    <source media="(min-width: 768px)" srcset="/images/banners/newsletter/newsletter-1200x300.webp" type="image/webp" />
+                    <img
+                        src="/images/banners/newsletter/newsletter-1200x300.jpg"
+                        alt=""
+                        class="h-full w-full object-cover"
+                        loading="lazy"
+                        aria-hidden="true"
+                    />
+                </picture>
+
+                <!-- Тъмен градиент за четимост на текста -->
+                <div class="absolute inset-0 z-10 bg-gradient-to-r from-black/90 via-black/70 to-black/40" />
+
+                <div class="relative z-20 mx-auto max-w-4xl px-6 text-left md:px-8">
+                    <h3 class="mb-2 font-display text-2xl font-bold text-white md:text-3xl">
+                        Не пропускай нито един уикенд от Формула 1
+                    </h3>
+                    <p class="mb-4 text-base text-white/85 md:mb-6 md:text-lg">
+                        Абонирай се за бюлетина — прегледи преди старта, резултати и анализи.
+                    </p>
+                    <NewsletterForm source="footer" />
+                </div>
+            </section>
             <p class="mx-auto max-w-xl">
                 Падок — независима общност на българските фенове на Формула 1.
             </p>
