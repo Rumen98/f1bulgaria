@@ -80,6 +80,12 @@ class JolpicaClient
             $this->backoff($attempt, $maxAttempts, $baseSleepMs, $url, (string) $response->status(), $response->status() === 429);
         }
 
+        if ($lastStatus === 429) {
+            throw new JolpicaRateLimitException(
+                "Jolpica rate limit: {$maxAttempts} опита за {$url} удариха 429. Изчакай часовия прозорец и опитай пак.",
+            );
+        }
+
         throw new JolpicaException(
             "Jolpica API недостъпен след {$maxAttempts} опита за {$url} (последен статус: {$lastStatus}). Опитай по-късно.",
         );

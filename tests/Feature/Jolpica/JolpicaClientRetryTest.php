@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Services\Jolpica\JolpicaClient;
 use App\Services\Jolpica\JolpicaException;
+use App\Services\Jolpica\JolpicaRateLimitException;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
@@ -55,4 +56,13 @@ it('повтаря при 429 (rate limit)', function () {
 
     expect($data)->toHaveKey('StandingsTable');
     Http::assertSentCount(2);
+});
+
+it('хвърля JolpicaRateLimitException при постоянен 429 (изчерпан часови лимит)', function () {
+    Http::fake(['*' => Http::response('', 429)]);
+
+    expect(fn () => app(JolpicaClient::class)->get('2024/driverstandings'))
+        ->toThrow(JolpicaRateLimitException::class);
+
+    Http::assertSentCount(3);
 });
