@@ -10,7 +10,7 @@ V2 модули са скрити зад feature flags (виж [config/features.
 
 **Сървър / среда**
 - [ ] PHP 8.4+ (препоръчително 8.5, както на dev машината — [config/database.php](config/database.php) ползва `Pdo\Mysql`, наличен от 8.4), MySQL 8 (или 5.7), Nginx, Composer, Node 20+ инсталирани
-- [ ] `.env` създаден от [.env.production.example](.env.production.example), `APP_DEBUG=false`, `APP_ENV=production`
+- [ ] `.env` създаден от `.env.example` и попълнен за production: `APP_DEBUG=false`, `APP_ENV=production`, `APP_URL=https://padok.bg`, `SESSION_SECURE_COOKIE=true`, database драйвери за session/queue/cache
 - [ ] `php artisan key:generate` (ако `APP_KEY` е празен)
 - [ ] `APP_URL=https://f1bulgaria.bg` и реален SMTP за поща (newsletter/верификация)
 - [ ] Всички `FEATURE_*` са `false` (V1 scope)
@@ -53,7 +53,7 @@ V2 модули са скрити зад feature flags (виж [config/features.
 
 ```bash
 git clone <repo> /var/www/f1bulgaria && cd /var/www/f1bulgaria
-cp .env.production.example .env            # после попълни тайните
+cp .env.example .env                       # после попълни тайните и production стойностите (раздел 1)
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
 php artisan key:generate                   # ако APP_KEY е празен
