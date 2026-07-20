@@ -24,24 +24,25 @@ function seedTsolovF2(): void
     F2Result::create(['f2_race_session_id' => $feature->id, 'f2_driver_id' => $tsolov->id, 'position' => 1, 'points' => 25]);
 }
 
-it('/tsolov показва текущите F2 статистики', function () {
-    seedTsolovF2();
-
+it('/tsolov показва профила от config (единствен източник)', function () {
+    // Страницата ползва само config/tsolov.php — за да не се разминават банерът
+    // и класирането (F2 auto-sync е непълен и изключен в V1).
     $this->get('/tsolov')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Tsolov')
-            ->where('f2.season', 2026)
-            ->where('f2.team', 'Campos Racing')
-            ->where('f2.position', 3)
-            ->where('f2.wins', 1)
-            ->where('f2.latest.location', 'Melbourne'));
+            ->where('profile.current_team', 'Campos Racing')
+            ->has('profile.season_stats')
+            ->has('profile.standings'));
 });
 
-it('/tsolov без F2 данни → f2 е null', function () {
+it('/tsolov рендерира независимо от F2 данните (config-driven)', function () {
+    // Без никакъв F2 seed — страницата пак работи изцяло от config.
     $this->get('/tsolov')
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('f2', null));
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Tsolov')
+            ->has('profile'));
 });
 
 it('/f2 показва spotlight за българския състезател', function () {

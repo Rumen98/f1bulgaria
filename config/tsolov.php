@@ -36,6 +36,16 @@ return [
         'championship_lead' => 17, // точки пред Minì (2-ри в класирането)
     ],
 
+    // Топ на класирането F2 2026 (ръчно — обновявай при кръг).
+    // Източник: fiaformula2.com / nikolatsolovfan.com. Актуално след R07 Силвърстоун.
+    'standings' => [
+        ['pos' => 1, 'code' => 'NT', 'name' => 'Никола Цолов', 'team' => 'Campos Racing', 'points' => 141, 'is_tsolov' => true],
+        ['pos' => 2, 'code' => 'GM', 'name' => 'Gabriele Minì', 'team' => 'MP Motorsport', 'points' => 124],
+        ['pos' => 3, 'code' => 'RC', 'name' => 'Rafael Câmara', 'team' => 'Invicta Racing', 'points' => 94],
+        ['pos' => 4, 'code' => 'AD', 'name' => 'Alexander Dunne', 'team' => 'Rodin Motorsport', 'points' => 92],
+        ['pos' => 5, 'code' => 'NL', 'name' => 'Noel León', 'team' => 'Campos Racing', 'points' => 69],
+    ],
+
     // Заглавни варианти за начална страница / герой секция.
     'headline_options' => [
         'primary' => 'Лидерът на Формула 2',

@@ -24,8 +24,20 @@ const age = computed(() => {
     return years;
 });
 
-// Статистиката идва от config/tsolov.php, за да не се разминава с банера при обновяване.
+// ЕДИНСТВЕН източник за числата: config/tsolov.php (F2 auto-sync е непълен и е
+// изключен в V1). Така банер и класиране никога не се разминават.
 const stats = computed(() => props.profile.season_stats ?? null);
+
+// Челен сблъсък с преследвача (Minì): точките му = точки на Цолов минус преднината.
+const rivalName = computed(() => props.profile.standings?.[1]?.name ?? 'Minì');
+const rivalPoints = computed(() => (stats.value ? stats.value.points - stats.value.championship_lead : null));
+const tsolovShare = computed(() => {
+    if (!stats.value || rivalPoints.value === null) {
+        return 50;
+    }
+    const total = stats.value.points + rivalPoints.value;
+    return total > 0 ? Math.round((stats.value.points / total) * 100) : 50;
+});
 </script>
 
 <template>
@@ -117,28 +129,50 @@ const stats = computed(() => props.profile.season_stats ?? null);
             </div>
         </section>
 
-        <!-- В момента в F2 (синхронизирано от Wikipedia) -->
-        <section v-if="f2" class="mx-auto mt-8 max-w-3xl rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6">
+        <!-- Сезон 2026 във F2 — класиране + челен сблъсък (източник: config/tsolov.php) -->
+        <section v-if="stats" class="mx-auto mt-8 max-w-3xl rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 class="font-display text-lg font-bold text-white">В момента във Формула 2 — {{ f2.team }}</h2>
-                <span class="text-sm text-zinc-500">Сезон {{ f2.season }}</span>
+                <h2 class="font-display text-lg font-bold text-white">Сезон 2026 във Формула 2 — {{ profile.current_team }}</h2>
+                <span class="text-sm text-zinc-500">№{{ profile.car_number }}</span>
             </div>
 
             <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <StatTile label="Позиция">{{ f2.position ?? '—' }}</StatTile>
-                <StatTile label="Точки">{{ f2.points }}</StatTile>
-                <StatTile label="Победи">{{ f2.wins }}</StatTile>
-                <StatTile label="Подиуми">{{ f2.podiums }}</StatTile>
+                <StatTile label="Позиция">P{{ stats.championship_position }}</StatTile>
+                <StatTile label="Точки">{{ stats.points }}</StatTile>
+                <StatTile label="Победи">{{ stats.wins }}</StatTile>
+                <StatTile label="Преднина">+{{ stats.championship_lead }}</StatTile>
             </div>
 
-            <div v-if="f2.latest" class="mt-3 rounded-xl border border-zinc-800 bg-zinc-950/50 p-3 text-sm text-zinc-300">
-                Последно: <span class="font-semibold text-white">{{ f2.latest.location }}</span> ({{ f2.latest.session }}) —
-                <span class="font-bold">{{ f2.latest.position ? 'P' + f2.latest.position : '—' }}</span>
+            <!-- Челен сблъсък с преследвача -->
+            <div v-if="rivalPoints !== null" class="mt-5">
+                <div class="mb-1.5 flex items-center justify-between text-xs font-semibold uppercase tracking-wide">
+                    <span class="text-emerald-400">Цолов · {{ stats.points }} т.</span>
+                    <span class="text-zinc-400">{{ rivalName }} · {{ rivalPoints }} т.</span>
+                </div>
+                <div class="flex h-3 overflow-hidden rounded-full bg-zinc-800 ring-1 ring-inset ring-zinc-700">
+                    <div class="bg-emerald-500 transition-[width] duration-700 ease-out" :style="{ width: tsolovShare + '%' }" />
+                    <div class="bg-red-600 transition-[width] duration-700 ease-out" :style="{ width: 100 - tsolovShare + '%' }" />
+                </div>
+                <p class="mt-1.5 text-center text-xs text-zinc-500">Цолов води с {{ stats.championship_lead }} точки</p>
             </div>
 
-            <Link :href="route('f2.drivers.show', 'nikola-tsolov')" class="mt-4 inline-block text-sm font-medium text-emerald-400 transition hover:text-emerald-300">
-                Виж пълните F2 резултати →
-            </Link>
+            <!-- Мини класиране (топ 5) -->
+            <div v-if="profile.standings?.length" class="mt-5 overflow-hidden rounded-xl border border-zinc-800">
+                <div
+                    v-for="row in profile.standings"
+                    :key="row.pos"
+                    class="flex items-center gap-3 border-b border-zinc-800/60 px-3 py-2 text-sm last:border-0"
+                    :class="row.is_tsolov ? 'bg-emerald-500/10' : ''"
+                >
+                    <span class="w-5 text-center font-black tabular-nums" :class="row.is_tsolov ? 'text-emerald-400' : 'text-zinc-500'">{{ row.pos }}</span>
+                    <span class="min-w-0 flex-1 truncate" :class="row.is_tsolov ? 'font-bold text-white' : 'text-zinc-300'">
+                        <span v-if="row.is_tsolov">🇧🇬 </span>{{ row.name }} <span class="text-xs text-zinc-500">· {{ row.team }}</span>
+                    </span>
+                    <span class="font-bold tabular-nums" :class="row.is_tsolov ? 'text-emerald-400' : 'text-zinc-400'">{{ row.points }}</span>
+                </div>
+            </div>
+
+            <p class="mt-2 text-right text-xs text-zinc-600">Класиране след R07 Силвърстоун · fiaformula2.com</p>
         </section>
 
         <!-- Подкрепи -->
