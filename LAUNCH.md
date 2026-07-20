@@ -12,7 +12,7 @@ V2 модули са скрити зад feature flags (виж [config/features.
 - [ ] PHP 8.4+ (препоръчително 8.5, както на dev машината — [config/database.php](config/database.php) ползва `Pdo\Mysql`, наличен от 8.4), MySQL 8 (или 5.7), Nginx, Composer, Node 20+ инсталирани
 - [ ] `.env` създаден от `.env.example` и попълнен за production: `APP_DEBUG=false`, `APP_ENV=production`, `APP_URL=https://padok.bg`, `SESSION_SECURE_COOKIE=true`, database драйвери за session/queue/cache
 - [ ] `php artisan key:generate` (ако `APP_KEY` е празен)
-- [ ] `APP_URL=https://f1bulgaria.bg` и реален SMTP за поща (newsletter/верификация)
+- [ ] `APP_URL=https://padok.bg` и реален SMTP за поща (newsletter/верификация)
 - [ ] Всички `FEATURE_*` са `false` (V1 scope)
 
 **База данни**
@@ -134,7 +134,7 @@ php artisan queue:work --tries=3 --max-time=3600
 
 ## 8. DNS / HTTPS
 
-- A/AAAA запис `f1bulgaria.bg` → IP на сървъра (+ `www` CNAME → apex или redirect)
+- A/AAAA запис `padok.bg` → IP на сървъра (+ `www` CNAME → apex или redirect)
 - Let's Encrypt (`certbot --nginx`), auto-renew (cron на certbot)
 - Принудителен HTTPS redirect в Nginx; HSTS header
 - След смяна на домейн → обнови `APP_URL`, [public/robots.txt](public/robots.txt) (Sitemap ред) и регенерирай sitemap
@@ -154,7 +154,7 @@ php artisan padok:sync-admin
 (празна стойност = изключена). Ръчно промотиране на друг акаунт:
 
 ```bash
-php artisan tinker --execute 'App\Models\User::where("email","ti@f1bulgaria.bg")->update(["is_admin"=>true]);'
+php artisan tinker --execute 'App\Models\User::where("email","ti@padok.bg")->update(["is_admin"=>true]);'
 ```
 
 ## 10. Backup стратегия
