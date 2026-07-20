@@ -65,7 +65,7 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
                 <div class="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
                 <div class="relative max-w-4xl px-6 md:px-12 lg:px-20">
                     <p class="font-display text-4xl font-black leading-none tracking-tight text-white md:text-6xl lg:text-7xl">
-                        Падок<span class="text-red-600">.</span>
+                        Падок
                     </p>
                     <p class="mt-3 max-w-xl text-base font-medium text-white/90 md:text-xl lg:text-2xl">
                         Мястото на всички фенове на Формула 1 в България

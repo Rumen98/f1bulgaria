@@ -53,7 +53,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
         <header class="sticky top-0 z-30 border-b border-zinc-800/80 bg-black/70 backdrop-blur">
             <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5">
                 <Link :href="route('home')" class="flex items-center font-display text-lg font-black tracking-tight">
-                    <span>Падок</span><span class="text-red-600">.</span>
+                    <span>Падок</span>
                 </Link>
 
                 <div class="hidden items-center gap-3 lg:flex xl:gap-5">
