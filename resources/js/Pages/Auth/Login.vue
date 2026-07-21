@@ -1,6 +1,7 @@
 <script setup>
 import AuthLayout from '@/Layouts/AuthLayout.vue';
 import Checkbox from '@/Components/Checkbox.vue';
+import GoogleButton from '@/Components/GoogleButton.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -66,6 +67,8 @@ const submit = () => {
                 </PrimaryButton>
             </div>
         </form>
+
+        <GoogleButton class="mt-6" />
 
         <p class="mt-8 text-sm text-zinc-500">
             Нямаш акаунт?

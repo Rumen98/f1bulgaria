@@ -139,6 +139,23 @@ php artisan queue:work --tries=3 --max-time=3600
 - Принудителен HTTPS redirect в Nginx; HSTS header
 - След смяна на домейн → обнови `APP_URL`, [public/robots.txt](public/robots.txt) (Sitemap ред) и регенерирай sitemap
 
+## 8а. Вход с Google (Socialite)
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → нов проект „Padok" →
+   **APIs & Services → OAuth consent screen**: External, име „Падок", домейн padok.bg
+2. **Credentials → Create OAuth client ID** → Web application:
+   - Authorized JavaScript origins: `https://padok.bg`
+   - Authorized redirect URIs: `https://padok.bg/auth/google/callback`
+3. В `.env`:
+   ```
+   GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=...
+   ```
+4. `php artisan config:cache` — бутонът „Продължи с Google" на login/register проработва.
+
+Забележки: Google акаунтите се създават с потвърден имейл (без наш верификационен
+мейл); при съществуващ акаунт със същия имейл Google се свързва към него (без дубликат).
+
 ## 9. Админ достъп
 
 Задай `ADMIN_EMAIL` и `ADMIN_PASSWORD` в `.env` и пусни:
