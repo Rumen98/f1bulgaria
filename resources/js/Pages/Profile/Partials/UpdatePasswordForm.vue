@@ -6,6 +6,11 @@ import TextInput from '@/Components/TextInput.vue';
 import { useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
+const props = defineProps({
+    // Google акаунт без парола — задава първа, без „текуща".
+    hasPassword: { type: Boolean, default: true },
+});
+
 const passwordInput = ref(null);
 const currentPasswordInput = ref(null);
 
@@ -26,7 +31,7 @@ const updatePassword = () => {
             }
             if (form.errors.current_password) {
                 form.reset('current_password');
-                currentPasswordInput.value.focus();
+                currentPasswordInput.value?.focus();
             }
         },
     });
@@ -36,15 +41,16 @@ const updatePassword = () => {
 <template>
     <section>
         <header>
-            <h2 class="text-lg font-bold text-white">Смяна на парола</h2>
+            <h2 class="text-lg font-bold text-white">{{ hasPassword ? 'Смяна на парола' : 'Задай парола' }}</h2>
 
             <p class="mt-1 text-sm text-zinc-400">
-                Използвай дълга, случайна парола за по-голяма сигурност.
+                <template v-if="hasPassword">Използвай дълга, случайна парола за по-голяма сигурност.</template>
+                <template v-else>Влизаш с Google — по желание си задай и парола, за да можеш да влизаш и без него.</template>
             </p>
         </header>
 
         <form @submit.prevent="updatePassword" class="mt-6 space-y-6">
-            <div>
+            <div v-if="hasPassword">
                 <InputLabel for="current_password" value="Текуща парола" />
 
                 <TextInput

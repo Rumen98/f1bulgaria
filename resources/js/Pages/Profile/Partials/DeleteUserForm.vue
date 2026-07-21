@@ -8,6 +8,11 @@ import TextInput from '@/Components/TextInput.vue';
 import { useForm } from '@inertiajs/vue3';
 import { nextTick, ref } from 'vue';
 
+const props = defineProps({
+    // Google акаунтите нямат парола — потвърждават без нея.
+    hasPassword: { type: Boolean, default: true },
+});
+
 const confirmingUserDeletion = ref(false);
 const passwordInput = ref(null);
 
@@ -18,14 +23,16 @@ const form = useForm({
 const confirmUserDeletion = () => {
     confirmingUserDeletion.value = true;
 
-    nextTick(() => passwordInput.value.focus());
+    if (props.hasPassword) {
+        nextTick(() => passwordInput.value.focus());
+    }
 };
 
 const deleteUser = () => {
     form.delete(route('profile.destroy'), {
         preserveScroll: true,
         onSuccess: () => closeModal(),
-        onError: () => passwordInput.value.focus(),
+        onError: () => passwordInput.value?.focus(),
         onFinish: () => form.reset(),
     });
 };
@@ -58,11 +65,17 @@ const closeModal = () => {
                 </h2>
 
                 <p class="mt-1 text-sm text-zinc-400">
-                    След изтриване всички данни се премахват безвъзвратно. Въведи
-                    паролата си, за да потвърдиш окончателното изтриване.
+                    <template v-if="hasPassword">
+                        След изтриване всички данни се премахват безвъзвратно. Въведи
+                        паролата си, за да потвърдиш окончателното изтриване.
+                    </template>
+                    <template v-else>
+                        След изтриване всички данни се премахват безвъзвратно.
+                        Действието не може да бъде отменено.
+                    </template>
                 </p>
 
-                <div class="mt-6">
+                <div v-if="hasPassword" class="mt-6">
                     <InputLabel for="password" value="Парола" class="sr-only" />
 
                     <TextInput

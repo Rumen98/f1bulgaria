@@ -27,6 +27,8 @@ class ProfileController extends Controller
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
+            // Google акаунтите нямат парола — формите за смяна/изтриване се съобразяват.
+            'hasPassword' => $request->user()->password !== null,
             'drivers' => $seasonId
                 ? Driver::query()->where('season_id', $seasonId)
                     ->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
@@ -60,9 +62,12 @@ class ProfileController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
-        $request->validate([
-            'password' => ['required', 'current_password'],
-        ]);
+        // Google акаунт без парола потвърждава без нея — няма какво да въведе.
+        if ($request->user()->password !== null) {
+            $request->validate([
+                'password' => ['required', 'current_password'],
+            ]);
+        }
 
         $user = $request->user();
 

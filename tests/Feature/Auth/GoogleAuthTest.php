@@ -36,6 +36,7 @@ it('създава нов акаунт от Google с потвърден име�
         ->and($user->email)->toBe('fen@gmail.com')
         ->and($user->name)->toBe('Иван Фенов')
         ->and($user->google_id)->toBe('g-123')
+        ->and($user->password)->toBeNull()
         ->and($user->email_verified_at)->not->toBeNull();
 
     $this->assertAuthenticatedAs($user);

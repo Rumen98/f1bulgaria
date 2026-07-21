@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirect;
@@ -45,9 +44,9 @@ class GoogleAuthController extends Controller
                     'name' => $googleUser->getName() ?: Str::before($googleUser->getEmail(), '@'),
                     'email' => mb_strtolower($googleUser->getEmail()),
                     'google_id' => $googleUser->getId(),
-                    // Google акаунтът няма парола у нас — случайна, сменя се
-                    // през „Забравена парола", ако някога потрябва.
-                    'password' => Hash::make(Str::random(40)),
+                    // Без парола (null): password-гейтнатите форми проверяват
+                    // has_password и не искат текуща парола от Google акаунти.
+                    'password' => null,
                 ]);
             }
         }

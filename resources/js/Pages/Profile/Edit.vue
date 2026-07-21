@@ -21,6 +21,10 @@ defineProps({
         type: Array,
         default: () => [],
     },
+    hasPassword: {
+        type: Boolean,
+        default: true,
+    },
 });
 </script>
 
@@ -51,11 +55,11 @@ defineProps({
                 </div>
 
                 <div class="rounded-xl border border-zinc-800 border-l-2 border-l-red-600 bg-zinc-900/60 p-4 sm:p-8">
-                    <UpdatePasswordForm class="max-w-xl" />
+                    <UpdatePasswordForm :has-password="hasPassword" class="max-w-xl" />
                 </div>
 
                 <div class="rounded-xl border border-zinc-800 border-l-2 border-l-red-700 bg-zinc-900/60 p-4 sm:p-8">
-                    <DeleteUserForm class="max-w-xl" />
+                    <DeleteUserForm :has-password="hasPassword" class="max-w-xl" />
                 </div>
             </div>
         </div>

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
@@ -11,12 +13,15 @@ use Illuminate\Validation\Rules\Password;
 class PasswordController extends Controller
 {
     /**
-     * Update the user's password.
+     * Смяна на парола; Google акаунт без парола си задава първа —
+     * без изискване за текуща.
      */
     public function update(Request $request): RedirectResponse
     {
+        $hasPassword = $request->user()->password !== null;
+
         $validated = $request->validate([
-            'current_password' => ['required', 'current_password'],
+            'current_password' => $hasPassword ? ['required', 'current_password'] : ['nullable'],
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 
