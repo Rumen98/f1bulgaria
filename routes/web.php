@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CircuitsController;
+use App\Http\Controllers\CommentsController;
 use App\Http\Controllers\CompareController;
 use App\Http\Controllers\DriversController;
 use App\Http\Controllers\F2CalendarController;
@@ -99,6 +100,12 @@ Route::middleware('feature:rivalries')->group(function () {
 
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [NewsController::class, 'show'])->name('news.show');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/news/{slug}/comments', [CommentsController::class, 'store'])
+        ->middleware('throttle:5,1')
+        ->name('news.comments.store');
+    Route::delete('/comments/{comment}', [CommentsController::class, 'destroy'])->name('comments.destroy');
+});
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
     ->middleware('throttle:5,1')
     ->name('newsletter.subscribe');

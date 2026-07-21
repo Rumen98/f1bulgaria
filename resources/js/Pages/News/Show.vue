@@ -4,13 +4,32 @@ import NewsCard from '@/Components/News/NewsCard.vue';
 import NewsImage from '@/Components/News/NewsImage.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { NEUTRAL_DOT_COLOR } from '@/utils/racing';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
     article: { type: Object, required: true },
     related: { type: Array, default: () => [] },
+    comments: { type: Array, default: () => [] },
 });
+
+const page = usePage();
+const user = computed(() => page.props.auth?.user);
+
+const commentForm = useForm({ body: '' });
+
+const submitComment = () => {
+    commentForm.post(route('news.comments.store', props.article.slug), {
+        preserveScroll: true,
+        onSuccess: () => commentForm.reset(),
+    });
+};
+
+const deleteComment = (id) => {
+    if (confirm('Да изтрия ли коментара?')) {
+        router.delete(route('comments.destroy', id), { preserveScroll: true });
+    }
+};
 
 const metaDescription = (props.article.summary ?? props.article.title ?? '').slice(0, 200);
 
@@ -102,6 +121,63 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                         Прочетете оригинала<span v-if="article.source"> на {{ article.source }}</span> →
                     </a>
                 </div>
+
+                <!-- Коментари -->
+                <section class="mt-10">
+                    <h2 class="mb-4 font-display text-lg font-bold text-white">
+                        Коментари <span v-if="comments.length" class="text-zinc-500">({{ comments.length }})</span>
+                    </h2>
+
+                    <div v-if="comments.length" class="space-y-3">
+                        <div v-for="comment in comments" :key="comment.id" class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+                            <div class="flex items-baseline justify-between gap-3">
+                                <span class="font-semibold text-white">{{ comment.author }}</span>
+                                <span class="flex items-center gap-3 text-xs text-zinc-500">
+                                    {{ comment.created_at_human }}
+                                    <button
+                                        v-if="comment.can_delete"
+                                        type="button"
+                                        class="transition hover:text-red-400"
+                                        @click="deleteComment(comment.id)"
+                                    >
+                                        Изтрий
+                                    </button>
+                                </span>
+                            </div>
+                            <p class="mt-2 whitespace-pre-line leading-relaxed text-zinc-300">{{ comment.body }}</p>
+                        </div>
+                    </div>
+                    <p v-else class="text-sm text-zinc-500">Все още няма коментари — бъди първият.</p>
+
+                    <form v-if="user" class="mt-5" @submit.prevent="submitComment">
+                        <label for="comment-body" class="sr-only">Твоят коментар</label>
+                        <textarea
+                            id="comment-body"
+                            v-model="commentForm.body"
+                            rows="3"
+                            maxlength="2000"
+                            placeholder="Кажи си мнението — уважително и по темата."
+                            class="mt-1 block w-full rounded-lg border-zinc-800 bg-zinc-950 text-sm text-white placeholder-zinc-500 transition focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
+                        />
+                        <p v-if="commentForm.errors.body" class="mt-1 text-sm text-red-400">{{ commentForm.errors.body }}</p>
+                        <div class="mt-3 flex items-center justify-between gap-3">
+                            <span class="text-xs text-zinc-500">Спазвай правилата от Условията за ползване.</span>
+                            <button
+                                type="submit"
+                                :disabled="commentForm.processing"
+                                class="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
+                            >
+                                Публикувай
+                            </button>
+                        </div>
+                    </form>
+                    <div v-else class="mt-5 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400">
+                        <Link :href="route('login')" class="font-semibold text-red-500 transition hover:text-red-400">Влез</Link>
+                        или
+                        <Link :href="route('register')" class="font-semibold text-red-500 transition hover:text-red-400">се регистрирай</Link>,
+                        за да коментираш.
+                    </div>
+                </section>
             </article>
 
             <!-- Свързани новини -->

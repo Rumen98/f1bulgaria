@@ -33,4 +33,16 @@ class TeamNewsItemFactory extends Factory
             'status' => NewsStatus::Pending->value,
         ];
     }
+
+    /**
+     * Публично видима статия (одобрена, с бг заглавие).
+     */
+    public function approved(): static
+    {
+        return $this->state(fn () => [
+            'status' => NewsStatus::Approved->value,
+            'title_bg' => fake()->sentence(),
+            'summary_bg' => fake()->paragraph(),
+        ]);
+    }
 }

@@ -10,6 +10,7 @@ use Database\Factories\TeamNewsItemFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class TeamNewsItem extends Model
@@ -84,6 +85,12 @@ class TeamNewsItem extends Model
     public function source(): BelongsTo
     {
         return $this->belongsTo(TeamNewsSource::class, 'source_id');
+    }
+
+    /** @return HasMany<Comment, $this> */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
     }
 
     /** @return BelongsTo<Constructor, $this> */

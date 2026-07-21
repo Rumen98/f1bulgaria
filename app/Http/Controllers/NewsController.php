@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\NewsClassification;
 use App\Enums\NewsStatus;
+use App\Models\Comment;
 use App\Models\TeamNewsItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -49,7 +50,7 @@ class NewsController extends Controller
     /**
      * Собствена article страница — оригинален бг превод/резюме + ясно посочен източник.
      */
-    public function show(string $slug): Response
+    public function show(Request $request, string $slug): Response
     {
         $item = $this->visible()->where('slug', $slug)->first();
 
@@ -66,7 +67,28 @@ class NewsController extends Controller
                 'canonical' => route('news.show', $item->slug),
             ],
             'related' => $this->related($item),
+            'comments' => $this->comments($item, $request),
         ]);
+    }
+
+    /**
+     * Коментарите на статията, хронологично (най-старите първо).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function comments(TeamNewsItem $item, Request $request): Collection
+    {
+        return $item->comments()
+            ->with('user:id,name')
+            ->oldest()
+            ->get()
+            ->map(fn (Comment $comment) => [
+                'id' => $comment->id,
+                'body' => $comment->body,
+                'author' => $comment->user?->name ?? 'Изтрит профил',
+                'created_at_human' => $comment->created_at->diffForHumans(),
+                'can_delete' => $request->user()?->can('delete', $comment) ?? false,
+            ]);
     }
 
     /**
