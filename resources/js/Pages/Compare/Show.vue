@@ -55,8 +55,9 @@ const betterResult = (a, b) => {
 
         <Link :href="route('compare.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Ново сравнение</Link>
 
-        <!-- Hero split -->
-        <section class="mt-3 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2 sm:gap-4">
+        <!-- Hero split: на телефон картите се стекват (дългите имена искат ширина),
+             от md нагоре — класическото „едан срещу друг" с VS по средата. -->
+        <section class="mt-3 grid grid-cols-1 items-stretch gap-2 md:grid-cols-[1fr_auto_1fr] md:gap-4">
             <div
                 v-for="(d, i) in [a, b]"
                 :key="d.slug"
@@ -81,7 +82,11 @@ const betterResult = (a, b) => {
                     </div>
                 </div>
             </div>
-            <div class="order-2 flex items-center justify-center font-display text-lg font-black text-red-600 sm:text-2xl">VS</div>
+            <div class="order-2 flex items-center justify-center gap-3 py-1 font-display text-lg font-black text-red-600 sm:text-2xl md:py-0">
+                <span class="h-px w-12 bg-zinc-800 md:hidden" aria-hidden="true" />
+                VS
+                <span class="h-px w-12 bg-zinc-800 md:hidden" aria-hidden="true" />
+            </div>
         </section>
 
         <!-- Career stats -->
