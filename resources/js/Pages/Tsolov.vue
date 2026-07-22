@@ -70,8 +70,9 @@ const tsolovShare = computed(() => {
                     <div class="mb-3 inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white md:text-sm">
                         <span aria-hidden="true">🏆</span> Лидер 2026
                     </div>
-                    <h1 class="font-display text-3xl font-black leading-tight tracking-tight text-white md:text-5xl lg:text-6xl">
-                        {{ profile.name }}
+                    <!-- Името в трибагреник: стоповете 33/50/67% оформят три ясни ленти бяло/зелено/червено -->
+                    <h1 class="font-display text-4xl font-black leading-tight tracking-tight md:text-6xl lg:text-7xl">
+                        <span class="bg-gradient-to-b from-white from-33% via-green-500 via-50% to-red-600 to-67% bg-clip-text text-transparent">{{ profile.name }}</span>
                     </h1>
                     <p class="mt-1 font-display text-xl font-black leading-tight tracking-tight text-white md:text-3xl lg:text-4xl">
                         ЛИДЕРЪТ НА <span class="text-red-500">ФОРМУЛА 2</span>

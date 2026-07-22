@@ -4,6 +4,7 @@ import DriverAchievements from '@/Components/Driver/DriverAchievements.vue';
 import DriverRecentResults from '@/Components/Driver/DriverRecentResults.vue';
 import DriverStatsGrid from '@/Components/Driver/DriverStatsGrid.vue';
 import HeadToHeadBars from '@/Components/Driver/HeadToHeadBars.vue';
+import FlagIcon from '@/Components/FlagIcon.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 
@@ -74,7 +75,7 @@ const goToSeason = (e) => {
                         Легенда · последен сезон {{ season }}
                     </span>
                     <h1 class="font-display text-3xl font-black sm:text-4xl">
-                        <span v-if="driver.flag">{{ driver.flag }} </span>{{ driver.name }}
+                        <FlagIcon :code="driver.flag" class="mr-1" />{{ driver.name }}
                     </h1>
                     <div class="mt-2 flex flex-wrap items-center gap-3 text-zinc-300">
                         <Link

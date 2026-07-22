@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
@@ -74,7 +75,7 @@ const betterResult = (a, b) => {
                     />
                     <div v-else class="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-800 text-2xl sm:h-24 sm:w-24">🏎️</div>
                     <div>
-                        <div class="font-display text-xl font-black sm:text-2xl">{{ d.name }} <span>{{ d.flag }}</span></div>
+                        <div class="font-display text-xl font-black sm:text-2xl">{{ d.name }} <FlagIcon :code="d.flag" /></div>
                         <div class="text-sm text-zinc-400">{{ d.team ?? '—' }}</div>
                         <div class="mt-1 text-xs tabular-nums text-zinc-500">{{ career[i === 0 ? 'a' : 'b'].first_year }}–{{ career[i === 0 ? 'a' : 'b'].last_year }}</div>
                     </div>

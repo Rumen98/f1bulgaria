@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { hasRoute } from '@/utils/routes';
@@ -43,10 +44,10 @@ const rowClass = (p) => ({ 1: 'bg-amber-500/10', 2: 'bg-zinc-400/10', 3: 'bg-ora
 
             <div class="mt-4 flex flex-wrap gap-3">
                 <div v-if="pole" class="rounded-xl border border-zinc-800 bg-zinc-950/60 px-4 py-2 text-sm">
-                    <span class="text-zinc-500">Pole:</span> <span class="font-semibold text-white"><span aria-hidden="true">{{ pole.flag }}</span> {{ pole.driver }}</span>
+                    <span class="text-zinc-500">Pole:</span> <span class="font-semibold text-white"><FlagIcon :code="pole.flag" class="mr-1" />{{ pole.driver }}</span>
                 </div>
                 <div v-if="fastestLap" class="rounded-xl border border-zinc-800 bg-zinc-950/60 px-4 py-2 text-sm">
-                    <span class="text-zinc-500">⏱️ Най-бърза:</span> <span class="font-semibold text-white"><span aria-hidden="true">{{ fastestLap.flag }}</span> {{ fastestLap.driver }}</span>
+                    <span class="text-zinc-500">⏱️ Най-бърза:</span> <span class="font-semibold text-white"><FlagIcon :code="fastestLap.flag" class="mr-1" />{{ fastestLap.driver }}</span>
                     <span v-if="fastestLap.time" class="tabular-nums text-purple-400"> {{ fastestLap.time }}</span>
                 </div>
             </div>
@@ -72,9 +73,9 @@ const rowClass = (p) => ({ 1: 'bg-amber-500/10', 2: 'bg-zinc-400/10', 3: 'bg-ora
                         <td class="px-2 py-2.5 tabular-nums text-zinc-500">{{ r.car_number }}</td>
                         <td class="px-3 py-2.5 font-semibold text-white">
                             <Link v-if="r.slug && hasRoute('f2.drivers.show')" :href="route('f2.drivers.show', r.slug)" class="transition hover:text-red-400">
-                                <span aria-hidden="true">{{ r.flag }}</span> {{ r.driver }}
+                                <FlagIcon :code="r.flag" class="mr-1" />{{ r.driver }}
                             </Link>
-                            <span v-else><span aria-hidden="true">{{ r.flag }}</span> {{ r.driver }}</span>
+                            <span v-else><FlagIcon :code="r.flag" class="mr-1" />{{ r.driver }}</span>
                             <span v-if="r.is_bulgarian" class="sr-only">(български пилот)</span>
                             <span v-if="r.fastest_lap" title="Най-бърза обиколка" class="ml-1 text-purple-400"><span aria-hidden="true">⏱️</span><span class="sr-only">Най-бърза обиколка</span></span>
                         </td>

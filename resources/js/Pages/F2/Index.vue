@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
@@ -53,7 +54,7 @@ const goToSeason = (e) => {
         >
             <div>
                 <div class="text-xs font-bold uppercase tracking-[0.2em] text-emerald-400">Български състезател в F2 🇧🇬</div>
-                <div class="mt-1 text-xl font-black text-white"><span aria-hidden="true">{{ bulgarianSpotlight.flag }}</span> {{ bulgarianSpotlight.name }}</div>
+                <div class="mt-1 text-xl font-black text-white"><FlagIcon :code="bulgarianSpotlight.flag" class="mr-1" />{{ bulgarianSpotlight.name }}</div>
                 <div class="text-sm text-zinc-400">{{ bulgarianSpotlight.team }}</div>
             </div>
             <div class="text-right">
@@ -77,7 +78,7 @@ const goToSeason = (e) => {
                     <tr v-for="row in standings" :key="row.slug" class="bg-zinc-900/40">
                         <td class="px-4 py-2.5 font-bold tabular-nums" :class="podiumClass(row.position) || 'text-zinc-500'">{{ row.position ?? '—' }}</td>
                         <td class="px-4 py-2.5 font-semibold text-white">
-                            <span aria-hidden="true">{{ row.flag }}</span> {{ row.name }}
+                            <FlagIcon :code="row.flag" class="mr-1" />{{ row.name }}
                             <span v-if="row.is_champion" title="Шампион"><span aria-hidden="true">🏆</span><span class="sr-only">Шампион</span></span>
                         </td>
                         <td class="px-4 py-2.5 text-zinc-400">{{ row.team ?? '—' }}</td>
@@ -100,7 +101,7 @@ const goToSeason = (e) => {
                 >
                     <span class="font-display text-2xl font-black tabular-nums text-amber-300">{{ c.year }}</span>
                     <div>
-                        <div class="font-semibold text-white"><span aria-hidden="true">{{ c.flag }}</span> {{ c.name }}</div>
+                        <div class="font-semibold text-white"><FlagIcon :code="c.flag" class="mr-1" />{{ c.name }}</div>
                         <div class="text-xs text-zinc-500">{{ c.team }}</div>
                     </div>
                 </Link>

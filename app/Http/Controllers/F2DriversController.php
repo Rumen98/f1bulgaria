@@ -26,7 +26,7 @@ class F2DriversController extends Controller
                 ->map(fn (F2Driver $d) => [
                     'slug' => $d->slug,
                     'name' => $d->fullName(),
-                    'flag' => CountryFlag::emoji($d->country_code),
+                    'flag' => CountryFlag::iso2($d->country_code),
                     'team' => $d->team?->name,
                     'position' => $d->position,
                     'points' => $d->points,
@@ -53,7 +53,7 @@ class F2DriversController extends Controller
             'driver' => [
                 'slug' => $slug,
                 'name' => $latest->fullName(),
-                'flag' => CountryFlag::emoji($latest->country_code),
+                'flag' => CountryFlag::iso2($latest->country_code),
                 'country_code' => $latest->country_code,
                 'car_number' => $latest->car_number,
                 'current_team' => $latest->team?->name,

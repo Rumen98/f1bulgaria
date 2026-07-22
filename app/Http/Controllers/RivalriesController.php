@@ -144,7 +144,7 @@ class RivalriesController extends Controller
             'slug' => $c->slug,
             'name' => $c->fullName(),
             'photo' => $c->photo_url,
-            'flag' => CountryFlag::emoji($c->country_code),
+            'flag' => CountryFlag::iso2($c->country_code),
         ];
     }
 }

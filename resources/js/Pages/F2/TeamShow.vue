@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
@@ -39,7 +40,7 @@ const statCards = [
                     class="rounded-full border px-4 py-2 text-sm font-medium transition"
                     :class="d.is_bulgarian ? 'border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10' : 'border-zinc-700 text-zinc-200 hover:border-red-600 hover:text-white'"
                 >
-                    <span aria-hidden="true">{{ d.flag }}</span> {{ d.name }}
+                    <FlagIcon :code="d.flag" class="mr-1" />{{ d.name }}
                 </Link>
             </div>
         </section>
@@ -53,7 +54,7 @@ const statCards = [
                     :href="route('f2.drivers.show', a.slug)"
                     class="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2.5 text-sm transition hover:border-zinc-600"
                 >
-                    <span class="text-zinc-200"><span aria-hidden="true">{{ a.flag }}</span> {{ a.name }}</span>
+                    <span class="text-zinc-200"><FlagIcon :code="a.flag" class="mr-1" />{{ a.name }}</span>
                     <span class="tabular-nums text-zinc-500">{{ a.years.join(', ') }}</span>
                 </Link>
             </div>

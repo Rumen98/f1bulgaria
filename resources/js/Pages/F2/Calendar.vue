@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
@@ -69,7 +70,7 @@ const goToSeason = (e) => router.visit(route('f2.calendar.year', e.target.value)
                         <div v-if="s" class="space-y-1">
                             <div v-for="p in s.podium" :key="p.position" class="flex items-center gap-2 text-sm">
                                 <span class="w-4 font-bold tabular-nums" :class="podiumClass(p.position) || 'text-zinc-500'">{{ p.position }}</span>
-                                <span class="text-zinc-200"><span aria-hidden="true">{{ p.flag }}</span> {{ p.driver }}</span>
+                                <span class="text-zinc-200"><FlagIcon :code="p.flag" class="mr-1" />{{ p.driver }}</span>
                             </div>
                             <div v-if="s.date" class="mt-1 text-xs text-zinc-500">{{ s.date }}</div>
                         </div>

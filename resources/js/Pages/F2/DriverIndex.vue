@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
@@ -29,7 +30,7 @@ defineProps({
             >
                 <span class="w-7 text-center text-lg font-black tabular-nums" :class="podiumClass(d.position) || 'text-zinc-500'">{{ d.position ?? '—' }}</span>
                 <div class="min-w-0 flex-1">
-                    <div class="truncate font-semibold text-white"><span aria-hidden="true">{{ d.flag }}</span> {{ d.name }}</div>
+                    <div class="truncate font-semibold text-white"><FlagIcon :code="d.flag" class="mr-1" />{{ d.name }}</div>
                     <div class="truncate text-sm text-zinc-500">{{ d.team ?? '—' }}</div>
                 </div>
                 <span class="shrink-0 font-bold tabular-nums text-zinc-300">{{ d.points }}</span>

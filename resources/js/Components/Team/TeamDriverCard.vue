@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { TEAM_COLOR_FALLBACK } from '@/utils/racing';
@@ -25,7 +26,7 @@ const href = computed(() => (hasRoute('drivers.show') ? route('drivers.show', pr
         </div>
         <div class="min-w-0 flex-1">
             <div class="truncate font-semibold text-white">
-                <span v-if="driver.flag" aria-hidden="true">{{ driver.flag }} </span>{{ driver.name }}
+                <FlagIcon :code="driver.flag" class="mr-1" />{{ driver.name }}
             </div>
             <div class="text-sm text-zinc-500">
                 <span v-if="driver.number">#{{ driver.number }}</span>

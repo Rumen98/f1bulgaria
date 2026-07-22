@@ -4,6 +4,7 @@ import CircuitHero from '@/Components/Circuit/CircuitHero.vue';
 import CircuitRecords from '@/Components/Circuit/CircuitRecords.vue';
 import CircuitTechnical from '@/Components/Circuit/CircuitTechnical.vue';
 import RecentWinners from '@/Components/Circuit/RecentWinners.vue';
+import FlagIcon from '@/Components/FlagIcon.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { NEUTRAL_DOT_COLOR } from '@/utils/racing';
@@ -57,8 +58,8 @@ defineProps({
                         <tr v-for="w in f2Winners" :key="w.year" class="bg-zinc-900/40">
                             <td class="px-4 py-2.5 font-bold tabular-nums text-white">{{ w.year }}</td>
                             <td class="px-4 py-2.5 text-zinc-200">
-                                <Link v-if="hasRoute('f2.drivers.show')" :href="route('f2.drivers.show', w.slug)" class="transition hover:text-red-400">{{ w.flag }} {{ w.driver }}</Link>
-                                <span v-else>{{ w.flag }} {{ w.driver }}</span>
+                                <Link v-if="hasRoute('f2.drivers.show')" :href="route('f2.drivers.show', w.slug)" class="transition hover:text-red-400"><FlagIcon :code="w.flag" class="mr-1" />{{ w.driver }}</Link>
+                                <span v-else><FlagIcon :code="w.flag" class="mr-1" />{{ w.driver }}</span>
                             </td>
                             <td class="px-4 py-2.5 text-right">
                                 <Link v-if="hasRoute('f2.race')" :href="route('f2.race', [w.race_slug, 'feature'])" class="text-sm text-zinc-500 transition hover:text-zinc-300">Резултати →</Link>

@@ -68,7 +68,7 @@ class F2CalendarController extends Controller
                     'position' => $r->position,
                     'driver' => $r->driver?->fullName(),
                     'slug' => $r->driver?->slug,
-                    'flag' => CountryFlag::emoji($r->driver?->country_code),
+                    'flag' => CountryFlag::iso2($r->driver?->country_code),
                 ])->values(),
         ];
     }

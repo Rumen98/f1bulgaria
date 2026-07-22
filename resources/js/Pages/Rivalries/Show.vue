@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import Card from '@/Components/UI/Card.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
@@ -39,13 +40,13 @@ const better = (a, b) => (a > b ? 'a' : b > a ? 'b' : 'tie');
                 <Link :href="route('drivers.show', a.slug)" class="text-center">
                     <img v-if="a.photo" :src="a.photo" :alt="a.name" loading="lazy" referrerpolicy="no-referrer" class="mx-auto h-20 w-20 rounded-full object-cover object-top sm:h-28 sm:w-28" />
                     <div v-else class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-zinc-800 text-3xl sm:h-28 sm:w-28">🏎️</div>
-                    <div class="mt-2 font-bold text-white">{{ a.name }} {{ a.flag }}</div>
+                    <div class="mt-2 font-bold text-white">{{ a.name }} <FlagIcon :code="a.flag" /></div>
                 </Link>
                 <span class="font-display text-2xl font-black text-red-600 sm:text-4xl">VS</span>
                 <Link :href="route('drivers.show', b.slug)" class="text-center">
                     <img v-if="b.photo" :src="b.photo" :alt="b.name" loading="lazy" referrerpolicy="no-referrer" class="mx-auto h-20 w-20 rounded-full object-cover object-top sm:h-28 sm:w-28" />
                     <div v-else class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-zinc-800 text-3xl sm:h-28 sm:w-28">🏎️</div>
-                    <div class="mt-2 font-bold text-white">{{ b.name }} {{ b.flag }}</div>
+                    <div class="mt-2 font-bold text-white">{{ b.name }} <FlagIcon :code="b.flag" /></div>
                 </Link>
             </div>
             <h1 class="mt-6 text-center font-display text-2xl font-black sm:text-3xl">{{ rivalry.title }}</h1>

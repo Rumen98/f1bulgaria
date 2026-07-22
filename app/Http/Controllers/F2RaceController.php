@@ -67,7 +67,7 @@ class F2RaceController extends Controller
                 'car_number' => $r->driver?->car_number,
                 'driver' => $r->driver?->fullName(),
                 'slug' => $r->driver?->slug,
-                'flag' => CountryFlag::emoji($r->driver?->country_code),
+                'flag' => CountryFlag::iso2($r->driver?->country_code),
                 'is_bulgarian' => $r->driver?->country_code === 'BUL',
                 'team' => $r->driver?->team?->name,
                 'grid' => $r->grid_position,
@@ -86,7 +86,7 @@ class F2RaceController extends Controller
         return [
             'driver' => $driver->fullName(),
             'slug' => $driver->slug,
-            'flag' => CountryFlag::emoji($driver->country_code),
+            'flag' => CountryFlag::iso2($driver->country_code),
         ];
     }
 }

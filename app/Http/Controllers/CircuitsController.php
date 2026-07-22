@@ -123,7 +123,7 @@ class CircuitsController extends Controller
                     'year' => $race->season?->year,
                     'driver' => $winner->fullName(),
                     'slug' => $winner->slug,
-                    'flag' => CountryFlag::emoji($winner->country_code),
+                    'flag' => CountryFlag::iso2($winner->country_code),
                     'race_slug' => $race->slug,
                 ];
             })

@@ -76,7 +76,7 @@ class CompareController extends Controller
             'name' => $c->fullName(),
             'code' => $c->code,
             'photo' => $c->photo_url ?? $latest?->photo_url,
-            'flag' => CountryFlag::emoji($c->country_code),
+            'flag' => CountryFlag::iso2($c->country_code),
             'team' => $latest?->constructor?->name,
             'color_hex' => $latest?->constructor?->color_hex ?? '#e10600',
             'is_active' => $c->is_active,

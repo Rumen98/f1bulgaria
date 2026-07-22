@@ -90,7 +90,7 @@ class TeamsController extends Controller
                 'name' => $d->fullName(),
                 'number' => $d->permanent_number,
                 'code' => $d->driver_code,
-                'flag' => CountryFlag::emoji($d->country_code),
+                'flag' => CountryFlag::iso2($d->country_code),
                 'points' => $driverStandings->get($d->id)['points'] ?? 0,
                 'position' => $driverStandings->get($d->id)['position'] ?? null,
             ]),

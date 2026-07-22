@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
@@ -35,7 +36,7 @@ const statCards = [
             :style="driver.is_bulgarian ? 'background: linear-gradient(110deg, rgba(16,185,129,0.15), #0a0a0a 60%)' : ''"
         >
             <div v-if="driver.is_bulgarian" class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-emerald-400">Български състезател в F2 🇧🇬</div>
-            <h1 class="font-display text-3xl font-black sm:text-4xl"><span aria-hidden="true">{{ driver.flag }}</span> {{ driver.name }}</h1>
+            <h1 class="font-display text-3xl font-black sm:text-4xl"><FlagIcon :code="driver.flag" class="mr-1" />{{ driver.name }}</h1>
             <div class="mt-1 flex flex-wrap items-center gap-3 text-zinc-400">
                 <span v-if="driver.car_number">#{{ driver.car_number }}</span>
                 <span v-if="driver.current_team">· {{ driver.current_team }}</span>

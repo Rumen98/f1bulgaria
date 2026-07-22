@@ -60,7 +60,7 @@ class F2TeamsController extends Controller
             'currentDrivers' => $latest->drivers->map(fn ($d) => [
                 'slug' => $d->slug,
                 'name' => $d->fullName(),
-                'flag' => CountryFlag::emoji($d->country_code),
+                'flag' => CountryFlag::iso2($d->country_code),
                 'is_bulgarian' => $d->country_code === 'BUL',
             ])->values(),
             'alumni' => $this->alumni($allDrivers),
@@ -80,7 +80,7 @@ class F2TeamsController extends Controller
             ->map(fn (Collection $rows) => [
                 'slug' => $rows->first()->slug,
                 'name' => $rows->first()->fullName(),
-                'flag' => CountryFlag::emoji($rows->first()->country_code),
+                'flag' => CountryFlag::iso2($rows->first()->country_code),
                 'years' => $rows->map(fn ($d) => $d->season?->year)->filter()->unique()->sort()->values(),
             ])
             ->values();
