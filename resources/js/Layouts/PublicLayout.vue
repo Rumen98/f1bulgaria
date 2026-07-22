@@ -1,4 +1,5 @@
 <script setup>
+import FlagIcon from '@/Components/FlagIcon.vue';
 import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
 import { hasRoute } from '@/utils/routes';
 import { Link, usePage } from '@inertiajs/vue3';
@@ -18,7 +19,7 @@ const primaryNav = [
     { label: 'Отбори', route: 'teams.index' },
     { label: 'Пилоти', route: 'drivers.index' },
     { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
-    { label: 'Цолов 🇧🇬', route: 'tsolov', feature: 'tsolov' },
+    { label: 'Цолов', route: 'tsolov', feature: 'tsolov', flag: 'bg' },
 ];
 const secondaryNav = [
     { label: 'Формула 2', route: 'f2', feature: 'f2' },
@@ -69,6 +70,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                             <span class="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
                         </span>
                         {{ item.label }}
+                        <FlagIcon v-if="item.flag" :code="item.flag" class="text-[11px]" />
                     </Link>
 
                     <div v-if="secondary.length" ref="moreRef" class="relative">
@@ -134,6 +136,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                     >
                         <span v-if="item.live" class="h-2 w-2 rounded-full bg-red-600" />
                         {{ item.label }}
+                        <FlagIcon v-if="item.flag" :code="item.flag" class="text-[11px]" />
                     </Link>
                 </div>
             </div>
