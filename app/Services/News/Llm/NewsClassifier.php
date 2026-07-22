@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\News\Llm;
 
 use App\Enums\NewsClassification;
+use App\Enums\NewsStatus;
 use App\Models\Constructor;
 use App\Models\Driver;
 use App\Models\Season;
@@ -83,9 +84,13 @@ class NewsClassifier
                 ],
                 'constructor_id' => [
                     'type' => ['integer', 'null'],
-                    'description' => 'ID на конкретен отбор или null',
+                    'description' => 'ID на конкретен отбор или null. САМО по подадения списък пилот→отбор, не по общи знания.',
                 ],
                 'importance_score' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 5],
+                'duplicate_of_id' => [
+                    'type' => ['integer', 'null'],
+                    'description' => 'ID на скорошна новина, отразяваща СЪЩАТА история (не просто същата тема), или null.',
+                ],
             ],
             'required' => ['title_bg', 'summary_bg', 'classification', 'importance_score'],
         ];
@@ -98,22 +103,50 @@ class NewsClassifier
                 ->map(fn (Constructor $c) => "- {$c->id}: {$c->name}")->implode("\n")
             : '(няма данни)';
 
+        // С отбора на всеки пилот — иначе LLM-ът посяга към остарялата си
+        // памет (напр. „Хамилтън → Mercedes" от предишните му сезони).
         $drivers = $season
-            ? $season->drivers()->orderBy('last_name')->get()
-                ->map(fn (Driver $d) => "- {$d->fullName()}")->implode("\n")
+            ? $season->drivers()->with('constructor')->orderBy('last_name')->get()
+                ->map(fn (Driver $d) => '- '.$d->fullName().' ('.($d->constructor?->name ?? 'без отбор').')')->implode("\n")
             : '(няма данни)';
+
+        $recent = $this->recentTitles($item);
 
         return <<<PROMPT
             Конструктори за сезона (id: име):
             {$constructors}
 
-            Пилоти за сезона:
+            Пилоти за ТЕКУЩИЯ сезон (пилот → отбор). Обвързвай отбора САМО по този списък:
             {$drivers}
+
+            Скорошни новини на сайта (id: заглавие). Ако новината по-долу отразява СЪЩАТА
+            история като някоя от тях (същото събитие, не просто същата тема) — върни
+            duplicate_of_id с нейния ID, иначе null:
+            {$recent}
 
             Новина за класификация:
             Заглавие: {$item->title_original}
             Описание: {$item->content_snippet}
             PROMPT;
+    }
+
+    /**
+     * Заглавията от последните 72 часа (без текущата новина) — контекст за
+     * крос-източникова дедупликация.
+     */
+    private function recentTitles(TeamNewsItem $item): string
+    {
+        $titles = TeamNewsItem::query()
+            ->whereKeyNot($item->id)
+            ->where('published_at', '>=', now()->subHours(72))
+            ->whereNotIn('status', [NewsStatus::Rejected->value])
+            ->orderByDesc('published_at')
+            ->limit(25)
+            ->get(['id', 'title_bg', 'title_original'])
+            ->map(fn (TeamNewsItem $recent) => "- {$recent->id}: ".($recent->title_bg ?? $recent->title_original))
+            ->implode("\n");
+
+        return $titles !== '' ? $titles : '(няма скорошни новини)';
     }
 
     /**
@@ -278,6 +311,19 @@ class NewsClassifier
             throw new LlmException("LLM върна importance_score извън диапазона 1-5: {$importance}");
         }
 
+        // Толерантно: невалиден duplicate_of_id не проваля обогатяването —
+        // просто не третираме новината като дубликат.
+        $duplicateOfId = $data['duplicate_of_id'] ?? null;
+
+        if ($duplicateOfId !== null) {
+            $duplicateOfId = (int) $duplicateOfId;
+
+            if (! TeamNewsItem::query()->whereKey($duplicateOfId)->exists()) {
+                Log::warning("LLM върна несъществуващ duplicate_of_id: {$duplicateOfId}");
+                $duplicateOfId = null;
+            }
+        }
+
         return new NewsClassificationResult(
             titleBg: $titleBg,
             summaryBg: $summaryBg,
@@ -289,6 +335,7 @@ class NewsClassifier
                 'input_tokens' => $response['input_tokens'],
                 'output_tokens' => $response['output_tokens'],
             ],
+            duplicateOfId: $duplicateOfId,
         );
     }
 }

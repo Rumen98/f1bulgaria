@@ -42,6 +42,7 @@ class NewsEnricher
             'processed' => 0,
             'success' => 0,
             'failed' => 0,
+            'duplicates' => 0,
             'input_tokens' => 0,
             'output_tokens' => 0,
             'errors' => [],
@@ -55,20 +56,35 @@ class NewsEnricher
             try {
                 $result = $this->classifier->classify($item);
 
-                $item->update([
-                    'title_bg' => $result->titleBg,
-                    'summary_bg' => $result->summaryBg,
-                    'classification' => $result->classification->value,
-                    'constructor_id' => $result->constructorId ?? $item->constructor_id,
-                    'importance_score' => $result->importanceScore,
-                    // status НЕ се променя — остава pending за човешки review.
-                ]);
+                // Крос-източников дубликат (същата история от друг сайт) —
+                // отхвърля се автоматично, за да не излиза два пъти на сайта.
+                if ($result->duplicateOfId !== null) {
+                    $item->update([
+                        'title_bg' => $result->titleBg,
+                        'summary_bg' => $result->summaryBg,
+                        'classification' => $result->classification->value,
+                        'status' => NewsStatus::Rejected->value,
+                    ]);
 
-                // Визуален header — резолвва се от вече попълнените класификация/отбор.
-                $item->unsetRelation('constructor');
-                $item->update(['featured_image' => $this->imageResolver->resolve($item)]);
+                    Log::info("News item [{$item->id}] отхвърлен като дубликат на [{$result->duplicateOfId}].");
+                    $stats['duplicates']++;
+                } else {
+                    $item->update([
+                        'title_bg' => $result->titleBg,
+                        'summary_bg' => $result->summaryBg,
+                        'classification' => $result->classification->value,
+                        'constructor_id' => $result->constructorId ?? $item->constructor_id,
+                        'importance_score' => $result->importanceScore,
+                        // status НЕ се променя — остава pending за човешки review.
+                    ]);
 
-                $stats['success']++;
+                    // Визуален header — резолвва се от вече попълнените класификация/отбор.
+                    $item->unsetRelation('constructor');
+                    $item->update(['featured_image' => $this->imageResolver->resolve($item)]);
+
+                    $stats['success']++;
+                }
+
                 $stats['input_tokens'] += $result->tokenUsage['input_tokens'];
                 $stats['output_tokens'] += $result->tokenUsage['output_tokens'];
             } catch (Throwable $e) {

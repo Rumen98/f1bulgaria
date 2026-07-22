@@ -22,5 +22,7 @@ final readonly class NewsClassificationResult
         public int $importanceScore,
         public string $rawResponse,
         public array $tokenUsage,
+        /** ID на скорошна новина със СЪЩАТА история (крос-източников дубликат). */
+        public ?int $duplicateOfId = null,
     ) {}
 }

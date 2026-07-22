@@ -15,7 +15,7 @@ beforeEach(function () {
     config()->set('news.enrich_sleep_ms', 0);
 });
 
-function classResult(int $in = 10, int $out = 20): NewsClassificationResult
+function classResult(int $in = 10, int $out = 20, ?int $duplicateOfId = null): NewsClassificationResult
 {
     return new NewsClassificationResult(
         titleBg: 'Българско заглавие',
@@ -25,8 +25,22 @@ function classResult(int $in = 10, int $out = 20): NewsClassificationResult
         importanceScore: 3,
         rawResponse: '{}',
         tokenUsage: ['input_tokens' => $in, 'output_tokens' => $out],
+        duplicateOfId: $duplicateOfId,
     );
 }
+
+it('отхвърля автоматично крос-източниковите дубликати', function () {
+    $original = TeamNewsItem::factory()->create();
+    $duplicate = TeamNewsItem::factory()->create(['title_bg' => null, 'classification' => null]);
+
+    test()->mock(NewsClassifier::class, fn ($m) => $m->shouldReceive('classify')
+        ->andReturn(classResult(duplicateOfId: $original->id)));
+
+    $stats = app(NewsEnricher::class)->enrichPending();
+
+    expect($stats['duplicates'])->toBeGreaterThanOrEqual(1)
+        ->and($duplicate->fresh()->status)->toBe(NewsStatus::Rejected);
+});
 
 it('попълва полетата на pending items и запазва статуса pending', function () {
     TeamNewsItem::factory()->count(2)->create(['title_bg' => null, 'classification' => null]);
