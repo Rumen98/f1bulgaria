@@ -19,7 +19,8 @@ const primaryNav = [
     { label: 'Отбори', route: 'teams.index' },
     { label: 'Пилоти', route: 'drivers.index' },
     { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
-    { label: 'Цолов', route: 'tsolov', feature: 'tsolov', flag: 'bg' },
+    // tricolor: easter egg — името светва в бг трибагреника на hover.
+    { label: 'Цолов', route: 'tsolov', feature: 'tsolov', flag: 'bg', tricolor: true },
 ];
 const secondaryNav = [
     { label: 'Формула 2', route: 'f2', feature: 'f2' },
@@ -62,14 +63,16 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                         v-for="item in primary"
                         :key="item.route"
                         :href="route(item.route)"
-                        class="flex items-center gap-1 whitespace-nowrap text-[13px] font-medium text-zinc-400 transition duration-200 hover:text-white xl:text-sm"
+                        class="group flex items-center gap-1 whitespace-nowrap text-[13px] font-medium text-zinc-400 transition duration-200 hover:text-white xl:text-sm"
                         :class="{ 'text-white': route().current(item.route) }"
                     >
                         <span v-if="item.live" class="relative flex h-2 w-2">
                             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
                             <span class="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
                         </span>
-                        {{ item.label }}
+                        <span :class="{ 'group-hover:bg-gradient-to-b group-hover:from-white group-hover:via-green-500 group-hover:to-red-600 group-hover:bg-clip-text group-hover:text-transparent': item.tricolor }">
+                            {{ item.label }}
+                        </span>
                         <FlagIcon v-if="item.flag" :code="item.flag" class="text-[11px]" />
                     </Link>
 
