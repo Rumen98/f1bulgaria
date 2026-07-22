@@ -62,38 +62,22 @@ const tsolovShare = computed(() => {
                 />
             </picture>
 
-            <!-- Тъмен градиент — скрива остарелия надпис върху банера вляво -->
-            <div class="absolute inset-0 bg-gradient-to-r from-black/95 via-black/70 to-transparent" />
-
-            <div class="absolute inset-0 flex items-center">
-                <div class="relative max-w-3xl px-6 md:px-12 lg:px-20">
-                    <div class="mb-3 inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white md:text-sm">
-                        <span aria-hidden="true">🏆</span> Лидер 2026
-                    </div>
-                    <!-- Името в трибагреник: стоповете 33/50/67% оформят три ясни ленти бяло/зелено/червено -->
-                    <h1 class="font-display text-4xl font-black leading-tight tracking-tight md:text-6xl lg:text-7xl">
-                        <span class="bg-gradient-to-b from-white from-33% via-green-500 via-50% to-red-600 to-67% bg-clip-text text-transparent">{{ profile.name }}</span>
-                    </h1>
-                    <p class="mt-1 font-display text-xl font-black leading-tight tracking-tight text-white md:text-3xl lg:text-4xl">
-                        ЛИДЕРЪТ НА <span class="text-red-500">ФОРМУЛА 2</span>
-                    </p>
-                    <div v-if="stats" class="mt-4 flex flex-wrap items-center gap-2 text-sm font-semibold text-white/95 md:gap-3 md:text-base">
-                        <span>{{ stats.points }} точки</span>
-                        <span class="text-red-500" aria-hidden="true">·</span>
-                        <span>{{ stats.wins }} победи</span>
-                        <span class="text-red-500" aria-hidden="true">·</span>
-                        <span class="flex items-center gap-1">3 поредни <span class="text-yellow-400" aria-hidden="true">🔥</span></span>
-                    </div>
-                    <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-white/80">
-                        <span v-if="age">{{ age }} години</span>
-                        <span class="text-white/40" aria-hidden="true">·</span>
-                        <span>{{ profile.hometown }}</span>
-                        <span v-if="profile.current_series" class="text-white/40" aria-hidden="true">·</span>
-                        <span v-if="profile.current_series" class="font-semibold text-white">{{ profile.current_series }}</span>
-                    </div>
-                </div>
-            </div>
+            <!-- Заглавието е запечено в дизайна на банера — h1 остава само за SEO/четци. -->
+            <h1 class="sr-only">{{ profile.name }} — Българската надежда във Формула 2</h1>
         </section>
+
+        <!-- Ключови факти под банера (бяха в overlay-а, сега не се бият с дизайна) -->
+        <div class="mx-auto mt-4 flex max-w-3xl flex-wrap items-center gap-3 text-sm text-zinc-400">
+            <span v-if="stats" class="font-semibold text-white">{{ stats.points }} точки</span>
+            <span v-if="stats" class="text-red-500" aria-hidden="true">·</span>
+            <span v-if="stats" class="font-semibold text-white">{{ stats.wins }} победи</span>
+            <span v-if="stats" class="text-red-500" aria-hidden="true">·</span>
+            <span v-if="age">{{ age }} години</span>
+            <span class="text-zinc-600" aria-hidden="true">·</span>
+            <span>{{ profile.hometown }}</span>
+            <span v-if="profile.current_series" class="text-zinc-600" aria-hidden="true">·</span>
+            <span v-if="profile.current_series" class="font-semibold text-white">{{ profile.current_series }}</span>
+        </div>
 
         <!-- Биография -->
         <section class="mx-auto mt-8 max-w-3xl">
