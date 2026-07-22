@@ -29,10 +29,9 @@ final class CountryFlag
 
     public static function emoji(?string $iso3): string
     {
-        if ($iso3 === null) {
-            return '';
-        }
-
-        return self::MAP[strtoupper($iso3)] ?? '';
+        // Emoji знамената са изключени — на Windows не се рендерират като флагове,
+        // а като двубуквен код/кутийки пред имената. За да ги върнеш, ползвай:
+        // return $iso3 === null ? '' : (self::MAP[strtoupper($iso3)] ?? '');
+        return '';
     }
 }
