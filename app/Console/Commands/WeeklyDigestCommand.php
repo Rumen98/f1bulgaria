@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Mail\WeeklyDigestMail;
+use App\Models\NewsletterSubscriber;
 use App\Models\Race;
 use App\Models\Season;
 use App\Models\User;
@@ -47,7 +48,25 @@ class WeeklyDigestCommand extends Command
             Mail::to($user)->queue(new WeeklyDigestMail($race, $recap, $board, $stats));
         }
 
-        $this->info("Дайджестът е поставен в опашката за {$recipients->count()} получатели.");
+        // Потвърдените бюлетинни абонати без акаунт получават общата версия
+        // (без лична статистика) с линк за отписване. Дедупликация по имейл.
+        $userEmails = $recipients->pluck('email')->map(fn (string $email) => mb_strtolower($email))->all();
+
+        $subscribers = NewsletterSubscriber::active()
+            ->whereNotIn('email', $userEmails)
+            ->get();
+
+        foreach ($subscribers as $subscriber) {
+            Mail::to($subscriber->email)->queue(new WeeklyDigestMail(
+                $race,
+                $recap,
+                $board,
+                userStats: null,
+                unsubscribeToken: $subscriber->confirmation_token,
+            ));
+        }
+
+        $this->info("Дайджестът е поставен в опашката: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
 
         return self::SUCCESS;
     }

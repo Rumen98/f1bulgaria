@@ -18,13 +18,15 @@ class WeeklyDigestMail extends Mailable
     /**
      * @param  array<int, array<string, mixed>>  $recap  подиум + ключови факти
      * @param  array<int, array<string, mixed>>  $leaderboard  топ от класирането
-     * @param  array<string, mixed>  $userStats  статистика на получателя
+     * @param  array<string, mixed>|null  $userStats  статистика на получателя (null за бюлетинен абонат без акаунт)
+     * @param  string|null  $unsubscribeToken  токен за отписване (само за бюлетинни абонати)
      */
     public function __construct(
         public Race $race,
         public array $recap,
         public array $leaderboard,
-        public array $userStats,
+        public ?array $userStats = null,
+        public ?string $unsubscribeToken = null,
     ) {}
 
     public function envelope(): Envelope
