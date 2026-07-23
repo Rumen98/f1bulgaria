@@ -109,6 +109,7 @@ php artisan sitemap:generate    # вече включва F2 URL-ите
 - `f1:sync-results` — на час (резултати + точкуване + значки)
 - `f1:weekly-digest` — седмичен рекап имейл
 - `news:fetch` — 06:00 (RSS емисии); `news:enrich --limit=50` — 06:30 (LLM превод/класификация)
+- `sitemap:generate` — 07:00 (свеж sitemap за Google след новинарския цикъл)
 
 ## 6. Cache warmup
 

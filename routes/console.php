@@ -37,3 +37,9 @@ Schedule::command('news:enrich --limit=50')
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+// Свеж sitemap всеки ден след новинарския цикъл — новите статии влизат
+// в индекса на Google без ръчна намеса.
+Schedule::command('sitemap:generate')
+    ->dailyAt('07:00')
+    ->withoutOverlapping();
