@@ -52,3 +52,9 @@ Schedule::command('f2:sync-wikipedia')
 Schedule::command('sitemap:generate')
     ->dailyAt('07:00')
     ->withoutOverlapping();
+
+// Дневен отчет за активността към админ имейла — накрая на деня (софийско).
+Schedule::command('report:daily-activity')
+    ->dailyAt('23:55')
+    ->timezone('Europe/Sofia')
+    ->withoutOverlapping();
