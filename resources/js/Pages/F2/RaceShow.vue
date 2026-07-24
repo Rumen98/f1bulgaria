@@ -55,14 +55,16 @@ const rowClass = (p) => ({ 1: 'bg-amber-500/10', 2: 'bg-zinc-400/10', 3: 'bg-ora
 
         <!-- Results -->
         <TableShell class="mt-6">
-            <table class="w-full text-sm">
+            <!-- Всички колони са винаги видими — на тясно таблицата скролва
+                 хоризонтално (TableShell), вместо да крие Отбор/Старт. -->
+            <table class="w-full whitespace-nowrap text-sm">
                 <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
                         <th scope="col" class="px-3 py-2 text-left">Поз.</th>
                         <th scope="col" class="px-2 py-2 text-left">#</th>
                         <th scope="col" class="px-3 py-2 text-left">Пилот</th>
-                        <th scope="col" class="hidden px-3 py-2 text-left sm:table-cell">Отбор</th>
-                        <th scope="col" class="hidden px-2 py-2 text-right md:table-cell">Старт</th>
+                        <th scope="col" class="px-3 py-2 text-left">Отбор</th>
+                        <th scope="col" class="px-2 py-2 text-right">Старт</th>
                         <th scope="col" class="px-3 py-2 text-right">Време/Изоставане</th>
                         <th scope="col" class="px-2 py-2 text-right">Точки</th>
                     </tr>
@@ -79,8 +81,8 @@ const rowClass = (p) => ({ 1: 'bg-amber-500/10', 2: 'bg-zinc-400/10', 3: 'bg-ora
                             <span v-if="r.is_bulgarian" class="sr-only">(български пилот)</span>
                             <span v-if="r.fastest_lap" title="Най-бърза обиколка" class="ml-1 text-purple-400"><span aria-hidden="true">⏱️</span><span class="sr-only">Най-бърза обиколка</span></span>
                         </td>
-                        <td class="hidden px-3 py-2.5 text-zinc-400 sm:table-cell">{{ r.team }}</td>
-                        <td class="hidden px-2 py-2.5 text-right tabular-nums text-zinc-400 md:table-cell">{{ r.grid ?? '—' }}</td>
+                        <td class="px-3 py-2.5 text-zinc-400">{{ r.team }}</td>
+                        <td class="px-2 py-2.5 text-right tabular-nums text-zinc-400">{{ r.grid ?? '—' }}</td>
                         <td class="px-3 py-2.5 text-right tabular-nums text-zinc-300">{{ r.time_or_gap ?? r.status }}</td>
                         <td class="px-2 py-2.5 text-right font-bold tabular-nums text-white">{{ r.points || '' }}</td>
                     </tr>

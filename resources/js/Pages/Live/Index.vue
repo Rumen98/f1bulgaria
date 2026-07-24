@@ -136,20 +136,22 @@ const nextRaceCountdown = computed(() => {
             </div>
 
             <TableShell>
-                <table class="w-full text-sm">
+                <!-- Всички колони са винаги видими — на тясно таблицата скролва
+                     хоризонтално (TableShell), вместо да крие секторите/отбора. -->
+                <table class="w-full whitespace-nowrap text-sm">
                     <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                         <tr>
                             <th class="px-2 py-2 text-left sm:px-3">#</th>
                             <th class="px-2 py-2 text-left sm:px-3">Пилот</th>
-                            <th class="hidden px-3 py-2 text-left lg:table-cell">Отбор</th>
+                            <th class="px-3 py-2 text-left">Отбор</th>
                             <th class="px-2 py-2 text-right sm:px-3">Най-добра</th>
-                            <th class="hidden px-3 py-2 text-right md:table-cell">Последна</th>
-                            <th class="hidden px-2 py-2 text-right xl:table-cell">С1</th>
-                            <th class="hidden px-2 py-2 text-right xl:table-cell">С2</th>
-                            <th class="hidden px-2 py-2 text-right xl:table-cell">С3</th>
-                            <th class="hidden px-2 py-2 text-right lg:table-cell">Инт.</th>
+                            <th class="px-3 py-2 text-right">Последна</th>
+                            <th class="px-2 py-2 text-right">С1</th>
+                            <th class="px-2 py-2 text-right">С2</th>
+                            <th class="px-2 py-2 text-right">С3</th>
+                            <th class="px-2 py-2 text-right">Инт.</th>
                             <th class="px-2 py-2 text-center">Гума</th>
-                            <th class="hidden px-2 py-2 text-right sm:table-cell">Об.</th>
+                            <th class="px-2 py-2 text-right">Об.</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-800/60">
@@ -163,20 +165,20 @@ const nextRaceCountdown = computed(() => {
                                     <span v-if="isQualifying && row.position === 1 && row.best_lap_time" title="Pole">🏁</span>
                                 </span>
                             </td>
-                            <td class="hidden px-3 py-2.5 text-zinc-400 lg:table-cell">{{ row.team_name }}</td>
+                            <td class="px-3 py-2.5 text-zinc-400">{{ row.team_name }}</td>
                             <td class="px-2 py-2.5 text-right font-bold tabular-nums sm:px-3" :class="row.is_overall_best ? 'text-purple-400' : 'text-white'">{{ row.best_lap_time ?? '—' }}</td>
-                            <td class="hidden px-3 py-2.5 text-right tabular-nums text-zinc-400 md:table-cell">{{ row.last_lap_time ?? '—' }}</td>
-                            <td class="hidden px-2 py-2.5 text-right tabular-nums xl:table-cell" :class="sectorClass(row, 1)">{{ fmtSector(row.sector1_best) }}</td>
-                            <td class="hidden px-2 py-2.5 text-right tabular-nums xl:table-cell" :class="sectorClass(row, 2)">{{ fmtSector(row.sector2_best) }}</td>
-                            <td class="hidden px-2 py-2.5 text-right tabular-nums xl:table-cell" :class="sectorClass(row, 3)">{{ fmtSector(row.sector3_best) }}</td>
-                            <td class="hidden px-2 py-2.5 text-right tabular-nums text-zinc-400 lg:table-cell">{{ row.gap_to_leader ?? '' }}</td>
+                            <td class="px-3 py-2.5 text-right tabular-nums text-zinc-400">{{ row.last_lap_time ?? '—' }}</td>
+                            <td class="px-2 py-2.5 text-right tabular-nums" :class="sectorClass(row, 1)">{{ fmtSector(row.sector1_best) }}</td>
+                            <td class="px-2 py-2.5 text-right tabular-nums" :class="sectorClass(row, 2)">{{ fmtSector(row.sector2_best) }}</td>
+                            <td class="px-2 py-2.5 text-right tabular-nums" :class="sectorClass(row, 3)">{{ fmtSector(row.sector3_best) }}</td>
+                            <td class="px-2 py-2.5 text-right tabular-nums text-zinc-400">{{ row.gap_to_leader ?? '' }}</td>
                             <td class="px-2 py-2.5 text-center">
                                 <span v-if="tire(row.current_tire)" class="inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold" :class="tire(row.current_tire).c">
                                     {{ tire(row.current_tire).l }}
                                 </span>
                                 <span v-else class="text-zinc-600">—</span>
                             </td>
-                            <td class="hidden px-2 py-2.5 text-right tabular-nums text-zinc-500 sm:table-cell">{{ row.laps_completed }}</td>
+                            <td class="px-2 py-2.5 text-right tabular-nums text-zinc-500">{{ row.laps_completed }}</td>
                         </tr>
                         <tr v-if="cutoffs.includes(row.position)" :key="`cut-${row.position}`" class="bg-red-950/30">
                             <td colspan="11" class="px-3 py-1 text-center text-xs font-bold uppercase tracking-wider text-red-400">

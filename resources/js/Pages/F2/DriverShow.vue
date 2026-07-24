@@ -59,7 +59,7 @@ const statCards = [
         <section class="mt-8">
             <h2 class="mb-3 font-display text-lg font-bold text-white">Сезон по сезон</h2>
             <TableShell>
-                <table class="w-full text-sm">
+                <table class="w-full whitespace-nowrap text-sm">
                     <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                         <tr><th scope="col" class="px-4 py-2.5 text-left">Сезон</th><th scope="col" class="px-4 py-2.5 text-left">Отбор</th><th scope="col" class="px-4 py-2.5 text-right">Поз.</th><th scope="col" class="px-4 py-2.5 text-right">Точки</th></tr>
                     </thead>

@@ -15,7 +15,7 @@ defineProps({
             Няма данни.
         </EmptyState>
         <TableShell v-else>
-            <table class="w-full text-sm">
+            <table class="w-full whitespace-nowrap text-sm">
                 <tbody class="divide-y divide-zinc-800/60">
                     <tr v-for="(w, i) in winners" :key="i" class="bg-zinc-900/40 transition hover:bg-zinc-800/40">
                         <td class="px-4 py-2.5 font-bold tabular-nums text-zinc-400">{{ w.year }}</td>

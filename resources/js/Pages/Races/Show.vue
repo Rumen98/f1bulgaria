@@ -43,7 +43,7 @@ const finished = computed(() => props.race.results && props.race.results.length 
 
                 <TableShell v-if="finished" class="bg-zinc-900/60">
                     <h2 class="border-b border-zinc-800 px-4 py-3 font-display text-lg font-bold text-white">Резултати</h2>
-                    <table class="w-full text-sm">
+                    <table class="w-full whitespace-nowrap text-sm">
                         <thead class="bg-zinc-900/80 text-left text-xs uppercase tracking-wide text-zinc-500">
                             <tr>
                                 <th scope="col" class="px-4 py-2.5 w-14">Поз.</th>

@@ -65,7 +65,7 @@ const goToSeason = (e) => {
 
         <!-- Класиране -->
         <TableShell>
-            <table class="w-full text-sm">
+            <table class="w-full whitespace-nowrap text-sm">
                 <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
                         <th scope="col" class="px-4 py-2.5 text-left">#</th>

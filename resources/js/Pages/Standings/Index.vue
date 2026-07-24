@@ -60,7 +60,7 @@ const goToSeason = (e) => {
         </div>
 
         <TableShell v-if="tab === 'drivers'">
-            <table class="w-full text-sm">
+            <table class="w-full whitespace-nowrap text-sm">
                 <thead class="bg-zinc-900/80 text-left text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
                         <th class="px-4 py-2.5 w-12">#</th>
@@ -94,7 +94,7 @@ const goToSeason = (e) => {
         </TableShell>
 
         <TableShell v-else>
-            <table class="w-full text-sm">
+            <table class="w-full whitespace-nowrap text-sm">
                 <thead class="bg-zinc-900/80 text-left text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
                         <th class="px-4 py-2.5 w-12">#</th>

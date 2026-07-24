@@ -50,7 +50,7 @@ defineProps({
         <section v-if="f2Winners.length" class="mt-8">
             <h2 class="mb-3 font-display text-lg font-bold text-white">Формула 2 на тази писта</h2>
             <TableShell>
-                <table class="w-full text-sm">
+                <table class="w-full whitespace-nowrap text-sm">
                     <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                         <tr><th scope="col" class="px-4 py-2.5 text-left">Сезон</th><th scope="col" class="px-4 py-2.5 text-left">Победител (главно)</th><th scope="col" class="px-4 py-2.5 text-right"><span class="sr-only">Действия</span></th></tr>
                     </thead>
@@ -76,7 +76,7 @@ defineProps({
             <div v-if="lastRace" class="min-w-0">
                 <h2 class="mb-3 font-display text-lg font-bold text-white">Последно състезание <span class="text-sm font-normal text-zinc-500">{{ lastRace.year }}</span></h2>
                 <TableShell>
-                    <table class="w-full text-sm">
+                    <table class="w-full whitespace-nowrap text-sm">
                         <tbody class="divide-y divide-zinc-800/60">
                             <tr v-for="r in lastRace.top5" :key="r.position" class="bg-zinc-900/40">
                                 <td class="px-4 py-2.5 w-12 font-bold tabular-nums text-zinc-400">P{{ r.position }}</td>

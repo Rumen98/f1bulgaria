@@ -33,7 +33,7 @@ const posClass = (pos) => ({
         </div>
 
         <div v-else class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full whitespace-nowrap text-sm">
                 <thead class="bg-zinc-900/80 text-left text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
                         <th class="px-4 py-2.5 w-12">#</th>

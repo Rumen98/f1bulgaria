@@ -156,7 +156,7 @@ const betterResult = (a, b) => {
         <section v-if="circuits.length" class="mt-8">
             <h2 class="mb-4 font-display text-lg font-bold text-white">Общи писти</h2>
             <TableShell>
-                <table class="w-full text-sm">
+                <table class="w-full whitespace-nowrap text-sm">
                     <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                         <tr>
                             <th class="px-4 py-2.5 text-left">Писта</th>
