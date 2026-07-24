@@ -20,12 +20,14 @@ const primaryNav = [
     { label: 'Прогнози', route: 'leaderboard' },
     { label: 'Отбори', route: 'teams.index' },
     { label: 'Пилоти', route: 'drivers.index' },
-    { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
+    // Ф2 до Цолов — двете вървят заедно. „Писти" отива в „Повече ▾":
+    // 10 елемента не се събират на lg (1024px) без пренасяне.
+    { label: 'Формула 2', route: 'f2', feature: 'f2' },
     // tricolor: easter egg — името светва в бг трибагреника на hover.
     { label: 'Цолов', route: 'tsolov', feature: 'tsolov', flag: 'bg', tricolor: true },
 ];
 const secondaryNav = [
-    { label: 'Формула 2', route: 'f2', feature: 'f2' },
+    { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
     { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'История', route: 'history', feature: 'history' },
     { label: 'Речник', route: 'terminology' },
@@ -107,7 +109,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                         <Link :href="route('predictions.index')" class="hidden text-zinc-400 transition hover:text-white sm:block">
                             Моите прогнози
                         </Link>
-                        <Link :href="route('profile.edit')" class="font-medium text-white">{{ user.name }}</Link>
+                        <Link :href="route('profile.edit')" class="max-w-[140px] truncate font-medium text-white">{{ user.name }}</Link>
                     </template>
                     <template v-else>
                         <Link :href="route('login')" class="text-zinc-400 transition hover:text-white">Вход</Link>
