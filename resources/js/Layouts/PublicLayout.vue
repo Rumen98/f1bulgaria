@@ -106,7 +106,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
 
                 <div class="flex items-center gap-3 text-sm">
                     <template v-if="user">
-                        <Link :href="route('predictions.index')" class="hidden text-zinc-400 transition hover:text-white sm:block">
+                        <!-- xl: на lg лентата с 9 линка + „Повече" не побира и този — има го и в /leaderboard. -->
+                        <Link :href="route('predictions.index')" class="hidden text-zinc-400 transition hover:text-white xl:block">
                             Моите прогнози
                         </Link>
                         <Link :href="route('profile.edit')" class="max-w-[140px] truncate font-medium text-white">{{ user.name }}</Link>

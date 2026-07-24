@@ -2,12 +2,15 @@
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 defineProps({
     season: Number,
     leaderboard: Array,
 });
+
+const user = computed(() => usePage().props.auth?.user);
 
 const podium = (pos) => ({
     1: 'border-l-2 border-amber-400 bg-gradient-to-r from-amber-500/10 to-transparent',
@@ -22,7 +25,23 @@ const podium = (pos) => ({
     </Head>
 
     <PublicLayout>
-        <h1 class="mb-2 font-display text-2xl font-black sm:text-3xl">Prediction League <span class="text-red-600">{{ season }}</span></h1>
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
+            <h1 class="font-display text-2xl font-black sm:text-3xl">Prediction League <span class="text-red-600">{{ season }}</span></h1>
+            <Link
+                v-if="user"
+                :href="route('predictions.index')"
+                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
+            >
+                Моите прогнози →
+            </Link>
+            <Link
+                v-else
+                :href="route('register')"
+                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
+            >
+                Включи се в играта
+            </Link>
+        </div>
         <p class="mb-6 text-sm text-zinc-500">
             Точкуване: точен подиум, pole, най-бърза обиколка, брой DNF и safety car.
         </p>
