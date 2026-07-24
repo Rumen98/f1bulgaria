@@ -135,7 +135,7 @@ const nextRaceCountdown = computed(() => {
                 </div>
             </div>
 
-            <TableShell :scroll="true">
+            <TableShell>
                 <table class="w-full text-sm">
                     <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                         <tr>

@@ -130,6 +130,64 @@ it('--all записва photo_url на каноничните пилоти (л�
     expect($canonical->fresh()->photo_url)->toBe('https://upload.wikimedia.org/legend.jpg');
 });
 
+it('--validate подменя мъртъв URL и не пипа живия', function () {
+    Http::fake([
+        'https://dead.example/*' => Http::response('', 404),
+        'https://alive.example/*' => Http::response(''),
+        '*/page/summary/*' => Http::response([
+            'type' => 'standard',
+            'originalimage' => ['source' => 'https://upload.wikimedia.org/fresh.jpg'],
+        ]),
+    ]);
+
+    $season = Season::factory()->current()->create();
+    $broken = Driver::factory()->create(['season_id' => $season->id, 'photo_url' => 'https://dead.example/gone.jpg']);
+    $fine = Driver::factory()->create(['season_id' => $season->id, 'photo_url' => 'https://alive.example/ok.jpg']);
+
+    $this->artisan('drivers:fetch-photos', ['--validate' => true, '--sleep' => 0])->assertSuccessful();
+
+    expect($broken->fresh()->photo_url)->toBe('https://upload.wikimedia.org/fresh.jpg')
+        ->and($fine->fresh()->photo_url)->toBe('https://alive.example/ok.jpg');
+});
+
+it('--validate чисти URL-а, когато няма намерена замяна', function () {
+    Http::fake([
+        'https://dead.example/*' => Http::response('', 404),
+        '*/page/summary/*' => Http::response('', 404),
+    ]);
+
+    $season = Season::factory()->current()->create();
+    $driver = Driver::factory()->create(['season_id' => $season->id, 'photo_url' => 'https://dead.example/gone.jpg']);
+
+    $this->artisan('drivers:fetch-photos', ['--validate' => true, '--sleep' => 0])->assertSuccessful();
+
+    expect($driver->fresh()->photo_url)->toBeNull();
+});
+
+it('--validate --all подменя мъртъв URL на каноничен пилот (легенда)', function () {
+    Http::fake([
+        'https://dead.example/*' => Http::response('', 404),
+        '*/page/summary/*' => Http::response([
+            'type' => 'standard',
+            'originalimage' => ['source' => 'https://upload.wikimedia.org/schumi_fresh.jpg'],
+        ]),
+    ]);
+
+    $season = Season::factory()->create(['year' => 2012, 'is_current' => false]);
+    $canonical = DriverCanonical::create([
+        'slug' => 'michael-schumacher', 'first_name' => 'Michael', 'last_name' => 'Schumacher',
+        'photo_url' => 'https://dead.example/renamed-on-commons.jpg',
+    ]);
+    Driver::factory()->create([
+        'season_id' => $season->id, 'canonical_id' => $canonical->id,
+        'first_name' => 'Michael', 'last_name' => 'Schumacher', 'slug' => 'michael-schumacher',
+    ]);
+
+    $this->artisan('drivers:fetch-photos', ['--validate' => true, '--all' => true, '--sleep' => 0])->assertSuccessful();
+
+    expect($canonical->fresh()->photo_url)->toBe('https://upload.wikimedia.org/schumi_fresh.jpg');
+});
+
 it('командата записва photo_url за пилотите от текущия сезон', function () {
     Http::fake(['*/page/summary/*' => Http::response([
         'originalimage' => ['source' => 'https://upload.wikimedia.org/x.jpg'],

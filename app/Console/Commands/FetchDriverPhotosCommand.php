@@ -18,12 +18,19 @@ class FetchDriverPhotosCommand extends Command
     protected $signature = 'drivers:fetch-photos
         {--sleep=1500 : Пауза в милисекунди между заявките (щади Wikipedia)}
         {--refresh : Презарежда и за пилотите, които вече имат снимка (презаписва)}
+        {--validate : Проверява складираните URL-и и презарежда само мъртвите (Wikimedia трие файлове)}
         {--all : Обхожда ВСИЧКИ канонични пилоти (легендите), не само текущия сезон}';
 
     protected $description = 'Дърпа CC снимки на пилотите от Wikipedia (Wikimedia Commons).';
 
     public function handle(DriverPhotoFetcher $fetcher): int
     {
+        if ($this->option('validate')) {
+            return $this->option('all')
+                ? $this->validateAllCanonical($fetcher)
+                : $this->validateCurrentSeason($fetcher);
+        }
+
         return $this->option('all')
             ? $this->fetchAllCanonical($fetcher)
             : $this->fetchCurrentSeason($fetcher);
@@ -120,6 +127,101 @@ class FetchDriverPhotosCommand extends Command
         }
 
         $this->info("Готово: {$found} със снимка, {$missing} без (остават с монограма).");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Проверява живи ли са складираните URL-и за текущия сезон; мъртвите
+     * презарежда от Wikipedia (или чисти, ако вече няма снимка) — така счупен
+     * линк деградира до монограмата, вместо да остане broken image.
+     */
+    private function validateCurrentSeason(DriverPhotoFetcher $fetcher): int
+    {
+        $season = Season::current();
+
+        if ($season === null) {
+            $this->warn('Няма текущ сезон.');
+
+            return self::SUCCESS;
+        }
+
+        $drivers = $season->drivers()
+            ->whereNotNull('photo_url')
+            ->with('constructor')
+            ->orderBy('last_name')
+            ->get();
+
+        $sleepMs = max(0, (int) $this->option('sleep'));
+        $dead = 0;
+        $revived = 0;
+
+        $this->info("Проверявам {$drivers->count()} URL-а (сезон {$season->year})...");
+
+        foreach ($drivers as $driver) {
+            if ($fetcher->photoUrlAlive($driver->photo_url)) {
+                continue;
+            }
+
+            $dead++;
+            $url = $fetcher->fetch($driver);
+            $driver->update(['photo_url' => $url]);
+            $driver->canonical?->update(['photo_url' => $url]);
+
+            if ($url !== null) {
+                $revived++;
+                $this->line("  ✓ {$driver->fullName()} (нов URL)");
+            } else {
+                $this->line("  – {$driver->fullName()} (мъртъв URL, няма замяна — монограма)");
+            }
+
+            $this->pause($sleepMs);
+        }
+
+        $this->info("Готово: {$dead} мъртви URL-а, {$revived} подменени.");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Като validateCurrentSeason, но за всички канонични пилоти (легендите).
+     * Канониче без per-season запис няма контекст за ново търсене — чистим URL-а.
+     */
+    private function validateAllCanonical(DriverPhotoFetcher $fetcher): int
+    {
+        $sleepMs = max(0, (int) $this->option('sleep'));
+        $dead = 0;
+        $revived = 0;
+
+        $ids = DriverCanonical::query()->whereNotNull('photo_url')->orderBy('last_name')->pluck('id');
+
+        $this->info("Проверявам {$ids->count()} URL-а (канонични пилоти)...");
+
+        foreach ($ids->chunk(50) as $chunk) {
+            $canonicals = DriverCanonical::query()->whereIn('id', $chunk)->get();
+
+            foreach ($canonicals as $canonical) {
+                if ($fetcher->photoUrlAlive($canonical->photo_url)) {
+                    continue;
+                }
+
+                $dead++;
+                $driver = $canonical->seasons()->with('constructor')->orderByDesc('season_id')->first();
+                $url = $driver !== null ? $fetcher->fetch($driver) : null;
+                $canonical->update(['photo_url' => $url]);
+
+                if ($url !== null) {
+                    $revived++;
+                    $this->line("  ✓ {$canonical->fullName()} (нов URL)");
+                } else {
+                    $this->line("  – {$canonical->fullName()} (мъртъв URL, няма замяна — монограма)");
+                }
+
+                $this->pause($sleepMs);
+            }
+        }
+
+        $this->info("Готово: {$dead} мъртви URL-а, {$revived} подменени.");
 
         return self::SUCCESS;
     }

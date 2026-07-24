@@ -54,7 +54,7 @@ const rowClass = (p) => ({ 1: 'bg-amber-500/10', 2: 'bg-zinc-400/10', 3: 'bg-ora
         </section>
 
         <!-- Results -->
-        <TableShell :scroll="true" class="mt-6">
+        <TableShell class="mt-6">
             <table class="w-full text-sm">
                 <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                     <tr>

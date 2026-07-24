@@ -1,15 +1,13 @@
 <script setup>
 /**
  * Обвивка за таблици — каноничната рамка (радиус/бордер) на едно място.
- * scroll=true за широки таблици, които трябва да скролват хоризонтално.
+ * Винаги overflow-x-auto: тясна таблица не показва скролбар, а широка
+ * (напр. класирането на мобилно) може да се скролва хоризонтално.
  */
-defineProps({
-    scroll: { type: Boolean, default: false },
-});
 </script>
 
 <template>
-    <div class="rounded-xl border border-zinc-800" :class="scroll ? 'overflow-x-auto' : 'overflow-hidden'">
+    <div class="overflow-x-auto rounded-xl border border-zinc-800">
         <slot />
     </div>
 </template>

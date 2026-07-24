@@ -157,7 +157,7 @@ const tsolovShare = computed(() => {
                 </div>
             </div>
 
-            <p class="mt-2 text-right text-xs text-zinc-600">Класиране след R07 Силвърстоун · fiaformula2.com</p>
+            <p v-if="profile.standings_note" class="mt-2 text-right text-xs text-zinc-600">{{ profile.standings_note }}</p>
         </section>
 
         <!-- Подкрепи -->

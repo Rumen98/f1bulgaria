@@ -7,6 +7,7 @@ import HeadToHeadBars from '@/Components/Driver/HeadToHeadBars.vue';
 import FlagIcon from '@/Components/FlagIcon.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
+import { ref, watch } from 'vue';
 
 const props = defineProps({
     driver: Object,
@@ -26,6 +27,11 @@ const props = defineProps({
 const goToSeason = (e) => {
     router.visit(route('drivers.show', props.driver.slug) + `?season=${e.target.value}`, { preserveScroll: true });
 };
+
+// Wikimedia URL-ите умират при преименуване на файла в Commons — при счупена
+// снимка падаме към монограмата, вместо да показваме broken image.
+const photoFailed = ref(false);
+watch(() => props.driver.photo, () => (photoFailed.value = false));
 </script>
 
 <template>
@@ -55,20 +61,21 @@ const goToSeason = (e) => {
             <div class="flex items-center gap-5 sm:gap-8">
                 <!-- Снимка от Wikimedia (ако има), иначе голям номер -->
                 <img
-                    v-if="driver.photo"
+                    v-if="driver.photo && !photoFailed"
                     :src="driver.photo"
                     :alt="driver.name"
                     loading="lazy"
                     referrerpolicy="no-referrer"
                     class="h-28 w-28 flex-shrink-0 rounded-2xl object-cover object-top shadow-xl ring-2 sm:h-40 sm:w-40"
                     :style="{ '--tw-ring-color': driver.color_hex, boxShadow: '0 0 40px ' + driver.color_hex + '40' }"
+                    @error="photoFailed = true"
                 />
                 <div
                     v-else
                     class="select-none font-display text-6xl font-black leading-none tabular-nums sm:text-8xl"
                     :style="{ color: driver.color_hex, textShadow: '0 2px 0 rgba(0,0,0,0.4), 0 0 24px ' + driver.color_hex + '55' }"
                 >
-                    {{ driver.number ?? '' }}
+                    {{ driver.number ?? driver.code ?? '' }}
                 </div>
                 <div>
                     <span v-if="isHistorical" class="mb-2 inline-block rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-400">

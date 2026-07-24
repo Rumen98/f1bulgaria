@@ -20,6 +20,23 @@ class DriverPhotoFetcher
 {
     private const SUMMARY_URL = 'https://en.wikipedia.org/api/rest_v1/page/summary/';
 
+    /**
+     * Проверява дали складиран photo_url още отговаря (Wikimedia трие/преименува
+     * файлове и URL-ите умират). При мрежов проблем връщаме true — да не чистим
+     * валидни снимки заради временна грешка от наша страна.
+     */
+    public function photoUrlAlive(string $url): bool
+    {
+        try {
+            return Http::timeout(10)
+                ->withHeaders(['User-Agent' => 'Padok/1.0 (https://padok.bg; itcashbroker@gmail.com)'])
+                ->head($url)
+                ->successful();
+        } catch (ConnectionException) {
+            return true;
+        }
+    }
+
     public function fetch(Driver $driver): ?string
     {
         foreach ($this->candidateTitles($driver) as $title) {
