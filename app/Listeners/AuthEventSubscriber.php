@@ -11,6 +11,7 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Http\Request;
+use Throwable;
 
 /**
  * Записва събитията от автентикацията в auth_events (одит лог).
@@ -39,7 +40,7 @@ class AuthEventSubscriber
     {
         // Неуспешен вход: обикновено няма съвпаднал потребител — вадим имейла
         // от подадените креденшъли, за да видим кой акаунт е бил атакуван.
-        AuthEvent::create([
+        $this->store([
             'user_id' => $event->user?->getAuthIdentifier(),
             'email' => $event->credentials['email'] ?? null,
             'type' => AuthEvent::TYPE_FAILED,
@@ -63,12 +64,27 @@ class AuthEventSubscriber
 
     private function record(string $type, mixed $user): void
     {
-        AuthEvent::create([
+        $this->store([
             'user_id' => $user?->getAuthIdentifier(),
             'email' => $user->email ?? null,
             'type' => $type,
             'ip_address' => $this->request->ip(),
             'user_agent' => $this->request->userAgent(),
         ]);
+    }
+
+    /**
+     * Одит логът никога не бива да събаря самата автентикация (напр. още
+     * непусната миграция на прод) — докладваме грешката и продължаваме.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function store(array $attributes): void
+    {
+        try {
+            AuthEvent::create($attributes);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 }

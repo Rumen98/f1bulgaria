@@ -6,6 +6,16 @@
     /* Тъмен фон и на root елемента — без бял flash при първоначален paint/overscroll. */
     html {
         background-color: #0a0a0a;
+        /* Preflight слага само -webkit- варианта; дублираме и без префикс
+           срещу font boosting в iOS in-app браузъри (Instagram/FB и др.). */
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+
+    /* При надут от accessibility настройки текст (iOS Text Size) дългите думи
+       да се пренасят, вместо да стърчат извън екрана и да се режат. */
+    body {
+        overflow-wrap: break-word;
     }
 
     /*

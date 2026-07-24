@@ -9,7 +9,7 @@ defineProps({
 <template>
     <Link
         :href="route('circuits.show', circuit.slug)"
-        class="group rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 transition duration-200 hover:border-red-600/50 hover:bg-zinc-900"
+        class="group min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 transition duration-200 hover:border-red-600/50 hover:bg-zinc-900"
     >
         <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">

@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Support\Facades\Schema;
 
 it('логва влизане', function () {
     $user = User::factory()->create();
@@ -37,4 +38,16 @@ it('логва неуспешен опит с подадения имейл (б�
         'email' => 'attacker@example.com',
         'type' => AuthEvent::TYPE_FAILED,
     ]);
+});
+
+it('логинът работи дори когато одит таблицата липсва (миграция не е пусната)', function () {
+    // Реален прод инцидент: деплой без `php artisan migrate` → всеки login
+    // POST гърмеше с 500, защото subscriber-ът пишеше в липсваща таблица.
+    $user = User::factory()->create();
+    Schema::drop('auth_events');
+
+    $this->post('/login', ['email' => $user->email, 'password' => 'password'])
+        ->assertRedirect(route('dashboard', absolute: false));
+
+    $this->assertAuthenticatedAs($user);
 });
