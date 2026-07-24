@@ -16,6 +16,8 @@ const primaryNav = [
     { label: 'Новини', route: 'news.index' },
     { label: 'Календар', route: 'calendar' },
     { label: 'Класиране', route: 'standings' },
+    // Prediction league-ът е ядро на общността — стои в основната лента.
+    { label: 'Прогнози', route: 'leaderboard' },
     { label: 'Отбори', route: 'teams.index' },
     { label: 'Пилоти', route: 'drivers.index' },
     { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
@@ -25,7 +27,6 @@ const primaryNav = [
 const secondaryNav = [
     { label: 'Формула 2', route: 'f2', feature: 'f2' },
     { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
-    { label: 'Прогнози', route: 'leaderboard' },
     { label: 'История', route: 'history', feature: 'history' },
     { label: 'Речник', route: 'terminology' },
 ];
