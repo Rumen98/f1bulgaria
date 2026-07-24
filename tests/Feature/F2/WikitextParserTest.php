@@ -24,6 +24,27 @@ it('извлича списъка с кръгове от сезонната ст
         ->and($rounds)->toContain('2026 Monte Carlo Formula 2 round');
 });
 
+it('кръговете са в календарен ред, не по споменаване в текста', function () {
+    // Прозата на сезонната страница споменава Монреал/Баку преди календара
+    // (нови писти) — редът трябва да идва от „Report" линковете в таблицата.
+    $season = file_get_contents(base_path('tests/Fixtures/f2/season-2026.wikitext'));
+
+    $rounds = parser()->parseSeasonPage($season)['rounds'];
+
+    expect($rounds[0])->toBe('2026 Melbourne Formula 2 round')
+        ->and($rounds[1])->toBe('2026 Miami Formula 2 round')
+        ->and($rounds[2])->toBe('2026 Montreal Formula 2 round')
+        ->and($rounds[11])->toBe('2026 Baku Formula 2 round');
+});
+
+it('пада към сканиране на всички линкове без summary таблица', function () {
+    $rounds = parser()->parseSeasonPage('== Race calendar ==
+[[2026 Melbourne Formula 2 round]]
+[[2026 Miami Formula 2 round]]')['rounds'];
+
+    expect($rounds)->toBe(['2026 Melbourne Formula 2 round', '2026 Miami Formula 2 round']);
+});
+
 it('парсва кръг: номер, спринт и главно състезание', function () {
     $r = parser()->parseRoundPage(melbourneFixture());
 

@@ -158,15 +158,24 @@ class WikitextParser
     }
 
     /**
-     * Парсва сезонна страница → списък със заглавия на кръгове (по ред).
+     * Парсва сезонна страница → списък със заглавия на кръгове (в календарен ред).
+     *
+     * Каноничният ред идва от „Report" линковете в round summary таблицата.
+     * Свободният текст споменава кръгове извън ред (нови писти, бележки под
+     * линия) и би разбъркал номерацията, ако просто сканираме всички линкове.
      *
      * @return array{rounds: array<int, string>}
      */
     public function parseSeasonPage(string $wikitext): array
     {
-        preg_match_all('/\[\[(\d{4} .+? Formula 2 round)(?:\||\]\])/', $wikitext, $m);
-
+        preg_match_all('/\[\[(\d{4} .+? Formula 2 round)\|Report\]\]/', $wikitext, $m);
         $rounds = collect($m[1])->unique()->values()->all();
+
+        // Фолбек за страници без summary таблица (напр. началото на сезона).
+        if ($rounds === []) {
+            preg_match_all('/\[\[(\d{4} .+? Formula 2 round)(?:\||\]\])/', $wikitext, $m);
+            $rounds = collect($m[1])->unique()->values()->all();
+        }
 
         return ['rounds' => $rounds];
     }

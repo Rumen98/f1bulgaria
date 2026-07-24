@@ -23,6 +23,17 @@ use Throwable;
  */
 class F2WikipediaSync
 {
+    /**
+     * Базови точки по позиция в главното състезание (формат от 2022 г. насам).
+     * При синхрон на сезони преди 2022 г. схемата е друга — преразгледай.
+     *
+     * @var array<int, float>
+     */
+    private const FEATURE_POINTS = [1 => 25.0, 2 => 18.0, 3 => 15.0, 4 => 12.0, 5 => 10.0, 6 => 8.0, 7 => 6.0, 8 => 4.0, 9 => 2.0, 10 => 1.0];
+
+    /** Точки за пол позиция в главното състезание (формат от 2022 г. насам). */
+    private const POLE_POINTS = 2.0;
+
     /** @var array<string, int> */
     private array $stats = ['races' => 0, 'sessions' => 0, 'results' => 0, 'rounds_skipped' => 0];
 
@@ -94,16 +105,24 @@ class F2WikipediaSync
         $featureDate = $this->resolveDate($parsed['feature']['date'] ?? null, $season->year);
         $sprintDate = $this->resolveDate($parsed['sprint']['date'] ?? null, $season->year);
 
-        $race = F2Race::query()->updateOrCreate(
-            ['f2_season_id' => $season->id, 'round' => $roundNo],
-            [
-                'location_name' => $location,
-                'circuit_jolpica_id' => config("f2-circuit-map.{$location}"),
-                'slug' => Str::slug("{$season->year}-{$location}"),
-                'wikipedia_url' => 'https://en.wikipedia.org/wiki/'.str_replace(' ', '_', $title),
-                'race_datetime_utc' => $featureDate ?? $sprintDate,
-            ],
-        );
+        $race = F2Race::query()->firstOrNew(['f2_season_id' => $season->id, 'round' => $roundNo]);
+        $isRelocated = $race->exists && $race->location_name !== $location;
+
+        $race->fill([
+            'location_name' => $location,
+            'circuit_jolpica_id' => config("f2-circuit-map.{$location}"),
+            'slug' => Str::slug("{$season->year}-{$location}"),
+            'wikipedia_url' => 'https://en.wikipedia.org/wiki/'.str_replace(' ', '_', $title),
+            'race_datetime_utc' => $featureDate ?? $sprintDate,
+        ])->save();
+
+        // Кръг с номер, който вече сочи ДРУГО събитие (пренареден календар) —
+        // старите сесии/резултати са от предишното и биха се броили двойно.
+        if ($isRelocated) {
+            $sessionIds = $race->sessions()->pluck('id');
+            F2Result::query()->whereIn('f2_race_session_id', $sessionIds)->delete();
+            $race->sessions()->delete();
+        }
 
         $this->stats['races']++;
 
@@ -190,8 +209,8 @@ class F2WikipediaSync
     }
 
     /**
-     * Класиране: сума точки от всички резултати за сезона → позиция + шампион
-     * (само за приключил сезон — не за текущия).
+     * Класиране: сума точки от всички резултати за сезона + недостигащите
+     * пол бонуси → позиция + шампион (само за приключил сезон — не за текущия).
      */
     private function computeStandings(F2Season $season): void
     {
@@ -201,18 +220,109 @@ class F2WikipediaSync
             ->where('f2_races.f2_season_id', $season->id)
             ->groupBy('f2_results.f2_driver_id')
             ->selectRaw('f2_results.f2_driver_id as did, SUM(f2_results.points) as pts')
-            ->pluck('pts', 'did');
+            ->pluck('pts', 'did')
+            ->map(fn ($pts) => (float) $pts);
 
-        $ranked = $totals->sortDesc()->keys()->values();
+        foreach ($this->missingPoleBonuses($season) as $driverId => $bonus) {
+            $totals->put($driverId, ($totals->get($driverId) ?? 0.0) + $bonus);
+        }
+
+        $ranked = $this->rankDrivers($season, $totals);
 
         foreach ($season->drivers as $driver) {
             $rank = $ranked->search($driver->id);
             $driver->update([
-                'points' => (float) ($totals[$driver->id] ?? 0),
+                'points' => $totals->get($driver->id, 0.0),
                 'position' => $rank === false ? null : $rank + 1,
                 'is_champion' => $rank === 0 && ! $season->is_current,
             ]);
         }
+    }
+
+    /**
+     * Ранжира пилотите: точки, а при равенство — FIA countback (повече победи,
+     * после повече 2-ри места и т.н., по всички състезания в сезона).
+     *
+     * @param  Collection<int, float>  $totals  driver_id => точки
+     * @return Collection<int, int> driver_id в ред на класиране
+     */
+    private function rankDrivers(F2Season $season, Collection $totals): Collection
+    {
+        $positionCounts = F2Result::query()
+            ->join('f2_race_sessions', 'f2_race_sessions.id', '=', 'f2_results.f2_race_session_id')
+            ->join('f2_races', 'f2_races.id', '=', 'f2_race_sessions.f2_race_id')
+            ->where('f2_races.f2_season_id', $season->id)
+            ->whereNotNull('f2_results.position')
+            ->selectRaw('f2_results.f2_driver_id as did, f2_results.position as pos, COUNT(*) as cnt')
+            ->groupBy('did', 'pos')
+            ->get()
+            ->groupBy('did')
+            ->map(fn (Collection $rows) => $rows->pluck('cnt', 'pos'));
+
+        return $totals->keys()
+            ->sort(function (int $a, int $b) use ($totals, $positionCounts): int {
+                $byPoints = $totals[$b] <=> $totals[$a];
+
+                if ($byPoints !== 0) {
+                    return $byPoints;
+                }
+
+                $countsA = $positionCounts->get($a) ?? collect();
+                $countsB = $positionCounts->get($b) ?? collect();
+                $worst = (int) max($countsA->keys()->max() ?? 0, $countsB->keys()->max() ?? 0);
+
+                for ($pos = 1; $pos <= $worst; $pos++) {
+                    $byCount = ((int) ($countsB->get($pos) ?? 0)) <=> ((int) ($countsA->get($pos) ?? 0));
+
+                    if ($byCount !== 0) {
+                        return $byCount;
+                    }
+                }
+
+                return 0;
+            })
+            ->values();
+    }
+
+    /**
+     * Wikipedia непоследователно вгражда 2-те точки за пол в колоната Points
+     * на главното състезание (напр. Спа 2026: „25+2+1", но Барселона 2026:
+     * само „25"). Затова сверяваме точките на полмена с базовите за позицията
+     * му (+1 за най-бърза обиколка в топ 10) — липсва ли бонусът, връщаме го
+     * тук, за да е класирането равно на официалното.
+     *
+     * @return array<int, float> driver_id => недостигащи точки
+     */
+    private function missingPoleBonuses(F2Season $season): array
+    {
+        $sessions = F2RaceSession::query()
+            ->join('f2_races', 'f2_races.id', '=', 'f2_race_sessions.f2_race_id')
+            ->where('f2_races.f2_season_id', $season->id)
+            ->where('f2_race_sessions.session_type', F2SessionType::FeatureRace->value)
+            ->whereNotNull('f2_race_sessions.pole_position_driver_id')
+            ->select('f2_race_sessions.*')
+            ->get();
+
+        $bonuses = [];
+
+        foreach ($sessions as $session) {
+            $result = F2Result::query()
+                ->where('f2_race_session_id', $session->id)
+                ->where('f2_driver_id', $session->pole_position_driver_id)
+                ->first();
+
+            $position = $result?->position;
+            $base = $position !== null ? (self::FEATURE_POINTS[$position] ?? 0.0) : 0.0;
+            $fastestLapPoint = ($result?->fastest_lap && $position !== null && $position <= 10) ? 1.0 : 0.0;
+            $embedded = (float) ($result?->points ?? 0.0) - $base - $fastestLapPoint;
+
+            if ($embedded < self::POLE_POINTS) {
+                $driverId = $session->pole_position_driver_id;
+                $bonuses[$driverId] = ($bonuses[$driverId] ?? 0.0) + self::POLE_POINTS;
+            }
+        }
+
+        return $bonuses;
     }
 
     /**
