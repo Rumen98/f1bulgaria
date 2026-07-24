@@ -9,7 +9,7 @@ defineProps({
 </script>
 
 <template>
-    <div>
+    <div class="min-w-0">
         <h2 class="mb-3 font-display text-lg font-bold text-white">Последни победители</h2>
         <EmptyState v-if="winners.length === 0">
             Няма данни.

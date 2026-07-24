@@ -30,7 +30,7 @@ const finished = computed(() => props.race.results && props.race.results.length 
         </div>
 
         <div class="grid gap-6 lg:grid-cols-3">
-            <div class="space-y-6 lg:col-span-2">
+            <div class="min-w-0 space-y-6 lg:col-span-2">
                 <section class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
                     <h2 class="mb-3 font-display text-lg font-bold text-white">Разписание <span class="text-xs font-normal text-zinc-500">(софийско време)</span></h2>
                     <ul class="divide-y divide-zinc-800 text-sm">

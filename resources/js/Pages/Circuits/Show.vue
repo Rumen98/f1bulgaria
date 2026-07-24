@@ -73,7 +73,7 @@ defineProps({
         <div class="mt-8 grid gap-8 lg:grid-cols-2">
             <RecentWinners :winners="lastWinners" />
 
-            <div v-if="lastRace">
+            <div v-if="lastRace" class="min-w-0">
                 <h2 class="mb-3 font-display text-lg font-bold text-white">Последно състезание <span class="text-sm font-normal text-zinc-500">{{ lastRace.year }}</span></h2>
                 <TableShell>
                     <table class="w-full text-sm">

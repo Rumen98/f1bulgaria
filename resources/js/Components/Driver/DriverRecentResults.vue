@@ -1,18 +1,20 @@
 <script setup>
+import TableShell from '@/Components/UI/TableShell.vue';
+
 defineProps({
     results: { type: Array, default: () => [] },
 });
 </script>
 
 <template>
-    <div>
+    <div class="min-w-0">
         <h2 class="mb-3 text-lg font-bold text-white">Последни резултати</h2>
 
         <div v-if="results.length === 0" class="rounded-xl border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
             Няма резултати.
         </div>
 
-        <div v-else class="overflow-hidden rounded-xl border border-zinc-800">
+        <TableShell v-else>
             <table class="w-full text-sm">
                 <thead class="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
@@ -34,6 +36,6 @@ defineProps({
                     </tr>
                 </tbody>
             </table>
-        </div>
+        </TableShell>
     </div>
 </template>
