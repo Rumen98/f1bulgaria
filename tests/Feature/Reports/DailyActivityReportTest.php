@@ -14,7 +14,7 @@ beforeEach(function () {
 });
 
 it('праща дневния отчет на админа с верните бройки', function () {
-    config(['app.admin_email' => 'admin@padok.bg']);
+    config(['app.admin_report_email' => 'admin@padok.bg']);
     Mail::fake();
 
     $user = User::factory()->create();
@@ -35,8 +35,18 @@ it('праща дневния отчет на админа с верните б�
     });
 });
 
-it('гърми при липсващ admin имейл', function () {
-    config(['app.admin_email' => '']);
+it('праща отчета на ADMIN_REPORT_EMAIL, без да пипа логин имейла на админа', function () {
+    // Реален случай: логин акаунтът остава padok@..., отчетът отива на padokbg@...
+    config(['app.admin_email' => 'login@padok.bg', 'app.admin_report_email' => 'reports@padok.bg']);
+    Mail::fake();
+
+    $this->artisan('report:daily-activity')->assertSuccessful();
+
+    Mail::assertSent(DailyActivityMail::class, fn (DailyActivityMail $mail) => $mail->hasTo('reports@padok.bg'));
+});
+
+it('гърми при липсващ получател', function () {
+    config(['app.admin_report_email' => '']);
 
     $this->artisan('report:daily-activity')->assertFailed();
 });

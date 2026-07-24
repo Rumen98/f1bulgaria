@@ -149,6 +149,10 @@ return [
     'admin_email' => env('ADMIN_EMAIL', ''),
     'admin_password' => env('ADMIN_PASSWORD', ''),
 
+    // Получател на дневния отчет (report:daily-activity). Отделен от логин
+    // имейла на админа — при липса пада към ADMIN_EMAIL.
+    'admin_report_email' => env('ADMIN_REPORT_EMAIL', env('ADMIN_EMAIL', '')),
+
     /*
     |--------------------------------------------------------------------------
     | Contact Email

@@ -59,10 +59,10 @@ class DailyActivityReportCommand extends Command
             return self::SUCCESS;
         }
 
-        $email = (string) config('app.admin_email', '');
+        $email = (string) config('app.admin_report_email', '');
 
         if ($email === '') {
-            $this->error('Няма ADMIN_EMAIL в .env — задай го и презареди config кеша.');
+            $this->error('Няма ADMIN_REPORT_EMAIL (нито ADMIN_EMAIL) в .env — задай го и презареди config кеша.');
 
             return self::FAILURE;
         }
