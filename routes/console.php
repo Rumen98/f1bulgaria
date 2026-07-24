@@ -38,6 +38,15 @@ Schedule::command('news:enrich --limit=50')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
+// F2 синхрон от Wikipedia (текущите сезони) — дневно, преди sitemap-а,
+// защото той включва F2 слъговете. Кешът на WikipediaClient е 24h, така
+// че по-често пускане няма да донесе по-свежи данни.
+Schedule::command('f2:sync-wikipedia')
+    ->dailyAt('06:45')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
 // Свеж sitemap всеки ден след новинарския цикъл — новите статии влизат
 // в индекса на Google без ръчна намеса.
 Schedule::command('sitemap:generate')
