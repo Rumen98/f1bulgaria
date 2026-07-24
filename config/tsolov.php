@@ -11,6 +11,9 @@ declare(strict_types=1);
 | са проверени срещу официални източници (fiaformula2.com, fiaformula3.com,
 | f4spain.org, nikolatsolov.com) на 24.07.2026. Редактирай тук при новини.
 |
+| TsolovController чете този файл ДИРЕКТНО (не през config()), така че
+| промяна + deploy влиза в сила веднага — без `php artisan config:cache`.
+|
 | Last updated: 24.07.2026 — след R08 Спа-Франкоршан (19.07).
 | ВНИМАНИЕ: R09 Унгария се кара 24–26.07.2026 — числата ще мръднат веднага
 | след уикенда. Обновявай season_stats + standings + standings_note заедно.

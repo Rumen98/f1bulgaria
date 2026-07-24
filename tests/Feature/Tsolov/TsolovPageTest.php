@@ -44,6 +44,19 @@ it('мини класирането има бележка за актуално�
             ->has('profile.standings', 5));
 });
 
+it('сервира файла директно, не (потенциално стар) config кеш', function () {
+    // Симулираме стар config кеш: подменена стойност в config регистъра.
+    // Страницата трябва да я игнорира и да чете config/tsolov.php директно —
+    // така на прод редакция + deploy влиза в сила без `config:cache`.
+    config(['tsolov.season_stats.points' => 99999]);
+
+    $fromFile = require config_path('tsolov.php');
+
+    $this->get('/tsolov')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('profile.season_stats.points', $fromFile['season_stats']['points']));
+});
+
 it('страницата рендира титлите', function () {
     $this->get('/tsolov')
         ->assertInertia(fn (Assert $page) => $page->has('profile.titles', 2));
