@@ -346,6 +346,94 @@ it('публикува сесиите в хронологичен ред, не �
         ->toBe(['f2_practice', 'f2_qualifying', 'f2_feature_race']);
 });
 
+it('праща наново, ако оригиналното съобщение е изтрито от канала', function () {
+    Http::fake(['api.telegram.org/*' => Http::sequence()
+        ->push(['ok' => true, 'result' => ['message_id' => 55]], 200)
+        // Telegram отговаря така, когато съобщението вече не съществува.
+        ->push(['ok' => false, 'error_code' => 400, 'description' => 'Bad Request: MESSAGE_ID_INVALID'], 400)
+        ->push(['ok' => true, 'result' => ['message_id' => 77]], 200),
+    ]);
+
+    $session = makeF2Session(F2SessionType::FeatureRace, version: 'Provisional');
+
+    app(F2ChannelEnqueuer::class)->enqueuePending();
+    app(ChannelPublisher::class)->publish();
+
+    $session->update(['version' => 'Final']);
+    app(F2ChannelEnqueuer::class)->enqueuePending();
+    app(ChannelPublisher::class)->publish();
+
+    // Провалената редакция не бива да убива поста завинаги — по-добре нов
+    // пост, отколкото такъв, който остава грешен.
+    $post = ChannelPost::query()->first();
+
+    expect($post->status)->toBe(ChannelPostStatus::Sent)
+        ->and($post->telegram_message_id)->toBe(77);
+});
+
+it('връща провалените публикации в опашката с --retry-failed', function () {
+    telegramOk();
+    $post = pendingPost();
+    $post->update(['status' => ChannelPostStatus::Failed->value, 'attempts' => 5]);
+
+    $this->artisan('channel:post --retry-failed')->assertSuccessful();
+
+    $post->refresh();
+
+    // Опитите се нулират — инак таванът от предишния провал спира веднага.
+    expect($post->status)->toBe(ChannelPostStatus::Sent)
+        ->and($post->attempts)->toBe(1);
+});
+
+it('не показва измислен час за сесия с необявено разписание', function () {
+    $session = makeF2Session(F2SessionType::FeatureRace, version: 'Final');
+
+    // Следващият кръг идва от API-то с 00:00 местно време — запълнител.
+    // В софийско това става 01:00, час, в който F2 не кара.
+    $nextRace = F2Race::query()->create([
+        'f2_season_id' => $session->race->f2_season_id, 'round' => 10,
+        'location_name' => 'Monza', 'slug' => '2026-monza',
+    ]);
+
+    F2RaceSession::query()->create([
+        'f2_race_id' => $nextRace->id,
+        'session_type' => F2SessionType::Practice->value,
+        'scheduled_at_utc' => now()->addDays(40)->startOfDay(),
+        'time_tbc' => true,
+        'state' => 'upcoming',
+    ]);
+
+    app(F2ChannelEnqueuer::class)->enqueuePending();
+    $body = ChannelPost::query()->first()->body;
+
+    expect($body)->toContain('Свободна тренировка, кръг 10')
+        ->and($body)->not->toContain('01:00');
+});
+
+it('избира следващата сесия по реда на уикенда при еднакво време', function () {
+    $session = makeF2Session(F2SessionType::FeatureRace, version: 'Final');
+    $nextRace = F2Race::query()->create([
+        'f2_season_id' => $session->race->f2_season_id, 'round' => 10,
+        'location_name' => 'Monza', 'slug' => '2026-monza',
+    ]);
+
+    // И двете с еднакво време — SQL подредбата ги разбърква и постът обявяваше
+    // квалификацията преди тренировката.
+    foreach ([F2SessionType::Qualifying, F2SessionType::Practice] as $type) {
+        F2RaceSession::query()->create([
+            'f2_race_id' => $nextRace->id,
+            'session_type' => $type->value,
+            'scheduled_at_utc' => now()->addDays(40)->startOfDay(),
+            'time_tbc' => true,
+            'state' => 'upcoming',
+        ]);
+    }
+
+    app(F2ChannelEnqueuer::class)->enqueuePending();
+
+    expect(ChannelPost::query()->first()->body)->toContain('Свободна тренировка, кръг 10');
+});
+
 it('праща тренировките без звук', function () {
     telegramOk();
     $session = makeF2Session(F2SessionType::Practice);
