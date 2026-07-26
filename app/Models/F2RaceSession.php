@@ -13,7 +13,7 @@ class F2RaceSession extends Model
 {
     protected $fillable = [
         'f2_race_id', 'session_type', 'date', 'scheduled_at_utc', 'ends_at_utc',
-        'state', 'version', 'laps',
+        'time_tbc', 'state', 'version', 'laps',
         'pole_position_driver_id', 'pole_position_time',
         'fastest_lap_driver_id', 'fastest_lap_time',
     ];
@@ -25,6 +25,7 @@ class F2RaceSession extends Model
             'date' => 'date',
             'scheduled_at_utc' => 'datetime',
             'ends_at_utc' => 'datetime',
+            'time_tbc' => 'boolean',
             'laps' => 'integer',
         ];
     }

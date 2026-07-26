@@ -172,6 +172,7 @@ class F2ApiSync
                     'date' => $startsAt?->toDateString(),
                     'scheduled_at_utc' => $startsAt,
                     'ends_at_utc' => $endsAt,
+                    'time_tbc' => $this->isPlaceholderTime($apiSession['startTime'] ?? null),
                     'state' => $state ?: null,
                 ],
             );
@@ -493,6 +494,19 @@ class F2ApiSync
                 'points' => (float) ($row['championshipPoints'] ?? 0),
             ]);
         }
+    }
+
+    /**
+     * Часът още не е обявен.
+     *
+     * Бъдещите кръгове идват с `startTime` точно в 00:00 местно време —
+     * запълнител, не разписание. Проверено срещу API-то: и четирите сесии на
+     * Монца (кръг 10) са в 00:00, тоест дори подредбата в рамките на деня е
+     * произволна. F2 никога не кара в полунощ, така че проверката е безопасна.
+     */
+    private function isPlaceholderTime(mixed $startTime): bool
+    {
+        return is_string($startTime) && str_ends_with($startTime, 'T00:00:00');
     }
 
     private function toUtc(mixed $value, string $offset): ?Carbon
