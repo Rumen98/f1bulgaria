@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ChannelPostKind;
 use App\Enums\ChannelPostStatus;
+use App\Enums\ChannelQueueOutcome;
 use App\Enums\F2SessionType;
 use App\Models\ChannelPost;
 use App\Models\F2Driver;
@@ -178,8 +179,10 @@ it('поставя в опашката най-много веднъж за те�
     $session = makeF2Session(F2SessionType::Practice);
     $queue = app(ChannelQueue::class);
 
-    expect($queue->enqueue($session, ChannelPostKind::F2Practice, 'тест'))->toBeTrue()
-        ->and($queue->enqueue($session, ChannelPostKind::F2Practice, 'тест'))->toBeFalse()
+    expect($queue->enqueue($session, ChannelPostKind::F2Practice, 'тест'))
+        ->toBe(ChannelQueueOutcome::Created)
+        ->and($queue->enqueue($session, ChannelPostKind::F2Practice, 'тест'))
+        ->toBe(ChannelQueueOutcome::Unchanged)
         ->and(ChannelPost::query()->count())->toBe(1);
 });
 

@@ -6,6 +6,7 @@ namespace App\Services\Telegram;
 
 use App\Enums\ChannelPostKind;
 use App\Enums\ChannelPostStatus;
+use App\Enums\ChannelQueueOutcome;
 use App\Models\ChannelPost;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -20,15 +21,12 @@ use Illuminate\Support\Carbon;
  */
 class ChannelQueue
 {
-    /**
-     * @return bool true, ако редът е нов
-     */
     public function enqueue(
         Model $subject,
         ChannelPostKind $kind,
         string $body,
         ?Carbon $availableAt = null,
-    ): bool {
+    ): ChannelQueueOutcome {
         $keys = [
             'channel' => 'telegram',
             'kind' => $kind->value,
@@ -52,13 +50,13 @@ class ChannelQueue
             // 23000 = нарушен уникален индекс, тоест друг процес е изпреварил.
             // Всичко останало е истинска грешка и трябва да излезе нагоре.
             if ($e->getCode() === '23000') {
-                return false;
+                return ChannelQueueOutcome::Unchanged;
             }
 
             throw $e;
         }
 
-        return true;
+        return ChannelQueueOutcome::Created;
     }
 
     /**
@@ -68,19 +66,17 @@ class ChannelQueue
      * Вместо втори пост връщаме реда в pending, като ЗАПАЗВАМЕ
      * telegram_message_id. По него издателят разбира, че става дума за
      * редакция на място, а не за ново съобщение.
-     *
-     * @return bool false — тук никога не се създава нов ред
      */
-    private function refresh(ChannelPost $post, string $body): bool
+    private function refresh(ChannelPost $post, string $body): ChannelQueueOutcome
     {
         if ($post->body === $body) {
-            return false;
+            return ChannelQueueOutcome::Unchanged;
         }
 
         // Провалилите се публикации не се съживяват от промяна в текста —
         // причината (изгонен бот, грешен chat_id) е другаде и ще се повтори.
         if ($post->status === ChannelPostStatus::Failed) {
-            return false;
+            return ChannelQueueOutcome::Unchanged;
         }
 
         $post->update([
@@ -88,6 +84,6 @@ class ChannelQueue
             'status' => ChannelPostStatus::Pending->value,
         ]);
 
-        return false;
+        return ChannelQueueOutcome::Updated;
     }
 }

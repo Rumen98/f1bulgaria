@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Telegram;
 
+use App\Enums\ChannelQueueOutcome;
 use App\Models\F2RaceSession;
 use App\Services\Telegram\Formatters\F2SessionFormatter;
 use Illuminate\Support\Facades\Log;
@@ -12,12 +13,12 @@ use Throwable;
 /**
  * Пълни опашката с резултати от приключили F2 сесии.
  *
- * Две предпазни мерки, без които първото пускане би заляло канала:
+ * Прозорецът назад (`channel.max_backfill_hours`) пази канала при първо
+ * включване сред сезона — иначе изминалите кръгове тръгват наведнъж.
  *
- * 1. Прозорец назад (`channel.max_backfill_hours`) — при включване на канала
- *    сред сезона не искаме деветте изминали кръга да тръгнат наведнъж.
- * 2. Състезанията чакат `version = Final`. Това е по-добър сигнал от
- *    изчакване по часовник: стюардите се произнасят когато се произнесат.
+ * Публикуването следва хронологията на уикенда, не реда на вмъкване: при
+ * наваксване планировчикът може да хване състезанието преди квалификацията и
+ * каналът да обяви резултата пръв.
  */
 class F2ChannelEnqueuer
 {
@@ -27,11 +28,11 @@ class F2ChannelEnqueuer
     ) {}
 
     /**
-     * @return array{queued:int, errors:array<int, string>}
+     * @return array{queued:int, updated:int, errors:array<int, string>}
      */
     public function enqueuePending(): array
     {
-        $stats = ['queued' => 0, 'errors' => []];
+        $stats = ['queued' => 0, 'updated' => 0, 'errors' => []];
 
         $cutoff = now()->subHours((int) config('channel.max_backfill_hours', 24));
 
@@ -46,7 +47,7 @@ class F2ChannelEnqueuer
 
         foreach ($sessions as $session) {
             try {
-                $queued = $this->queue->enqueue(
+                $outcome = $this->queue->enqueue(
                     $session,
                     $session->session_type->channelPostKind(),
                     $this->formatter->format($session),
@@ -58,9 +59,11 @@ class F2ChannelEnqueuer
                     $session->ends_at_utc,
                 );
 
-                if ($queued) {
-                    $stats['queued']++;
-                }
+                match ($outcome) {
+                    ChannelQueueOutcome::Created => $stats['queued']++,
+                    ChannelQueueOutcome::Updated => $stats['updated']++,
+                    ChannelQueueOutcome::Unchanged => null,
+                };
             } catch (Throwable $e) {
                 $stats['errors'][] = "F2 сесия #{$session->id}: {$e->getMessage()}";
                 Log::warning("Канал: неуспешно поставяне на F2 сесия [{$session->id}]: {$e->getMessage()}");

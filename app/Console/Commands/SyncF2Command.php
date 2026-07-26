@@ -50,7 +50,7 @@ class SyncF2Command extends Command
         if (! $this->option('no-channel')) {
             $queued = $enqueuer->enqueuePending();
 
-            $this->line("В опашката на канала: {$queued['queued']}");
+            $this->line("В опашката на канала: {$queued['queued']} нови, {$queued['updated']} обновени");
 
             foreach ($queued['errors'] as $error) {
                 $this->warn($error);
