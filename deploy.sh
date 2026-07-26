@@ -31,6 +31,17 @@ fi
 # HOME на текущия потребител и другият пак ще гърми.
 git config --system --add safe.directory "$APP_DIR" 2>/dev/null || true
 
+# npm и composer пишат кеша си в HOME на www-data (/var/www). Ако там има
+# root-owned остатъци от предишни root билдове, `npm ci` гърми с EACCES —
+# при това СЛЕД като вече е изтрил node_modules.
+echo "→ Кеш директории на www-data"
+WWW_HOME="$(getent passwd www-data | cut -d: -f6)"
+WWW_HOME="${WWW_HOME:-/var/www}"
+for dir in "$WWW_HOME/.npm" "$WWW_HOME/.cache" "$WWW_HOME/.config"; do
+    mkdir -p "$dir"
+    chown -R www-data:www-data "$dir"
+done
+
 echo "→ Изтегляне на кода"
 $RUN git pull --ff-only
 
