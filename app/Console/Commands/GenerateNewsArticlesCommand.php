@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\TeamNewsItem;
 use App\Services\News\NewsEnricher;
 use Illuminate\Console\Command;
 
@@ -17,7 +18,11 @@ class GenerateNewsArticlesCommand extends Command
     {
         $limit = (int) $this->option('limit');
 
-        $stats = $enricher->generateExtendedArticles($limit);
+        $stats = $enricher->generateExtendedArticles($limit, function (TeamNewsItem $item, string $outcome, int $position, int $total): void {
+            $label = $outcome === 'generated' ? 'готова' : 'ГРЕШКА';
+
+            $this->line("[{$position}/{$total}] #{$item->id} {$label}: ".($item->title_bg ?? $item->title_original));
+        });
 
         $this->table(
             ['Обработени', 'Успешни', 'Провалени', 'Input tokens', 'Output tokens'],

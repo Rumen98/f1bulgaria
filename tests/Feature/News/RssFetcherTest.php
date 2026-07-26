@@ -44,8 +44,8 @@ it('парсва Atom формат', function () {
         ->and($items->first()->contentSnippet)->toContain('racecraft');
 });
 
-it('ограничава content_snippet до 500 знака', function () {
-    $long = '<p>'.str_repeat('Lorem ipsum dolor sit amet. ', 60).'</p>';
+it('ограничава content_snippet до 4000 знака', function () {
+    $long = '<p>'.str_repeat('Lorem ipsum dolor sit amet. ', 200).'</p>';
     $rss = '<?xml version="1.0"?><rss version="2.0"><channel><title>T</title><link>https://t.test</link><description>d</description>'
         .'<item><title>Long</title><link>https://t.test/long</link><description><![CDATA['.$long.']]></description><guid>g-long</guid><pubDate>Sun, 03 Nov 2024 18:30:00 +0000</pubDate></item>'
         .'</channel></rss>';
@@ -53,7 +53,9 @@ it('ограничава content_snippet до 500 знака', function () {
 
     $item = app(RssFetcher::class)->fetch(feedSource())->first();
 
-    expect(mb_strlen($item->contentSnippet))->toBeLessThanOrEqual(500);
+    expect(mb_strlen($item->contentSnippet))->toBeLessThanOrEqual(4000)
+        // Пази повече от стария 500-знаков откъс — суровина за пълните статии.
+        ->and(mb_strlen($item->contentSnippet))->toBeGreaterThan(3000);
 });
 
 it('повтаря при 500 и успява на втория опит', function () {

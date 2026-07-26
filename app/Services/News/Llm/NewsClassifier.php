@@ -29,13 +29,16 @@ class NewsClassifier
      * Генерира НАША оригинална българска статия по фактите от новината
      * (4-6 параграфа), плюс ключови факти и собствен анализ. Forced tool use.
      *
+     * @param  string|null  $sourceText  Пълният текст на оригинала (ако е наличен) —
+     *                                   дава реални факти/числа/резултати отвъд RSS откъса.
+     *
      * @throws LlmException
      */
-    public function generateFullArticle(TeamNewsItem $item): NewsArticleContent
+    public function generateFullArticle(TeamNewsItem $item, ?string $sourceText = null): NewsArticleContent
     {
         $response = $this->client->completeWithTool(
             (string) config('news.full_article_system_prompt'),
-            $this->buildArticlePrompt($item),
+            $this->buildArticlePrompt($item, $sourceText),
             self::ARTICLE_TOOL_NAME,
             $this->articleToolSchema(),
             4096,
@@ -171,16 +174,20 @@ class NewsClassifier
         ];
     }
 
-    private function buildArticlePrompt(TeamNewsItem $item): string
+    private function buildArticlePrompt(TeamNewsItem $item, ?string $sourceText = null): string
     {
         $context = $item->title_bg
             ? "Вече подготвен български контекст:\nЗаглавие: {$item->title_bg}\nРезюме: {$item->summary_bg}\n\n"
             : '';
 
+        $source = $sourceText !== null
+            ? "\n\nПълен текст на оригиналната статия — извлечи всички конкретни факти, числа, класирания и резултати (не копирай изречения):\n{$sourceText}"
+            : '';
+
         return <<<PROMPT
             {$context}Оригинална новина (английски) — ползвай я САМО за фактите, не копирай изреченията:
             Заглавие: {$item->title_original}
-            Описание: {$item->content_snippet}
+            Описание: {$item->content_snippet}{$source}
             PROMPT;
     }
 

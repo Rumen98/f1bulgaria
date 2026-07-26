@@ -6,10 +6,12 @@ use App\Enums\NewsClassification;
 use App\Enums\NewsStatus;
 use App\Models\TeamNewsItem;
 use App\Services\News\Llm\LlmException;
+use App\Services\News\Llm\NewsArticleContent;
 use App\Services\News\Llm\NewsClassificationResult;
 use App\Services\News\Llm\NewsClassifier;
 use App\Services\News\NewsEnricher;
 use App\Services\News\NewsImageResolver;
+use App\Services\News\SourceArticleFetcher;
 
 beforeEach(function () {
     // Без реална пауза между заявките в тестовете.
@@ -137,4 +139,39 @@ it('спазва --limit', function () {
     $stats = app(NewsEnricher::class)->enrichPending(2);
 
     expect($stats['processed'])->toBe(2);
+});
+
+it('подава прогрес callback за всеки обработен елемент', function () {
+    TeamNewsItem::factory()->count(2)->create(['title_bg' => null, 'classification' => null]);
+
+    test()->mock(NewsClassifier::class, fn ($m) => $m->shouldReceive('classify')->andReturn(classResult()));
+
+    $progress = [];
+    app(NewsEnricher::class)->enrichPending(50, function (TeamNewsItem $item, string $outcome, int $position, int $total) use (&$progress) {
+        $progress[] = [$position, $total, $outcome];
+    });
+
+    expect($progress)->toBe([[1, 2, 'published'], [2, 2, 'published']]);
+});
+
+it('подава пълния текст на оригинала към генератора на статии', function () {
+    TeamNewsItem::factory()->approved()->create(['full_article_bg' => null]);
+
+    test()->mock(SourceArticleFetcher::class, fn ($m) => $m->shouldReceive('fetch')
+        ->once()->andReturn('Пълен текст с резултатите от квалификацията.'));
+
+    test()->mock(NewsClassifier::class, fn ($m) => $m->shouldReceive('generateFullArticle')
+        ->once()
+        ->withArgs(fn (TeamNewsItem $item, ?string $sourceText) => $sourceText === 'Пълен текст с резултатите от квалификацията.')
+        ->andReturn(new NewsArticleContent(
+            fullArticleBg: 'Пълна статия.',
+            keyFacts: ['Факт'],
+            analysisBg: 'Анализ.',
+            tokenUsage: ['input_tokens' => 1, 'output_tokens' => 2],
+        )));
+
+    $stats = app(NewsEnricher::class)->generateExtendedArticles();
+
+    expect($stats['success'])->toBe(1)
+        ->and(TeamNewsItem::first()->full_article_bg)->toBe('Пълна статия.');
 });

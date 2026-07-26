@@ -7,6 +7,7 @@ namespace App\Services\News;
 use App\Enums\NewsStatus;
 use App\Models\TeamNewsItem;
 use App\Services\News\Llm\NewsClassifier;
+use Closure;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -23,12 +24,15 @@ class NewsEnricher
     public function __construct(
         private readonly NewsClassifier $classifier,
         private readonly NewsImageResolver $imageResolver,
+        private readonly SourceArticleFetcher $sourceFetcher,
     ) {}
 
     /**
-     * @return array{processed:int, success:int, failed:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
+     * @param  Closure(TeamNewsItem, string, int, int): void|null  $onItem  Прогрес след
+     *                                                                      всеки елемент: (елемент, изход published|duplicate|failed, пореден, общо).
+     * @return array{processed:int, success:int, failed:int, duplicates:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
      */
-    public function enrichPending(int $limit = 50): array
+    public function enrichPending(int $limit = 50, ?Closure $onItem = null): array
     {
         $items = TeamNewsItem::query()
             ->where('status', NewsStatus::Pending->value)
@@ -50,9 +54,11 @@ class NewsEnricher
         ];
 
         $sleepMs = (int) config('news.enrich_sleep_ms', 500);
+        $total = $items->count();
 
         foreach ($items as $item) {
             $stats['processed']++;
+            $outcome = 'failed';
 
             try {
                 $result = $this->classifier->classify($item);
@@ -69,6 +75,7 @@ class NewsEnricher
 
                     Log::info("News item [{$item->id}] отхвърлен като дубликат на [{$result->duplicateOfId}].");
                     $stats['duplicates']++;
+                    $outcome = 'duplicate';
                 } else {
                     $item->update([
                         'title_bg' => $result->titleBg,
@@ -88,6 +95,7 @@ class NewsEnricher
                     ]);
 
                     $stats['success']++;
+                    $outcome = 'published';
                 }
 
                 $stats['input_tokens'] += $result->tokenUsage['input_tokens'];
@@ -97,6 +105,8 @@ class NewsEnricher
                 $stats['errors'][] = "item #{$item->id}: {$e->getMessage()}";
                 Log::warning("News enrich failed for item [{$item->id}]: {$e->getMessage()}");
             }
+
+            $onItem?->__invoke($item, $outcome, $stats['processed'], $total);
 
             if ($sleepMs > 0) {
                 usleep($sleepMs * 1000);
@@ -111,9 +121,11 @@ class NewsEnricher
      * одобрените новини, които още нямат такава. Грешка в един елемент се логва
      * и не спира batch-а.
      *
+     * @param  Closure(TeamNewsItem, string, int, int): void|null  $onItem  Прогрес след
+     *                                                                      всеки елемент: (елемент, изход generated|failed, пореден, общо).
      * @return array{processed:int, success:int, failed:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
      */
-    public function generateExtendedArticles(int $limit = 10): array
+    public function generateExtendedArticles(int $limit = 10, ?Closure $onItem = null): array
     {
         $items = TeamNewsItem::query()
             ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
@@ -133,12 +145,16 @@ class NewsEnricher
         ];
 
         $sleepMs = (int) config('news.enrich_sleep_ms', 500);
+        $total = $items->count();
 
         foreach ($items as $item) {
             $stats['processed']++;
+            $outcome = 'failed';
 
             try {
-                $content = $this->classifier->generateFullArticle($item);
+                // Пълният текст на оригинала дава реалните факти/резултати;
+                // при блокиран източник генерираме само от RSS откъса.
+                $content = $this->classifier->generateFullArticle($item, $this->sourceFetcher->fetch($item));
 
                 $item->update([
                     'full_article_bg' => $content->fullArticleBg,
@@ -147,6 +163,7 @@ class NewsEnricher
                 ]);
 
                 $stats['success']++;
+                $outcome = 'generated';
                 $stats['input_tokens'] += $content->tokenUsage['input_tokens'];
                 $stats['output_tokens'] += $content->tokenUsage['output_tokens'];
             } catch (Throwable $e) {
@@ -154,6 +171,8 @@ class NewsEnricher
                 $stats['errors'][] = "item #{$item->id}: {$e->getMessage()}";
                 Log::warning("News article generation failed for item [{$item->id}]: {$e->getMessage()}");
             }
+
+            $onItem?->__invoke($item, $outcome, $stats['processed'], $total);
 
             if ($sleepMs > 0) {
                 usleep($sleepMs * 1000);

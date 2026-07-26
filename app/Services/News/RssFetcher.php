@@ -30,7 +30,11 @@ class RssFetcher
 
     private const MAX_ATTEMPTS = 3;
 
-    private const SNIPPET_LENGTH = 500;
+    /**
+     * Feed-ове като RaceFans носят цялата статия в content:encoded — пазим я
+     * (text колона), за да има LLM-ът реални факти, а не 500-знаков откъс.
+     */
+    private const SNIPPET_LENGTH = 4000;
 
     /**
      * Идентифицируем UA — default-ният Guzzle UA често яде 403 от bot protection.

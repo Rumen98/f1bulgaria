@@ -7,6 +7,7 @@ namespace App\Services\News\Llm;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -129,8 +130,12 @@ class AnthropicClient
                 ->retry(self::MAX_ATTEMPTS, $this->backoff(...), $this->shouldRetry(...), throw: true)
                 ->post('/messages', [...$payload, 'model' => $config['model']]);
         } catch (RequestException $e) {
-            // Само статусът — без ключа/хедърите.
-            throw new LlmException("Anthropic API върна {$e->response->status()}.", previous: $e);
+            // Статус + съобщението на API-то (напр. "credit balance is too
+            // low") — без ключа/хедърите. Иначе 400 е неразгадаем от лога.
+            $apiMessage = (string) data_get($e->response->json(), 'error.message', '');
+            $detail = $apiMessage !== '' ? ' '.Str::limit($apiMessage, 200) : '';
+
+            throw new LlmException("Anthropic API върна {$e->response->status()}.{$detail}", previous: $e);
         } catch (ConnectionException) {
             throw new LlmException('Мрежова грешка при връзка с Anthropic API.');
         }
