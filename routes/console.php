@@ -52,12 +52,18 @@ Schedule::command('news:publish-pending')
     ->withoutOverlapping(10)
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
-// F2 синхрон от Wikipedia (текущите сезони) — дневно, преди sitemap-а,
-// защото той включва F2 слъговете. Кешът на WikipediaClient е 24h, така
-// че по-често пускане няма да донесе по-свежи данни.
-Schedule::command('f2:sync-wikipedia')
-    ->dailyAt('06:45')
-    ->withoutOverlapping()
+// F2 синхрон от официалния API. На 15 мин, защото резултатите излизат минути
+// след сесията, а каналът публикува от базата.
+//
+// Честотата не е скъпа: F2ApiSync дърпа класация само за сесия без резултати
+// или за състезание, което още не е `Final`. В спокоен ден това са две
+// заявки — календарът и класирането.
+//
+// f2:sync-wikipedia вече НЕ е в разписанието — API-то е основният източник,
+// а Wikipedia остава ръчна, само за сезоните преди 2026 (`--historical`).
+Schedule::command('f2:sync')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping(14)
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
@@ -72,6 +78,18 @@ Schedule::command('sitemap:generate')
 Schedule::command('news:generate-articles --limit=10')
     ->hourlyAt(25)
     ->withoutOverlapping(50)
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+// Изпразва изходящата опашка към Telegram канала. На 5 мин: синхроните само
+// пълнят опашката, а тя трябва да тръгва бързо след сесия.
+//
+// withoutOverlapping е задължително — две едновременни пускания биха взели
+// един и същи ред и биха го публикували два пъти, преди първото да е
+// маркирало `sent_at`.
+Schedule::command('channel:post')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 

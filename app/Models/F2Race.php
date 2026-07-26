@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class F2Race extends Model
 {
     protected $fillable = [
-        'f2_season_id', 'circuit_jolpica_id', 'location_name', 'round',
-        'race_datetime_utc', 'wikipedia_url', 'slug',
+        'f2_season_id', 'meeting_key', 'circuit_jolpica_id', 'location_name',
+        'country_name', 'round', 'race_datetime_utc', 'wikipedia_url', 'slug',
     ];
 
     protected function casts(): array

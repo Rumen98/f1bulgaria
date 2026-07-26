@@ -1,0 +1,434 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\F2\Api;
+
+use App\Enums\F2SessionType;
+use App\Models\F2Driver;
+use App\Models\F2Race;
+use App\Models\F2RaceSession;
+use App\Models\F2Result;
+use App\Models\F2Season;
+use App\Models\F2Team;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Throwable;
+
+/**
+ * Синхрон на F2 сезон от официалния резултатен API.
+ *
+ * Заменя F2WikipediaSync за текущия сезон: и четирите сесии вместо две,
+ * минути вместо ден, и готови класирания вместо да ги смятаме сами.
+ * Wikipedia остава за сезоните преди 2026 г., които API-то не покрива.
+ *
+ * Идемпотентен. Грешка в един кръг не спира останалите — записва се в
+ * `errors` и обработката продължава.
+ */
+class F2ApiSync
+{
+    /** @var array{rounds:int, sessions:int, results:int, errors:array<int, string>} */
+    private array $stats = ['rounds' => 0, 'sessions' => 0, 'results' => 0, 'errors' => []];
+
+    public function __construct(
+        private readonly F2ApiClient $client,
+    ) {}
+
+    /**
+     * @param  callable|null  $onRound  fn (int $round, string $name, int $sessions): void
+     * @return array{season:int, rounds:int, sessions:int, results:int, errors:array<int, string>}
+     *
+     * @throws F2ApiException
+     */
+    public function syncSeason(int $year, ?callable $onRound = null): array
+    {
+        $this->stats = ['rounds' => 0, 'sessions' => 0, 'results' => 0, 'errors' => []];
+
+        $meetings = $this->client->meetings($year);
+
+        if ($meetings === []) {
+            $this->stats['errors'][] = "API-то няма данни за сезон {$year} (покритието започва от 2026).";
+
+            return ['season' => $year, ...$this->stats];
+        }
+
+        $season = $this->season($year);
+
+        foreach ($meetings as $meeting) {
+            // Тестовите събития нямат кръг и биха разместили номерацията.
+            if ((bool) ($meeting['isTestEvent'] ?? false)) {
+                continue;
+            }
+
+            $round = $this->roundNumber($meeting);
+
+            if ($round === null) {
+                continue;
+            }
+
+            try {
+                $sessions = $this->syncRound($season, $meeting, $round);
+                $this->stats['rounds']++;
+
+                if ($onRound !== null) {
+                    $onRound($round, (string) ($meeting['meetingName'] ?? ''), $sessions);
+                }
+            } catch (Throwable $e) {
+                $this->stats['errors'][] = "кръг {$round}: {$e->getMessage()}";
+                Log::warning("F2 API: провален кръг [{$round}] от сезон {$year}: {$e->getMessage()}");
+            }
+        }
+
+        $this->syncStandings($season);
+
+        return ['season' => $year, ...$this->stats];
+    }
+
+    private function season(int $year): F2Season
+    {
+        $isCurrent = $year >= (int) (F2Season::query()->max('year') ?? $year);
+
+        $season = F2Season::query()->updateOrCreate(['year' => $year], ['is_current' => $isCurrent]);
+
+        if ($isCurrent) {
+            F2Season::query()->where('id', '!=', $season->id)->update(['is_current' => false]);
+        }
+
+        return $season;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meeting
+     */
+    private function syncRound(F2Season $season, array $meeting, int $round): int
+    {
+        $meetingKey = (string) ($meeting['meetingKey'] ?? '');
+        $location = (string) ($meeting['meetingLocation'] ?? $meeting['meetingName'] ?? '');
+        $offset = (string) ($meeting['gmtOffset'] ?? '+00:00');
+
+        $apiSessions = (array) ($meeting['meetingSessions'] ?? []);
+
+        // Датата на кръга = началото на главното състезание, не meetingStartDate:
+        // календарът на сайта подрежда по нея и трябва да сочи същия момент,
+        // който показваме като „състезание".
+        $featureStart = null;
+
+        foreach ($apiSessions as $apiSession) {
+            if (F2SessionType::fromApiCode((string) ($apiSession['session'] ?? '')) === F2SessionType::FeatureRace) {
+                $featureStart = $this->toUtc($apiSession['startTime'] ?? null, (string) ($apiSession['gmtOffset'] ?? $offset));
+            }
+        }
+
+        $race = F2Race::query()->updateOrCreate(
+            ['f2_season_id' => $season->id, 'round' => $round],
+            [
+                'meeting_key' => $meetingKey,
+                'location_name' => $location,
+                'country_name' => (string) ($meeting['meetingCountryName'] ?? '') ?: null,
+                'race_datetime_utc' => $featureStart,
+                'slug' => Str::slug("{$season->year}-{$location}"),
+            ],
+        );
+
+        $synced = 0;
+
+        foreach ($apiSessions as $apiSession) {
+            $type = F2SessionType::fromApiCode((string) ($apiSession['session'] ?? ''));
+
+            if ($type === null) {
+                continue;
+            }
+
+            $startsAt = $this->toUtc($apiSession['startTime'] ?? null, (string) ($apiSession['gmtOffset'] ?? $offset));
+            $endsAt = $this->toUtc($apiSession['endTime'] ?? null, (string) ($apiSession['gmtOffset'] ?? $offset));
+            $state = (string) ($apiSession['state'] ?? '');
+
+            $sessionModel = F2RaceSession::query()->updateOrCreate(
+                ['f2_race_id' => $race->id, 'session_type' => $type->value],
+                [
+                    'date' => $startsAt?->toDateString(),
+                    'scheduled_at_utc' => $startsAt,
+                    'ends_at_utc' => $endsAt,
+                    'state' => $state ?: null,
+                ],
+            );
+
+            $this->stats['sessions']++;
+            $synced++;
+
+            if ($state === 'completed' && $this->needsResults($sessionModel, $type)) {
+                $this->syncResults($season, $race, $sessionModel, $type);
+            }
+        }
+
+        return $synced;
+    }
+
+    /**
+     * Пази ни от това да дърпаме класациите на целия сезон при всяко пускане.
+     *
+     * Състезанията се презареждат, докато класацията стане `Final` — стюардите
+     * дописват наказания след финала. Тренировките и квалификациите нямат
+     * `version` и веднъж свалени, повече не се пипат.
+     */
+    private function needsResults(F2RaceSession $sessionModel, F2SessionType $type): bool
+    {
+        if (! $sessionModel->results()->exists()) {
+            return true;
+        }
+
+        return $type->isRace() && $sessionModel->version !== 'Final';
+    }
+
+    private function syncResults(F2Season $season, F2Race $race, F2RaceSession $sessionModel, F2SessionType $type): void
+    {
+        $meetingKey = (int) $race->meeting_key;
+        $rows = match ($type) {
+            F2SessionType::Practice => $this->client->practice($season->year, $meetingKey),
+            F2SessionType::Qualifying => $this->client->qualifying($season->year, $meetingKey),
+            F2SessionType::QualifyingGroupA => $this->client->qualifying($season->year, $meetingKey, 1),
+            F2SessionType::QualifyingGroupB => $this->client->qualifying($season->year, $meetingKey, 2),
+            F2SessionType::SprintRace => $this->client->race($season->year, $meetingKey, 1),
+            F2SessionType::FeatureRace => $this->client->race($season->year, $meetingKey, 2),
+        };
+
+        if ($rows === []) {
+            return;
+        }
+
+        $poleDriverId = null;
+        $poleTime = null;
+
+        foreach ($rows as $row) {
+            $driver = $this->resolveDriver($season, $row);
+            $position = $this->position($row);
+
+            F2Result::query()->updateOrCreate(
+                ['f2_race_session_id' => $sessionModel->id, 'f2_driver_id' => $driver->id],
+                [
+                    'position' => $position,
+                    'laps_completed' => isset($row['lapsCompleted']) ? (int) $row['lapsCompleted'] : null,
+                    'time_or_gap' => $this->timeOrGap($row, $type),
+                    'points' => (float) ($row['racePoints'] ?? 0),
+                    'status' => $this->status($row),
+                    // Най-бърза обиколка НЕ се извежда от racePoints: API-то не
+                    // различава общата най-бърза от точкуващата, а те се
+                    // разминават (виж финалната класация на FIA). По-добре
+                    // липсваща стойност, отколкото измислена.
+                ],
+            );
+
+            $this->stats['results']++;
+
+            if ($position === 1) {
+                $poleDriverId = $driver->id;
+                $poleTime = (string) ($row['classifiedTime'] ?? '') ?: null;
+            }
+        }
+
+        $updates = ['version' => (string) ($rows[0]['version'] ?? '') ?: null];
+
+        // Пол позицията живее върху квалификацията и се пренася върху главното
+        // състезание, защото сайтът я чете оттам.
+        if ($poleDriverId !== null && in_array($type, [
+            F2SessionType::Qualifying,
+            F2SessionType::QualifyingGroupA,
+        ], strict: true)) {
+            $updates['pole_position_driver_id'] = $poleDriverId;
+            $updates['pole_position_time'] = $poleTime;
+
+            F2RaceSession::query()
+                ->where('f2_race_id', $race->id)
+                ->where('session_type', F2SessionType::FeatureRace->value)
+                ->update([
+                    'pole_position_driver_id' => $poleDriverId,
+                    'pole_position_time' => $poleTime,
+                ]);
+        }
+
+        $sessionModel->update($updates);
+    }
+
+    /**
+     * DNF пристига като `positionNumber: "666"` / `displayPosition: "NC"` —
+     * часовиков сентинел, който не бива да изтича в базата.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function position(array $row): ?int
+    {
+        $raw = (string) ($row['positionNumber'] ?? '');
+
+        if ($raw === '' || $raw === '666') {
+            return null;
+        }
+
+        $display = strtoupper((string) ($row['displayPosition'] ?? ''));
+
+        if (in_array($display, ['NC', 'DQ', 'DSQ'], strict: true)) {
+            return null;
+        }
+
+        return (int) $raw;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function status(array $row): ?string
+    {
+        $code = (string) ($row['completionStatusCode'] ?? '');
+
+        if ($code === '' || $code === 'OK') {
+            return null;
+        }
+
+        return $code;
+    }
+
+    /**
+     * Трите вида сесии носят времето в различни полета: тренировката и
+     * квалификацията дават абсолютна обиколка, състезанието — време на
+     * победителя и изоставане за останалите.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function timeOrGap(array $row, F2SessionType $type): ?string
+    {
+        if (! $type->isRace()) {
+            return (string) ($row['classifiedTime'] ?? '') ?: null;
+        }
+
+        $display = (string) ($row['displayTime'] ?? $row['raceTime'] ?? '');
+
+        return $display !== '' ? $display : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function resolveDriver(F2Season $season, array $row): F2Driver
+    {
+        $reference = (string) ($row['driverReference'] ?? '');
+        $first = (string) ($row['driverFirstName'] ?? '');
+        $last = (string) ($row['driverLastName'] ?? '');
+        $slug = Str::slug(trim("{$first} {$last}")) ?: Str::slug($reference);
+
+        $team = $this->resolveTeam($season, $row);
+
+        // Съпоставяме по driverReference — стабилен ключ. Slug-ът е резервен,
+        // за да хванем пилоти, дошли по-рано от Wikipedia без reference.
+        $driver = F2Driver::query()
+            ->where('f2_season_id', $season->id)
+            ->where(function ($query) use ($reference, $slug): void {
+                $query->when($reference !== '', fn ($q) => $q->where('driver_reference', $reference))
+                    ->orWhere('slug', $slug);
+            })
+            ->first();
+
+        $attributes = [
+            'f2_team_id' => $team?->id,
+            'first_name' => $first,
+            'last_name' => $last,
+            'slug' => $slug,
+            'driver_reference' => $reference ?: null,
+            'tla' => (string) ($row['driverTLA'] ?? '') ?: null,
+            'car_number' => isset($row['racingNumber']) ? (int) $row['racingNumber'] : null,
+        ];
+
+        if ($driver === null) {
+            return F2Driver::query()->create(['f2_season_id' => $season->id, ...$attributes]);
+        }
+
+        $driver->update($attributes);
+
+        return $driver;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function resolveTeam(F2Season $season, array $row): ?F2Team
+    {
+        $name = (string) ($row['teamName'] ?? '');
+
+        if ($name === '') {
+            return null;
+        }
+
+        return F2Team::query()->updateOrCreate(
+            ['f2_season_id' => $season->id, 'slug' => Str::slug($name)],
+            [
+                'name' => $name,
+                'team_key' => (string) ($row['teamKey'] ?? '') ?: null,
+                'color_hex' => $this->colour($row),
+            ],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function colour(array $row): ?string
+    {
+        $colour = (string) ($row['teamColourCode'] ?? '');
+
+        if ($colour === '') {
+            return null;
+        }
+
+        return Str::startsWith($colour, '#') ? $colour : '#'.$colour;
+    }
+
+    /**
+     * Класиранията идват готови от API-то, с включени бонуси за пол позиция —
+     * затова тук няма смятане. Точките в `race` endpoint-а НЕ стават за целта:
+     * те изключват бонуса за пол.
+     */
+    private function syncStandings(F2Season $season): void
+    {
+        try {
+            $rows = $this->client->driverStandings($season->year);
+        } catch (Throwable $e) {
+            $this->stats['errors'][] = "класиране: {$e->getMessage()}";
+
+            return;
+        }
+
+        foreach ($rows as $index => $row) {
+            $reference = (string) ($row['driverReference'] ?? '');
+            $slug = Str::slug(trim(((string) ($row['driverFirstName'] ?? '')).' '.((string) ($row['driverLastName'] ?? ''))));
+
+            $query = F2Driver::query()->where('f2_season_id', $season->id);
+
+            if ($reference !== '') {
+                $query->where('driver_reference', $reference);
+            } else {
+                $query->where('slug', $slug);
+            }
+
+            $query->update([
+                // Позицията в отговора невинаги е попълнена; редът е
+                // авторитетен и вече отчита изравняванията по правилата на FIA.
+                'position' => isset($row['positionNumber']) && $row['positionNumber'] !== null
+                    ? (int) $row['positionNumber']
+                    : $index + 1,
+                'points' => (float) ($row['championshipPoints'] ?? 0),
+            ]);
+        }
+    }
+
+    private function toUtc(mixed $value, string $offset): ?Carbon
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value.$offset)->utc();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+}

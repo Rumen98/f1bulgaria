@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class F2Team extends Model
 {
-    protected $fillable = ['f2_season_id', 'name', 'slug', 'color_hex'];
+    protected $fillable = ['f2_season_id', 'team_key', 'name', 'slug', 'color_hex'];
 
     /** @return BelongsTo<F2Season, $this> */
     public function season(): BelongsTo

@@ -12,7 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class F2RaceSession extends Model
 {
     protected $fillable = [
-        'f2_race_id', 'session_type', 'date', 'laps',
+        'f2_race_id', 'session_type', 'date', 'scheduled_at_utc', 'ends_at_utc',
+        'state', 'version', 'laps',
         'pole_position_driver_id', 'pole_position_time',
         'fastest_lap_driver_id', 'fastest_lap_time',
     ];
@@ -22,8 +23,18 @@ class F2RaceSession extends Model
         return [
             'session_type' => F2SessionType::class,
             'date' => 'date',
+            'scheduled_at_utc' => 'datetime',
+            'ends_at_utc' => 'datetime',
             'laps' => 'integer',
         ];
+    }
+
+    /**
+     * Сесията е приключила според API-то — резултатите ѝ са налични.
+     */
+    public function isCompleted(): bool
+    {
+        return $this->state === 'completed';
     }
 
     /** @return BelongsTo<F2Race, $this> */

@@ -68,6 +68,29 @@ return [
         'password' => env('OPENF1_PASSWORD'),
     ],
 
+    /*
+    | Формула 2 — официалните резултати.
+    |
+    | Хостът е api.formula1.com с path scope /f2/ — това е backend-ът на
+    | fiaformula2.com, не документирано публично API. Няма версия по договор:
+    | имена на endpoint-и и полета могат да се сменят без предупреждение.
+    |
+    | Ключът НЕ се пише тук. Той е build-time константа в бандъла на сайта им
+    | и се сменя при всеки техен редеплой — зашит в конфигурацията означава
+    | тихо спиране някой ден. Вади се по време на работа от страницата
+    | (виж F2ApiClient) и се кешира.
+    |
+    | Покритие: само от 2026 г. По-старите сезони връщат празни списъци —
+    | за тях остава `f2:sync-wikipedia --historical`.
+    */
+    'f2' => [
+        'base_url' => env('F2_API_BASE_URL', 'https://api.formula1.com/v2/core-fom-results/f2'),
+        'key_page_url' => env('F2_API_KEY_PAGE_URL', 'https://www.fiaformula2.com/en/racing'),
+        'user_agent' => env('F2_API_USER_AGENT', 'PadokBot/1.0 (+https://padok.bg)'),
+        'timeout' => (int) env('F2_API_TIMEOUT', 20),
+        'key_cache_hours' => (int) env('F2_API_KEY_CACHE_HOURS', 24),
+    ],
+
     'wikipedia' => [
         'base_url' => env('WIKIPEDIA_BASE_URL', 'https://en.wikipedia.org/w/api.php'),
         'user_agent' => env('WIKIPEDIA_USER_AGENT', 'Padok/1.0 (https://padok.bg)'),

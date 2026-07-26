@@ -10,19 +10,38 @@ use App\Services\F2\F2WikipediaSync;
 use Illuminate\Console\Command;
 
 /**
- * Синхронизира F2 данни от Wikipedia. По подразбиране от 2025 нагоре.
+ * Синхрон на F2 от Wikipedia — САМО за история.
+ *
+ * Основният източник е официалният API (`f2:sync`): и четирите сесии, точни
+ * времена и готови класирания, минути след сесията. Wikipedia остава само
+ * защото API-то не покрива сезоните преди 2026 г.
+ *
+ * Затова командата е извън разписанието и иска изричен `--historical`:
+ * пусната върху текущия сезон, тя ще презапише пресните данни от API-то с
+ * по-бедни и по-стари.
  */
 class SyncF2WikipediaCommand extends Command
 {
+    /** Първата година, покрита от официалния API. */
+    private const API_COVERAGE_FROM = 2026;
+
     protected $signature = 'f2:sync-wikipedia
-        {--year= : Конкретна година (напр. 2026) или "all"}
+        {--historical : Задължителен — потвърждава, че това е ръчен синхрон на стар сезон}
+        {--year= : Конкретна година (напр. 2024) или "all"}
         {--since=2025 : Начална година при --year=all}
         {--rebuild : Изтрива F2 race данните преди синхрон (внимателно)}';
 
-    protected $description = 'Синхронизира F2 кръгове и резултати от Wikipedia.';
+    protected $description = 'Синхронизира стари F2 сезони от Wikipedia (само преди 2026 — текущите идват от f2:sync).';
 
     public function handle(F2WikipediaSync $sync): int
     {
+        if (! $this->option('historical')) {
+            $this->error('Основният източник за F2 вече е официалният API — пусни `f2:sync`.');
+            $this->line('Ако наистина искаш да презаредиш стар сезон от Wikipedia, добави --historical.');
+
+            return self::FAILURE;
+        }
+
         $current = (int) now()->year;
         $yearOpt = $this->option('year');
 
@@ -31,6 +50,17 @@ class SyncF2WikipediaCommand extends Command
             $yearOpt !== null => [(int) $yearOpt],
             default => range((int) $this->option('since'), $current),
         };
+
+        $covered = array_filter($years, fn (int $year): bool => $year >= self::API_COVERAGE_FROM);
+
+        if ($covered !== []) {
+            $this->warn('ВНИМАНИЕ: '.implode(', ', $covered).' се покрива(т) от официалния API.');
+            $this->warn('Синхронът от Wikipedia ще презапише по-пресните данни с по-бедни.');
+
+            if (! $this->confirm('Да продължа ли въпреки това?', false)) {
+                return self::SUCCESS;
+            }
+        }
 
         if ($this->option('rebuild')) {
             // Само за синхронизираните години — да не трием чужди сезони.

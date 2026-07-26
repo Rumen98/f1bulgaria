@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class F2Driver extends Model
 {
     protected $fillable = [
-        'f2_season_id', 'f2_team_id', 'first_name', 'last_name', 'slug', 'car_number',
+        'f2_season_id', 'f2_team_id', 'first_name', 'last_name', 'slug',
+        'driver_reference', 'tla', 'car_number',
         'country_code', 'position', 'points', 'is_champion',
     ];
 
