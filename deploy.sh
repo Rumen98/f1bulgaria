@@ -72,6 +72,11 @@ echo "→ Рестарт на SSR демона"
 $ARTISAN inertia:stop-ssr || true
 supervisorctl restart padok-ssr
 
+echo "→ Рестарт на queue worker-а"
+# Worker-ът също държи кода в паметта от старта си — без това новите job-ове
+# се обработват от стария код.
+$ARTISAN queue:restart || true
+
 echo "→ Проверка"
 sleep 3
 $ARTISAN inertia:check-ssr
