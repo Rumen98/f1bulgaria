@@ -27,7 +27,7 @@ const scrollTo = (id) => {
 
     <PublicLayout>
         <article class="mx-auto max-w-3xl">
-            <Link :href="route('history')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Историята на F1</Link>
+            <Link :href="route('history')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Историята на Формула 1</Link>
 
             <!-- Hero -->
             <header class="relative mt-3 overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-br from-red-950/40 via-zinc-950 to-black p-8 sm:p-12">

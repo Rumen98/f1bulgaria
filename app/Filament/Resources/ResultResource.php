@@ -25,7 +25,7 @@ class ResultResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-trophy';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'F1 данни';
+    protected static string|\UnitEnum|null $navigationGroup = 'Данни от Формула 1';
 
     protected static ?string $navigationLabel = 'Резултати';
 

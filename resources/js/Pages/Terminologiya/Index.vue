@@ -27,7 +27,7 @@ const filtered = computed(() => {
 
     <PublicLayout>
         <h1 class="mb-2 font-display text-2xl font-black sm:text-3xl">Речник на Формула 1</h1>
-        <p class="mb-6 text-zinc-400">Термините от света на F1 — обяснени на български.</p>
+        <p class="mb-6 text-zinc-400">Термините от света на Формула 1 — обяснени на български.</p>
 
         <input
             v-model="search"

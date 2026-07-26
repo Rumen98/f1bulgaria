@@ -11,7 +11,7 @@ defineProps({
 <template>
     <section v-if="events.length" class="mt-10">
         <div class="mb-4 flex items-baseline gap-3">
-            <h2 class="font-display text-xl font-black sm:text-2xl">На този ден във F1</h2>
+            <h2 class="font-display text-xl font-black sm:text-2xl">На този ден във Формула 1</h2>
             <span class="text-sm text-zinc-500">състезания, проведени на днешната дата</span>
         </div>
 

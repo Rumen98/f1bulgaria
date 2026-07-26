@@ -74,7 +74,7 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
 
         <HeroSection :hero="hero" />
 
-        <!-- На този ден във F1 (V2) -->
+        <!-- На този ден във Формула 1 (V2) -->
         <ThisDayWidget v-if="features.this_day" :events="thisDay" />
 
         <!-- Топ новини -->

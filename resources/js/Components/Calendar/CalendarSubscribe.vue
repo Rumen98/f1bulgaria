@@ -57,7 +57,7 @@ onBeforeUnmount(() => {
             v-if="open"
             class="absolute right-0 z-20 mt-2 w-72 rounded-xl border border-zinc-800 bg-zinc-950 p-4 shadow-2xl"
         >
-            <p class="mb-3 text-xs text-zinc-400">Добави F1 календара в твоето приложение — сесиите се обновяват автоматично.</p>
+            <p class="mb-3 text-xs text-zinc-400">Добави календара на Падок в твоето приложение — сесиите се обновяват автоматично.</p>
 
             <div class="flex items-center gap-2">
                 <input

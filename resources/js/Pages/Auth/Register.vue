@@ -22,7 +22,7 @@ const submit = () => {
 </script>
 
 <template>
-    <AuthLayout title="Стани част от общността" subtitle="Прави прогнози, събирай точки и значки, следи историята на F1.">
+    <AuthLayout title="Стани част от общността" subtitle="Прави прогнози, събирай точки и значки, следи историята на Формула 1.">
 
         <form @submit.prevent="submit">
             <div>
