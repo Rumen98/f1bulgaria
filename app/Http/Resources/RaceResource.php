@@ -34,6 +34,12 @@ class RaceResource extends JsonResource
             'qualifying_at_utc' => $this->qualifying_datetime_utc?->toIso8601String(),
             'qualifying_at_sofia' => $this->sofia($this->qualifying_datetime_utc),
             'sprint_at_sofia' => $this->sofia($this->sprint_datetime_utc),
+            // ПРОВЕДЕНО (по часовник) и ИМА РЕЗУЛТАТИ са различни неща и не
+            // бива да се бъркат: източникът на резултати закъснява с часове,
+            // а понякога с ден. Докато календарът делеше по `finished`,
+            // изкараното състезание оставаше „предстоящо" и получаваше брояч
+            // към час в миналото.
+            'held' => $this->race_datetime_utc?->isPast() ?? false,
             'finished' => $this->whenLoaded('results', fn () => $this->results->isNotEmpty()),
             'sessions' => RaceSessionResource::collection($this->whenLoaded('sessions')),
             'results' => ResultResource::collection($this->whenLoaded('results')),

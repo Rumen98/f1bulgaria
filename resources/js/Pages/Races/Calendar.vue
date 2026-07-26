@@ -11,17 +11,19 @@ const props = defineProps({
     races: Array,
 });
 
+// Делим по ЧАСОВНИК (`held`), не по наличие на резултати: източникът им
+// закъснява с часове, а изкараното състезание не бива да стои като предстоящо.
 const upcomingRaces = computed(() =>
-    props.races.filter((race) => !race.finished).sort((a, b) => a.round - b.round),
+    props.races.filter((race) => !race.held).sort((a, b) => a.round - b.round),
 );
 
 // Низходящо по кръг — най-скорошното завършено състезание е най-интересно.
 const finishedRaces = computed(() =>
-    props.races.filter((race) => race.finished).sort((a, b) => b.round - a.round),
+    props.races.filter((race) => race.held).sort((a, b) => b.round - a.round),
 );
 
 // Дефолт „Предстоящи"; след края на сезона няма какво да предстои → „Приключени".
-const tab = ref(props.races.some((race) => !race.finished) ? 'upcoming' : 'finished');
+const tab = ref(props.races.some((race) => !race.held) ? 'upcoming' : 'finished');
 
 const visibleRaces = computed(() => (tab.value === 'upcoming' ? upcomingRaces.value : finishedRaces.value));
 
@@ -127,6 +129,9 @@ const countdownText = computed(() => {
                             {{ countdownText }}
                         </div>
                         <div v-else-if="race.finished" class="text-xs font-medium text-emerald-400">Завършено</div>
+                        <!-- Изкарано, но източникът още не е публикувал класацията.
+                             Без този надпис изглежда като че данните липсват. -->
+                        <div v-else-if="race.held" class="text-xs text-amber-400">Чакаме резултатите</div>
                         <div v-else class="text-xs text-zinc-500">Предстои</div>
                     </div>
                 </Link>
