@@ -15,6 +15,27 @@ enum SessionType: string
     case Race = 'race';
 
     /**
+     * Ред на показване в рамките на уикенда.
+     *
+     * Едната подредба покрива и двата формата: при обикновен уикенд дава
+     * FP1→FP2→FP3→Квалификация→Състезание, а при спринтов —
+     * FP1→Спринт квалификация→Спринт→Квалификация→Състезание, защото
+     * несъществуващите сесии просто липсват.
+     */
+    public function order(): int
+    {
+        return match ($this) {
+            self::FP1 => 1,
+            self::FP2 => 2,
+            self::FP3 => 3,
+            self::SprintQuali => 4,
+            self::Sprint => 5,
+            self::Qualifying => 6,
+            self::Race => 7,
+        };
+    }
+
+    /**
      * Човешко име на български за показване в UI.
      */
     public function label(): string

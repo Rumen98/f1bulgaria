@@ -3,7 +3,7 @@ import PredictionForm from '@/Components/PredictionForm.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     race: Object,
@@ -11,10 +11,22 @@ const props = defineProps({
     lockDeadline: String,
     userPrediction: Object,
     drivers: Array,
+    // Класациите от всички сесии на уикенда, в реда на провеждането им.
+    classifications: { type: Array, default: () => [] },
 });
 
 const user = computed(() => usePage().props.auth?.user);
-const finished = computed(() => props.race.results && props.race.results.length > 0);
+
+// По подразбиране последната проведена сесия — състезанието, ако го има,
+// иначе квалификацията. Тя е причината човек да отвори страницата.
+const selected = ref(props.classifications.at(-1)?.type ?? null);
+
+const active = computed(
+    () => props.classifications.find((c) => c.type === selected.value) ?? null,
+);
+
+const showsPoints = computed(() => ['race', 'sprint'].includes(active.value?.type));
+const showsTime = computed(() => active.value?.rows.some((r) => r.time));
 </script>
 
 <template>
@@ -40,24 +52,36 @@ const finished = computed(() => props.race.results && props.race.results.length 
                     </ul>
                 </section>
 
-                <TableShell v-if="finished" class="bg-zinc-900/60">
-                    <h2 class="border-b border-zinc-800 px-4 py-3 font-display text-lg font-bold text-white">Резултати</h2>
+                <TableShell v-if="active" class="bg-zinc-900/60">
+                    <div class="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-4 py-3">
+                        <h2 class="mr-2 font-display text-lg font-bold text-white">Класация</h2>
+                        <button v-for="c in classifications" :key="c.type" type="button"
+                            class="rounded-lg px-2.5 py-1 text-xs font-medium transition"
+                            :class="c.type === selected ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-400 hover:text-white'"
+                            @click="selected = c.type">{{ c.label }}</button>
+                    </div>
+
                     <table class="w-full whitespace-nowrap text-sm">
                         <thead class="bg-zinc-900/80 text-left text-xs uppercase tracking-wide text-zinc-500">
                             <tr>
-                                <th scope="col" class="px-4 py-2.5 w-14">Поз.</th>
+                                <th scope="col" class="w-14 px-4 py-2.5">Поз.</th>
                                 <th scope="col" class="px-4 py-2.5">Пилот</th>
-                                <th scope="col" class="px-4 py-2.5 text-right">Точки</th>
+                                <th v-if="showsTime" scope="col" class="px-4 py-2.5 text-right">Време</th>
+                                <th v-if="showsPoints" scope="col" class="px-4 py-2.5 text-right">Точки</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-zinc-800/60">
-                            <tr v-for="r in race.results" :key="r.driver.id" class="transition hover:bg-zinc-800/40">
-                                <td class="px-4 py-2.5 font-bold tabular-nums" :class="r.position ? 'text-zinc-200' : 'text-red-500'">{{ r.position ?? 'DNF' }}</td>
+                            <tr v-for="(r, i) in active.rows" :key="`${active.type}-${r.slug ?? i}`" class="transition hover:bg-zinc-800/40">
+                                <td class="px-4 py-2.5 font-bold tabular-nums" :class="r.position ? 'text-zinc-200' : 'text-red-500'">
+                                    {{ r.position ?? (r.dnf ? 'DNF' : '—') }}
+                                </td>
                                 <td class="px-4 py-2.5 text-zinc-200">
-                                    {{ r.driver.full_name }}
+                                    {{ r.driver }}
+                                    <span v-if="r.team" class="ml-1 text-xs text-zinc-500">{{ r.team }}</span>
                                     <span v-if="r.fastest_lap" title="Най-бърза обиколка">🔥</span>
                                 </td>
-                                <td class="px-4 py-2.5 text-right font-medium tabular-nums text-white">{{ r.points }}</td>
+                                <td v-if="showsTime" class="px-4 py-2.5 text-right tabular-nums text-zinc-300">{{ r.time ?? '—' }}</td>
+                                <td v-if="showsPoints" class="px-4 py-2.5 text-right font-medium tabular-nums text-white">{{ r.points || '' }}</td>
                             </tr>
                         </tbody>
                     </table>

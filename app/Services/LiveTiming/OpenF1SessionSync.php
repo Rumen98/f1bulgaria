@@ -288,15 +288,17 @@ class OpenF1SessionSync
     /**
      * Секунди във вид „1:23.456".
      *
-     * Масив означава квалификационна сесия ([Q1, Q2, Q3]) — взимаме най-добрата
-     * налична отсечка. За тренировка стойността е обикновено число.
+     * Масив означава квалификационна сесия ([Q1, Q2, Q3]). Взимаме ПОСЛЕДНАТА
+     * изкарана отсечка, а не най-бързата: позицията се определя от нея, а
+     * времената от различни отсечки не са сравними помежду си. Същото правим
+     * и при данните от Jolpica (Q3, иначе Q2, иначе Q1).
      */
     private function lapTime(mixed $duration): ?string
     {
         if (is_array($duration)) {
-            $best = collect($duration)->filter(fn ($v) => is_numeric($v))->max();
+            $last = collect($duration)->filter(fn ($v) => is_numeric($v) && (float) $v > 0)->last();
 
-            return $best !== null ? $this->lapTime($best) : null;
+            return $last !== null ? $this->lapTime($last) : null;
         }
 
         if (! is_numeric($duration) || (float) $duration <= 0) {
