@@ -68,6 +68,35 @@ enum F2SessionType: string
     }
 
     /**
+     * Отрязъкът в URL-а на страницата за сесията (`/f2/races/{race}/{session}`).
+     *
+     * `sprint` и `feature` са наследени и НЕ бива да се преименуват — външни
+     * линкове и вече публикувани постове в канала сочат към тях.
+     */
+    public function urlSegment(): string
+    {
+        return match ($this) {
+            self::Practice => 'practice',
+            self::Qualifying => 'qualifying',
+            self::QualifyingGroupA => 'qualifying-a',
+            self::QualifyingGroupB => 'qualifying-b',
+            self::SprintRace => 'sprint',
+            self::FeatureRace => 'feature',
+        };
+    }
+
+    public static function fromUrlSegment(string $segment): ?self
+    {
+        foreach (self::cases() as $case) {
+            if ($case->urlSegment() === $segment) {
+                return $case;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Подредба в рамките на уикенда — за показване и за реда на публикуване.
      */
     public function order(): int

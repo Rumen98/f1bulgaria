@@ -125,6 +125,29 @@ return [
     'noel-leon' => 'Ноел Леон',
     'dino-beganovic' => 'Дино Беганович',
 
+    /*
+    | --- Решетката на Формула 2, сезон 2026 ---
+    |
+    | Ключът е slug на „{driverFirstName} {driverLastName}" от официалния API,
+    | НЕ съкратената форма от медиите: API-то дава „Alexander Dunne", тоест
+    | 'alexander-dunne', а горното 'alex-dunne' не съвпада с него.
+    | Тези имена излизат във всеки пост в Telegram канала след F2 сесия.
+    */
+    'alexander-dunne' => 'Александър Дън',
+    'kush-maini' => 'Куш Майни',
+    'rafael-camara' => 'Рафаел Камара',
+    'gabriele-mini' => 'Габриеле Мини',
+    'laurens-van-hoepen' => 'Лауренс ван Хупен',
+    'joshua-durksen' => 'Джошуа Дюрксен',
+    'martinius-stenshorne' => 'Мартиниус Стенсхорне',
+    'sebastian-montoya' => 'Себастиан Монтоя',
+    'oliver-goethe' => 'Оливер Гьоте',
+    'roman-bilinski' => 'Роман Билински',
+    'nico-varrone' => 'Нико Вароне',
+    'john-bennett' => 'Джон Бенет',
+    'rafael-villagomez' => 'Рафаел Виягомес',
+    'tasanapol-inthraphuvasak' => 'Тасанапол Интрапувасак',
+
     // --- Скорошни и разпознаваеми ---
     'mick-schumacher' => 'Мик Шумахер',
     'jos-verstappen' => 'Йос Верстапен',

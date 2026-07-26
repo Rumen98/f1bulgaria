@@ -9,8 +9,10 @@ const props = defineProps({
     race: { type: Object, required: true },
     sessionType: { type: String, required: true },
     sessionLabel: { type: String, required: true },
-    hasSprint: { type: Boolean, default: false },
-    hasFeature: { type: Boolean, default: false },
+    isRace: { type: Boolean, default: false },
+    // [{ segment, label }] в реда на уикенда — тренировка, квалификация,
+    // спринт, главно. Монако добавя и двете групи на квалификацията.
+    sessions: { type: Array, default: () => [] },
     pole: { type: Object, default: null },
     fastestLap: { type: Object, default: null },
     results: { type: Array, default: () => [] },
@@ -29,14 +31,15 @@ const rowClass = (p) => ({ 1: 'bg-amber-500/10', 2: 'bg-zinc-400/10', 3: 'bg-ora
             <div class="flex flex-wrap items-center gap-3">
                 <span class="rounded-full bg-zinc-800 px-3 py-1 text-sm font-bold tabular-nums">Кръг {{ race.round }}</span>
                 <h1 class="font-display text-2xl font-black sm:text-3xl">{{ race.location }} <span class="text-red-600">{{ race.season }}</span></h1>
-                <span class="rounded px-2 py-0.5 text-xs font-bold uppercase tracking-wide" :class="sessionType === 'feature' ? 'bg-red-600/20 text-red-400' : 'bg-sky-500/20 text-sky-400'">{{ sessionLabel }}</span>
+                <span class="rounded px-2 py-0.5 text-xs font-bold uppercase tracking-wide" :class="isRace ? 'bg-red-600/20 text-red-400' : 'bg-sky-500/20 text-sky-400'">{{ sessionLabel }}</span>
             </div>
 
             <div class="mt-3 flex flex-wrap gap-2 text-sm">
-                <Link v-if="hasSprint" :href="route('f2.race', [race.slug, 'sprint'])"
-                    class="rounded-lg px-3 py-2 font-medium transition" :class="sessionType === 'sprint' ? 'bg-sky-600 text-white' : 'bg-zinc-900 text-zinc-400 hover:text-white'">Спринт</Link>
-                <Link v-if="hasFeature" :href="route('f2.race', [race.slug, 'feature'])"
-                    class="rounded-lg px-3 py-2 font-medium transition" :class="sessionType === 'feature' ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-400 hover:text-white'">Главно</Link>
+                <Link v-for="s in sessions" :key="s.segment" :href="route('f2.race', [race.slug, s.segment])"
+                    class="rounded-lg px-3 py-2 font-medium transition"
+                    :class="sessionType === s.segment
+                        ? (s.segment === 'feature' ? 'bg-red-600 text-white' : 'bg-sky-600 text-white')
+                        : 'bg-zinc-900 text-zinc-400 hover:text-white'">{{ s.label }}</Link>
                 <Link v-if="race.circuit_jolpica_id && hasRoute('circuits.show')" :href="route('circuits.show', race.circuit_jolpica_id)"
                     class="rounded-lg bg-zinc-900 px-3 py-2 font-medium text-zinc-400 transition hover:text-white">Пистата →</Link>
             </div>

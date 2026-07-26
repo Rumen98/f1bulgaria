@@ -90,6 +90,26 @@ class ChannelPublisher
 
         $chunks = TelegramText::chunk($post->body);
         $sleepMs = (int) config('channel.post_sleep_ms', 1200);
+
+        // Вече изпратен ред, върнат в pending, значи промяна в съдържанието —
+        // редактираме на място, за да няма второ известие за едно събитие.
+        if ($post->telegram_message_id !== null) {
+            if (count($chunks) > 1) {
+                throw new TelegramPermanentException(
+                    'Обновеният текст не се събира в едно съобщение, а редакцията пази само първото.',
+                );
+            }
+
+            $this->client->edit((int) $post->telegram_message_id, $chunks[0]);
+
+            $post->update([
+                'status' => ChannelPostStatus::Sent->value,
+                'last_error' => null,
+            ]);
+
+            return;
+        }
+
         $firstMessageId = null;
 
         foreach ($chunks as $index => $chunk) {

@@ -80,7 +80,11 @@ Route::middleware('feature:f2')->group(function () {
     Route::get('/f2/drivers/{slug}', [F2DriversController::class, 'show'])->name('f2.drivers.show');
     Route::get('/f2/teams', [F2TeamsController::class, 'index'])->name('f2.teams.index');
     Route::get('/f2/teams/{slug}', [F2TeamsController::class, 'show'])->name('f2.teams.show');
-    Route::get('/f2/races/{race}/{session}', [F2RaceController::class, 'show'])->where('session', 'sprint|feature')->name('f2.race');
+    // sprint|feature са наследени отрязъци — не ги преименувай, външни линкове
+    // и вече публикувани постове в канала сочат към тях.
+    Route::get('/f2/races/{race}/{session}', [F2RaceController::class, 'show'])
+        ->where('session', 'practice|qualifying|qualifying-a|qualifying-b|sprint|feature')
+        ->name('f2.race');
     Route::get('/f2/seasons/{year}', [F2Controller::class, 'season'])->where('year', '[0-9]{4}')->name('f2.season');
 });
 

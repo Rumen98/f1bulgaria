@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Telegram\Formatters;
 
 use App\Enums\F2SessionType;
+use App\Models\F2Driver;
 use App\Models\F2RaceSession;
 use App\Models\F2Result;
 use App\Services\Telegram\TelegramText;
+use App\Support\DriverName;
 use Illuminate\Support\Collection;
 
 /**
@@ -16,6 +18,9 @@ use Illuminate\Support\Collection;
  * Публикуваме първите десет плюс линк към сайта, а не цялата класация: двайсет
  * и два реда правят поста нечетим на телефон и приближават лимита от 4096
  * знака, а линкът връща трафик към padok.bg.
+ *
+ * Имената минават през DriverName — сайтът е само на български и „Nikola
+ * Tsolov" в канал за българска аудитория изглежда като чужд продукт.
  */
 class F2SessionFormatter
 {
@@ -23,29 +28,31 @@ class F2SessionFormatter
 
     private const MEDALS = [1 => '🥇', 2 => '🥈', 3 => '🥉'];
 
+    /** Кратки български дни за реда „Следва". */
+    private const WEEKDAYS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
     public function format(F2RaceSession $session): string
     {
         $session->loadMissing(['race.season', 'results.driver.team']);
 
-        $race = $session->race;
         $type = $session->session_type;
+        $classified = $this->classified($session);
 
-        $lines = [];
-        $lines[] = '🏁 <b>Формула 2 · '.TelegramText::escape($type->label()).'</b>';
+        $lines = [
+            '🏁 <b>Формула 2 · '.TelegramText::escape($type->label()).'</b>',
+            TelegramText::escape($this->subtitle($session)),
+            '',
+        ];
 
-        $subtitle = collect([
-            $race?->country_name ?: $race?->location_name,
-            $race?->round !== null ? "кръг {$race->round}" : null,
-        ])->filter()->implode(' · ');
-
-        if ($subtitle !== '') {
-            $lines[] = TelegramText::escape($subtitle);
+        foreach ($classified->take(self::VISIBLE_POSITIONS) as $result) {
+            $lines[] = $this->resultLine($result, $type);
         }
 
-        $lines[] = '';
+        $highlight = $this->highlightLine($session, $classified);
 
-        foreach ($this->classified($session)->take(self::VISIBLE_POSITIONS) as $result) {
-            $lines[] = $this->resultLine($result, $type);
+        if ($highlight !== null) {
+            $lines[] = '';
+            $lines[] = $highlight;
         }
 
         $retired = $this->retired($session);
@@ -55,9 +62,11 @@ class F2SessionFormatter
             $lines[] = '<i>Отпаднали: '.TelegramText::escape($retired->implode(', ')).'</i>';
         }
 
+        $lines = [...$lines, ...$this->context($session, $type)];
+
         if ($session->version === 'Provisional') {
             $lines[] = '';
-            $lines[] = '<i>Класацията е временна — стюардите още не са се произнесли.</i>';
+            $lines[] = '<i>⚠️ Временна класация — стюардите още не са се произнесли. Постът ще се обнови.</i>';
         }
 
         $url = $this->url($session);
@@ -68,6 +77,156 @@ class F2SessionFormatter
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * „Гран При на Унгария · кръг 9".
+     *
+     * Българското име идва от config/race-names-bg.php през връзката към F1
+     * пистата. Без нея пада към името на локацията, което е на латиница.
+     */
+    private function subtitle(F2RaceSession $session): string
+    {
+        $race = $session->race;
+
+        if ($race === null) {
+            return '';
+        }
+
+        $name = config('race-names-bg')[$race->circuit_jolpica_id] ?? null;
+
+        return collect([
+            is_string($name) ? $name : ($race->location_name ?: $race->country_name),
+            $race->round !== null ? "кръг {$race->round}" : null,
+        ])->filter()->implode(' · ');
+    }
+
+    /**
+     * Допълнителните редове под класацията, в реда на четене.
+     *
+     * @return array<int, string>
+     */
+    private function context(F2RaceSession $session, F2SessionType $type): array
+    {
+        $lines = [];
+
+        // Пол позицията има смисъл само за главното състезание — решетката на
+        // спринта е обърнатата десетка, не резултат от квалификация.
+        if ($type === F2SessionType::FeatureRace && $session->poleDriver !== null) {
+            $lines[] = '';
+            $lines[] = '🅿️ От пол позиция: <b>'.TelegramText::escape($this->name($session->poleDriver)).'</b>';
+        }
+
+        if ($type === F2SessionType::FeatureRace) {
+            $standings = $this->standings($session);
+
+            if ($standings !== null) {
+                $lines[] = '';
+                $lines[] = '📊 Шампионат: '.$standings;
+            }
+        }
+
+        $next = $this->nextSession($session);
+
+        if ($next !== null) {
+            $lines[] = '';
+            $lines[] = '⏱ Следва: '.$next;
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Първите трима в шампионата след кръга.
+     */
+    private function standings(F2RaceSession $session): ?string
+    {
+        $seasonId = $session->race?->f2_season_id;
+
+        if ($seasonId === null) {
+            return null;
+        }
+
+        $top = F2Driver::query()
+            ->where('f2_season_id', $seasonId)
+            ->whereNotNull('position')
+            ->orderBy('position')
+            ->limit(3)
+            ->get();
+
+        if ($top->isEmpty()) {
+            return null;
+        }
+
+        return $top
+            ->map(fn (F2Driver $driver): string => TelegramText::escape(
+                $this->surname($driver).' '.$this->points((float) $driver->points),
+            ))
+            ->implode(' · ');
+    }
+
+    /**
+     * „Спринт — Сб, 15:15" в софийско време.
+     */
+    private function nextSession(F2RaceSession $session): ?string
+    {
+        $seasonId = $session->race?->f2_season_id;
+
+        if ($seasonId === null) {
+            return null;
+        }
+
+        $next = F2RaceSession::query()
+            ->whereHas('race', fn ($query) => $query->where('f2_season_id', $seasonId))
+            ->whereNotNull('scheduled_at_utc')
+            ->where('scheduled_at_utc', '>', now())
+            ->orderBy('scheduled_at_utc')
+            ->with('race')
+            ->first();
+
+        if ($next === null) {
+            return null;
+        }
+
+        $sofia = $next->scheduled_at_utc->copy()->setTimezone('Europe/Sofia');
+        $when = self::WEEKDAYS[(int) $sofia->dayOfWeek].', '.$sofia->format('H:i');
+
+        // Ако следващата сесия е от друг кръг, самò „Спринт, Сб 15:15" е
+        // подвеждащо — човек ще го чака този уикенд.
+        $label = $next->session_type->label();
+
+        if ($next->f2_race_id !== $session->f2_race_id) {
+            $label .= ', кръг '.$next->race?->round;
+            $when = $sofia->format('d.m').', '.$sofia->format('H:i');
+        }
+
+        return TelegramText::escape("{$label} — {$when}");
+    }
+
+    /**
+     * Ред за българския пилот, когато е извън показаните позиции.
+     */
+    private function highlightLine(F2RaceSession $session, Collection $classified): ?string
+    {
+        /** @var array<int, string> $slugs */
+        $slugs = (array) config('channel.highlight_driver_slugs', []);
+
+        if ($slugs === []) {
+            return null;
+        }
+
+        $result = $classified
+            ->skip(self::VISIBLE_POSITIONS)
+            ->first(fn (F2Result $r): bool => in_array($r->driver?->slug, $slugs, strict: true));
+
+        if ($result === null) {
+            return null;
+        }
+
+        $name = TelegramText::escape($this->name($result->driver));
+        $position = (int) $result->position;
+
+        return "🇧🇬 <b>{$name}</b> — {$position}-и";
     }
 
     /**
@@ -88,7 +247,7 @@ class F2SessionFormatter
     {
         return $session->results
             ->filter(fn (F2Result $result): bool => $result->position === null)
-            ->map(fn (F2Result $result): string => $result->driver?->fullName() ?? '')
+            ->map(fn (F2Result $result): string => $this->name($result->driver))
             ->filter()
             ->values();
     }
@@ -98,7 +257,7 @@ class F2SessionFormatter
         $position = (int) $result->position;
         $prefix = self::MEDALS[$position] ?? str_pad((string) $position, 2, ' ', STR_PAD_LEFT).'.';
 
-        $driver = TelegramText::escape($result->driver?->fullName() ?? '');
+        $driver = TelegramText::escape($this->name($result->driver));
         $team = TelegramText::escape($result->driver?->team?->name ?? '');
 
         $parts = ["{$prefix} <b>{$driver}</b>"];
@@ -109,27 +268,50 @@ class F2SessionFormatter
 
         // Победителят в състезание показва време, останалите — изоставане.
         // В тренировка и квалификация всеки има абсолютна обиколка.
-        $time = $result->time_or_gap;
-
-        if ($time !== null && $time !== '') {
-            $parts[] = TelegramText::escape($time);
+        if (filled($result->time_or_gap)) {
+            $parts[] = TelegramText::escape((string) $result->time_or_gap);
         }
 
         $line = implode(' · ', $parts);
 
         if ($type->isRace() && (float) $result->points > 0) {
-            $points = rtrim(rtrim(number_format((float) $result->points, 1, ',', ''), '0'), ',');
-            $line .= ' · '.TelegramText::escape("{$points} т.");
+            $line .= ' · '.TelegramText::escape($this->points((float) $result->points).' т.');
         }
 
         return $line;
     }
 
+    private function name(?F2Driver $driver): string
+    {
+        if ($driver === null) {
+            return '';
+        }
+
+        return DriverName::display($driver->slug, $driver->fullName());
+    }
+
+    /**
+     * Само фамилията — за класирането, където три пълни имена не се събират
+     * на един ред на телефон.
+     */
+    private function surname(F2Driver $driver): string
+    {
+        $display = $this->name($driver);
+        $parts = preg_split('/\s+/', trim($display)) ?: [];
+
+        return (string) (end($parts) ?: $display);
+    }
+
+    /**
+     * „19" вместо „19,0"; „1,5" остава с десетичната.
+     */
+    private function points(float $points): string
+    {
+        return rtrim(rtrim(number_format($points, 1, ',', ''), '0'), ',');
+    }
+
     /**
      * Страница на сайта за тази сесия.
-     *
-     * Маршрутът `f2.race` приема само sprint и feature — за тренировка и
-     * квалификация още няма страница, затова водим към календара на сезона.
      */
     private function url(F2RaceSession $session): ?string
     {
@@ -139,12 +321,6 @@ class F2SessionFormatter
             return null;
         }
 
-        return match ($session->session_type) {
-            F2SessionType::SprintRace => route('f2.race', [$race->slug, 'sprint']),
-            F2SessionType::FeatureRace => route('f2.race', [$race->slug, 'feature']),
-            default => $race->season?->year !== null
-                ? route('f2.calendar.year', $race->season->year)
-                : route('f2.calendar'),
-        };
+        return route('f2.race', [$race->slug, $session->session_type->urlSegment()]);
     }
 }

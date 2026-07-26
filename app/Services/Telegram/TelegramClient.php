@@ -81,6 +81,42 @@ class TelegramClient
     }
 
     /**
+     * Пренаписва вече публикувано съобщение.
+     *
+     * Ползва се, когато временната класация стане окончателна: редакцията на
+     * място не праща ново известие и не оставя два поста за едно събитие.
+     *
+     * @throws TelegramException
+     * @throws TelegramPermanentException
+     */
+    public function edit(int $messageId, string $html): void
+    {
+        $chatId = config('services.telegram.chat_id');
+
+        if (blank($chatId)) {
+            throw new TelegramPermanentException('Липсва TELEGRAM_CHAT_ID в конфигурацията.');
+        }
+
+        try {
+            $this->call('editMessageText', [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'text' => $html,
+                'parse_mode' => 'HTML',
+                'link_preview_options' => ['is_disabled' => true],
+            ]);
+        } catch (TelegramPermanentException $e) {
+            // Telegram отказва редакция с идентичен текст. Това означава, че
+            // съобщението вече е каквото трябва — успех, не грешка.
+            if (str_contains($e->getMessage(), 'message is not modified')) {
+                return;
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
      * Вади числовото id на канал по @username. Ползва се веднъж при настройка
      * (`channel:resolve-chat-id`), не в горещия път.
      *

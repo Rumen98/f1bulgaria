@@ -142,6 +142,10 @@ class F2ApiSync
             ['f2_season_id' => $season->id, 'round' => $round],
             [
                 'meeting_key' => $meetingKey,
+                // Връзката към F1 пистата дава българското име на Гран При-то
+                // (config/race-names-bg.php) и кръстосаните връзки към
+                // страниците на пистите. Без нея постът казва „Hungary".
+                'circuit_jolpica_id' => config('f2-circuit-map')[$location] ?? null,
                 'location_name' => $location,
                 'country_name' => (string) ($meeting['meetingCountryName'] ?? '') ?: null,
                 'race_datetime_utc' => $featureStart,

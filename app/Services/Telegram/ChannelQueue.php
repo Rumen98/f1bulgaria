@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Telegram;
 
 use App\Enums\ChannelPostKind;
+use App\Enums\ChannelPostStatus;
 use App\Models\ChannelPost;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -35,8 +36,10 @@ class ChannelQueue
             'subject_id' => $subject->getKey(),
         ];
 
-        if (ChannelPost::query()->where($keys)->exists()) {
-            return false;
+        $existing = ChannelPost::query()->where($keys)->first();
+
+        if ($existing !== null) {
+            return $this->refresh($existing, $body);
         }
 
         try {
@@ -56,5 +59,35 @@ class ChannelQueue
         }
 
         return true;
+    }
+
+    /**
+     * Съдържанието на вече поставена публикация се е променило — например
+     * временната класация е станала окончателна.
+     *
+     * Вместо втори пост връщаме реда в pending, като ЗАПАЗВАМЕ
+     * telegram_message_id. По него издателят разбира, че става дума за
+     * редакция на място, а не за ново съобщение.
+     *
+     * @return bool false — тук никога не се създава нов ред
+     */
+    private function refresh(ChannelPost $post, string $body): bool
+    {
+        if ($post->body === $body) {
+            return false;
+        }
+
+        // Провалилите се публикации не се съживяват от промяна в текста —
+        // причината (изгонен бот, грешен chat_id) е другаде и ще се повтори.
+        if ($post->status === ChannelPostStatus::Failed) {
+            return false;
+        }
+
+        $post->update([
+            'body' => $body,
+            'status' => ChannelPostStatus::Pending->value,
+        ]);
+
+        return false;
     }
 }

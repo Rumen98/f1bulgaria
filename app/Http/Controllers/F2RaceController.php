@@ -18,7 +18,9 @@ class F2RaceController extends Controller
     {
         $raceModel = F2Race::query()->where('slug', $race)->with('season')->firstOrFail();
 
-        $type = $session === 'sprint' ? F2SessionType::SprintRace : F2SessionType::FeatureRace;
+        $type = F2SessionType::fromUrlSegment($session);
+
+        abort_if($type === null, 404);
 
         $sessionModel = F2RaceSession::query()
             ->where('f2_race_id', $raceModel->id)
@@ -28,9 +30,17 @@ class F2RaceController extends Controller
 
         abort_if($sessionModel === null, 404);
 
-        // Кои сесии съществуват за този кръг (за toggle-а).
-        $available = F2RaceSession::query()->where('f2_race_id', $raceModel->id)
-            ->pluck('session_type')->map(fn ($t) => $t->value)->all();
+        // Кои сесии съществуват за този кръг (за toggle-а), в реда на уикенда.
+        $available = F2RaceSession::query()
+            ->where('f2_race_id', $raceModel->id)
+            ->whereHas('results')
+            ->get(['session_type'])
+            ->sortBy(fn (F2RaceSession $s) => $s->session_type->order())
+            ->map(fn (F2RaceSession $s) => [
+                'segment' => $s->session_type->urlSegment(),
+                'label' => $s->session_type->label(),
+            ])
+            ->values();
 
         return Inertia::render('F2/RaceShow', [
             'race' => [
@@ -42,8 +52,8 @@ class F2RaceController extends Controller
             ],
             'sessionType' => $session,
             'sessionLabel' => $type->label(),
-            'hasSprint' => in_array(F2SessionType::SprintRace->value, $available, true),
-            'hasFeature' => in_array(F2SessionType::FeatureRace->value, $available, true),
+            'isRace' => $type->isRace(),
+            'sessions' => $available,
             'pole' => $sessionModel->poleDriver ? $this->driverRef($sessionModel->poleDriver) : null,
             'fastestLap' => $sessionModel->fastestLapDriver ? [
                 ...$this->driverRef($sessionModel->fastestLapDriver),
