@@ -8,6 +8,7 @@ use App\Enums\F2SessionType;
 use App\Models\F2Race;
 use App\Models\F2RaceSession;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -75,7 +76,7 @@ class F2RaceController extends Controller
                 'position' => $r->position,
                 'status' => $r->status,
                 'car_number' => $r->driver?->car_number,
-                'driver' => $r->driver?->fullName(),
+                'driver' => $r->driver ? DriverName::display($r->driver->slug, $r->driver->fullName()) : null,
                 'slug' => $r->driver?->slug,
                 'flag' => CountryFlag::iso2($r->driver?->country_code),
                 'is_bulgarian' => $r->driver?->country_code === 'BUL',
@@ -94,7 +95,7 @@ class F2RaceController extends Controller
     private function driverRef($driver): array
     {
         return [
-            'driver' => $driver->fullName(),
+            'driver' => DriverName::display($driver->slug, $driver->fullName()),
             'slug' => $driver->slug,
             'flag' => CountryFlag::iso2($driver->country_code),
         ];

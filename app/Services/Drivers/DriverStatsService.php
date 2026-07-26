@@ -11,6 +11,7 @@ use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
 use App\Services\Standings\StandingsService;
+use App\Support\DriverName;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -248,7 +249,7 @@ class DriverStatsService
             return collect($latest)->map(function (Driver $d) use ($stats) {
                 return [
                     'code' => $d->driver_code,
-                    'name' => $d->fullName(),
+                    'name' => DriverName::display($d->slug, $d->fullName()),
                     'slug' => $d->slug,
                     'color' => $d->constructor?->color_hex ?? '#52525b',
                     'wins' => (int) ($stats->get($d->driver_code)->wins ?? 0),
@@ -334,7 +335,13 @@ class DriverStatsService
             ->where('id', '!=', $driver->id)
             ->first();
 
-        $empty = ['teammate' => $teammate?->fullName(), 'race_wins' => 0, 'race_losses' => 0, 'quali_wins' => 0, 'quali_losses' => 0];
+        $empty = [
+            'teammate' => $teammate === null ? null : DriverName::display($teammate->slug, $teammate->fullName()),
+            'race_wins' => 0,
+            'race_losses' => 0,
+            'quali_wins' => 0,
+            'quali_losses' => 0,
+        ];
 
         if ($teammate === null) {
             return $empty;

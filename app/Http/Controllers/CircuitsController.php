@@ -9,6 +9,7 @@ use App\Models\Race;
 use App\Models\Season;
 use App\Services\Circuits\CircuitStatsService;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use App\Support\Seo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -127,7 +128,7 @@ class CircuitsController extends Controller
 
                 return $winner === null ? null : [
                     'year' => $race->season?->year,
-                    'driver' => $winner->fullName(),
+                    'driver' => DriverName::display($winner->slug, $winner->fullName()),
                     'slug' => $winner->slug,
                     'flag' => CountryFlag::iso2($winner->country_code),
                     'race_slug' => $race->slug,

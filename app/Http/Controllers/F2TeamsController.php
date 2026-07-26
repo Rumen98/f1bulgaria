@@ -9,6 +9,7 @@ use App\Models\F2Result;
 use App\Models\F2Season;
 use App\Models\F2Team;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -59,7 +60,7 @@ class F2TeamsController extends Controller
             ],
             'currentDrivers' => $latest->drivers->map(fn ($d) => [
                 'slug' => $d->slug,
-                'name' => $d->fullName(),
+                'name' => DriverName::display($d->slug, $d->fullName()),
                 'flag' => CountryFlag::iso2($d->country_code),
                 'is_bulgarian' => $d->country_code === 'BUL',
             ])->values(),
@@ -79,7 +80,7 @@ class F2TeamsController extends Controller
             ->groupBy('slug')
             ->map(fn (Collection $rows) => [
                 'slug' => $rows->first()->slug,
-                'name' => $rows->first()->fullName(),
+                'name' => DriverName::display($rows->first()->slug, $rows->first()->fullName()),
                 'flag' => CountryFlag::iso2($rows->first()->country_code),
                 'years' => $rows->map(fn ($d) => $d->season?->year)->filter()->unique()->sort()->values(),
             ])

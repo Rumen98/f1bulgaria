@@ -8,6 +8,7 @@ use App\Enums\F2SessionType;
 use App\Models\F2Race;
 use App\Models\F2Season;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -66,7 +67,7 @@ class F2CalendarController extends Controller
                 ->take(3)
                 ->map(fn ($r) => [
                     'position' => $r->position,
-                    'driver' => $r->driver?->fullName(),
+                    'driver' => $r->driver ? DriverName::display($r->driver->slug, $r->driver->fullName()) : null,
                     'slug' => $r->driver?->slug,
                     'flag' => CountryFlag::iso2($r->driver?->country_code),
                 ])->values(),

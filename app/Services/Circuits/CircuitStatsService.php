@@ -9,6 +9,7 @@ use App\Models\Driver;
 use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
+use App\Support\DriverName;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -53,7 +54,7 @@ class CircuitStatsService
             return $rows
                 ->map(fn ($r) => [
                     'code' => $r->code,
-                    'name' => trim("{$r->first_name} {$r->last_name}"),
+                    'name' => DriverName::display($r->slug, trim("{$r->first_name} {$r->last_name}")),
                     'slug' => $r->slug,
                     'races' => (int) $r->races,
                     'wins' => (int) $r->wins,
@@ -84,7 +85,7 @@ class CircuitStatsService
             ->get(['results.*'])
             ->map(fn (Result $r) => [
                 'year' => $r->race?->season?->year,
-                'driver' => $r->driver?->fullName(),
+                'driver' => $r->driver === null ? null : DriverName::display($r->driver->slug, $r->driver->fullName()),
                 'team' => $r->driver?->constructor?->name,
                 'color' => $r->driver?->constructor?->color_hex,
             ]);
@@ -132,7 +133,7 @@ class CircuitStatsService
     private function raceWinners(string $circuitSlug): Collection
     {
         return Result::query()
-            ->selectRaw('seasons.year as year, drivers.canonical_id as cid, dc.first_name, dc.last_name, results.grid_position as grid')
+            ->selectRaw('seasons.year as year, drivers.canonical_id as cid, dc.first_name, dc.last_name, dc.slug, results.grid_position as grid')
             ->join('drivers', 'drivers.id', '=', 'results.driver_id')
             ->join('drivers_canonical as dc', 'dc.id', '=', 'drivers.canonical_id')
             ->join('races', 'races.id', '=', 'results.race_id')
@@ -145,7 +146,7 @@ class CircuitStatsService
             ->map(fn ($r) => (object) [
                 'year' => (int) $r->year,
                 'cid' => (int) $r->cid,
-                'name' => trim("{$r->first_name} {$r->last_name}"),
+                'name' => DriverName::display($r->slug, trim("{$r->first_name} {$r->last_name}")),
                 'grid' => $r->grid !== null ? (int) $r->grid : null,
             ]);
     }
@@ -238,14 +239,14 @@ class CircuitStatsService
     public function getMostPolePosDriver(string $circuitSlug): ?array
     {
         $row = Result::query()
-            ->selectRaw('dc.first_name, dc.last_name, COUNT(*) as cnt')
+            ->selectRaw('dc.first_name, dc.last_name, dc.slug, COUNT(*) as cnt')
             ->join('drivers', 'drivers.id', '=', 'results.driver_id')
             ->join('drivers_canonical as dc', 'dc.id', '=', 'drivers.canonical_id')
             ->join('races', 'races.id', '=', 'results.race_id')
             ->where('races.jolpica_id', $circuitSlug)
             ->where('results.grid_position', 1)
             ->where('results.session_type', ResultSessionType::Race->value)
-            ->groupBy('drivers.canonical_id', 'dc.first_name', 'dc.last_name')
+            ->groupBy('drivers.canonical_id', 'dc.first_name', 'dc.last_name', 'dc.slug')
             ->orderByDesc('cnt')
             ->first();
 
@@ -253,7 +254,10 @@ class CircuitStatsService
             return null;
         }
 
-        return ['name' => trim("{$row->first_name} {$row->last_name}"), 'count' => (int) $row->cnt];
+        return [
+            'name' => DriverName::display($row->slug, trim("{$row->first_name} {$row->last_name}")),
+            'count' => (int) $row->cnt,
+        ];
     }
 
     /**
@@ -281,7 +285,7 @@ class CircuitStatsService
             ->get()
             ->map(fn (Result $r) => [
                 'position' => $r->position,
-                'driver' => $r->driver?->fullName(),
+                'driver' => $r->driver === null ? null : DriverName::display($r->driver->slug, $r->driver->fullName()),
                 'team' => $r->driver?->constructor?->name,
                 'color' => $r->driver?->constructor?->color_hex,
             ]);
@@ -299,7 +303,7 @@ class CircuitStatsService
             ->whereIn('driver_code', $codes)
             ->orderBy('season_id')
             ->get()
-            ->mapWithKeys(fn (Driver $d) => [$d->driver_code => $d->fullName()])
+            ->mapWithKeys(fn (Driver $d) => [$d->driver_code => DriverName::display($d->slug, $d->fullName())])
             ->all();
     }
 

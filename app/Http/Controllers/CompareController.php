@@ -8,6 +8,7 @@ use App\Models\Driver;
 use App\Models\DriverCanonical;
 use App\Services\Drivers\ComparisonService;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -53,7 +54,7 @@ class CompareController extends Controller
             ->get(['slug', 'first_name', 'last_name', 'total_wins', 'is_active'])
             ->map(fn (DriverCanonical $c) => [
                 'slug' => $c->slug,
-                'name' => $c->fullName(),
+                'name' => DriverName::display($c->slug, $c->fullName()),
                 'wins' => $c->total_wins,
                 'is_active' => $c->is_active,
             ])
@@ -73,7 +74,7 @@ class CompareController extends Controller
 
         return [
             'slug' => $c->slug,
-            'name' => $c->fullName(),
+            'name' => DriverName::display($c->slug, $c->fullName()),
             'code' => $c->code,
             'photo' => $c->photo_url ?? $latest?->photo_url,
             'flag' => CountryFlag::iso2($c->country_code),

@@ -8,6 +8,7 @@ use App\Models\DriverCanonical;
 use App\Models\Rivalry;
 use App\Services\Drivers\ComparisonService;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use App\Support\Seo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,8 +35,14 @@ class RivalriesController extends Controller
                 'era' => $this->era($r),
                 'is_featured' => $r->is_featured,
                 'is_custom' => $r->is_custom,
-                'one' => ['name' => $r->driverOne->fullName(), 'photo' => $r->driverOne->photo_url],
-                'two' => ['name' => $r->driverTwo->fullName(), 'photo' => $r->driverTwo->photo_url],
+                'one' => [
+                    'name' => DriverName::display($r->driverOne->slug, $r->driverOne->fullName()),
+                    'photo' => $r->driverOne->photo_url,
+                ],
+                'two' => [
+                    'name' => DriverName::display($r->driverTwo->slug, $r->driverTwo->fullName()),
+                    'photo' => $r->driverTwo->photo_url,
+                ],
             ]);
 
         return Inertia::render('Rivalries/Index', [
@@ -53,7 +60,7 @@ class RivalriesController extends Controller
                 ->get(['slug', 'first_name', 'last_name', 'total_wins'])
                 ->map(fn (DriverCanonical $c) => [
                     'slug' => $c->slug,
-                    'name' => $c->fullName(),
+                    'name' => DriverName::display($c->slug, $c->fullName()),
                     'wins' => $c->total_wins,
                 ]),
         ]);
@@ -148,7 +155,7 @@ class RivalriesController extends Controller
     {
         return [
             'slug' => $c->slug,
-            'name' => $c->fullName(),
+            'name' => DriverName::display($c->slug, $c->fullName()),
             'photo' => $c->photo_url,
             'flag' => CountryFlag::iso2($c->country_code),
         ];

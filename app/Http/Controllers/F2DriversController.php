@@ -9,6 +9,7 @@ use App\Models\F2RaceSession;
 use App\Models\F2Result;
 use App\Models\F2Season;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,7 +26,7 @@ class F2DriversController extends Controller
                 ->get()
                 ->map(fn (F2Driver $d) => [
                     'slug' => $d->slug,
-                    'name' => $d->fullName(),
+                    'name' => DriverName::display($d->slug, $d->fullName()),
                     'flag' => CountryFlag::iso2($d->country_code),
                     'team' => $d->team?->name,
                     'position' => $d->position,
@@ -52,7 +53,7 @@ class F2DriversController extends Controller
         return Inertia::render('F2/DriverShow', [
             'driver' => [
                 'slug' => $slug,
-                'name' => $latest->fullName(),
+                'name' => DriverName::display($slug, $latest->fullName()),
                 'flag' => CountryFlag::iso2($latest->country_code),
                 'country_code' => $latest->country_code,
                 'car_number' => $latest->car_number,

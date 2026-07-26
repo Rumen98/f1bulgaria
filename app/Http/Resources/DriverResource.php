@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\Driver;
+use App\Support\DriverName;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,7 +23,9 @@ class DriverResource extends JsonResource
             'id' => $this->id,
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
-            'full_name' => $this->fullName(),
+            // `full_name` е името за екрана (кирилица, ако е известна). Латиницата
+            // остава достъпна през `first_name`/`last_name`.
+            'full_name' => DriverName::display($this->slug, $this->fullName()),
             'slug' => $this->slug,
             'code' => $this->driver_code,
             'number' => $this->permanent_number,

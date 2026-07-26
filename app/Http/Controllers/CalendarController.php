@@ -10,6 +10,7 @@ use App\Models\Driver;
 use App\Models\Race;
 use App\Models\Season;
 use App\Services\Calendar\IcsCalendarBuilder;
+use App\Support\DriverName;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -55,8 +56,10 @@ class CalendarController extends Controller
             ->where('slug', $slug)
             ->firstOrFail();
 
+        $driverName = DriverName::display($driver->slug, $driver->fullName());
+
         return $this->icsResponse(
-            $builder->build($this->seasonRaces($season), "F1 Календар — {$driver->fullName()}"),
+            $builder->build($this->seasonRaces($season), "F1 Календар — {$driverName}"),
             "f1-{$slug}",
         );
     }

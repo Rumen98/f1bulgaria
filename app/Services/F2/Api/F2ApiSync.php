@@ -386,13 +386,36 @@ class F2ApiSync
             'car_number' => isset($row['racingNumber']) ? (int) $row['racingNumber'] : null,
         ];
 
+        $country = $this->countryCode($slug);
+
         if ($driver === null) {
-            return F2Driver::query()->create(['f2_season_id' => $season->id, ...$attributes]);
+            return F2Driver::query()->create([
+                'f2_season_id' => $season->id,
+                'country_code' => $country,
+                ...$attributes,
+            ]);
+        }
+
+        // Само запълване, не презаписване: записите от Wikipedia и seed-а вече
+        // носят верен флаг и са по-надежден източник от ръчната таблица.
+        if ($country !== null && blank($driver->country_code)) {
+            $attributes['country_code'] = $country;
         }
 
         $driver->update($attributes);
 
         return $driver;
+    }
+
+    /**
+     * Националността липсва в API-то, затова идва от ръчна таблица по slug —
+     * виж заглавния коментар на config/f2-driver-countries.php.
+     */
+    private function countryCode(string $slug): ?string
+    {
+        $code = config('f2-driver-countries')[$slug] ?? null;
+
+        return is_string($code) && $code !== '' ? $code : null;
     }
 
     /**
@@ -457,12 +480,14 @@ class F2ApiSync
                 $query->where('slug', $slug);
             }
 
+            // Полето е `position` — `positionNumber` е от резултатите на сесия
+            // и в този endpoint го няма, тоест всяка позиция падаше към индекса.
+            $position = is_numeric($row['position'] ?? null) ? (int) $row['position'] : 0;
+
             $query->update([
                 // Позицията в отговора невинаги е попълнена; редът е
                 // авторитетен и вече отчита изравняванията по правилата на FIA.
-                'position' => isset($row['positionNumber']) && $row['positionNumber'] !== null
-                    ? (int) $row['positionNumber']
-                    : $index + 1,
+                'position' => $position > 0 ? $position : $index + 1,
                 'points' => (float) ($row['championshipPoints'] ?? 0),
             ]);
         }

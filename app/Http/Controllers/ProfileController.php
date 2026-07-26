@@ -6,6 +6,7 @@ use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\Constructor;
 use App\Models\Driver;
 use App\Models\Season;
+use App\Support\DriverName;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,8 +32,8 @@ class ProfileController extends Controller
             'hasPassword' => $request->user()->password !== null,
             'drivers' => $seasonId
                 ? Driver::query()->where('season_id', $seasonId)
-                    ->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
-                    ->map(fn ($d) => ['id' => $d->id, 'name' => $d->fullName()])
+                    ->orderBy('last_name')->get(['id', 'slug', 'first_name', 'last_name'])
+                    ->map(fn ($d) => ['id' => $d->id, 'name' => DriverName::display($d->slug, $d->fullName())])
                 : [],
             'constructors' => $seasonId
                 ? Constructor::query()->where('season_id', $seasonId)

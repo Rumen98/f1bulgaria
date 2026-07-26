@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\F2Driver;
 use App\Models\F2Season;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -52,7 +53,7 @@ class F2Controller extends Controller
 
         return [
             'slug' => $driver->slug,
-            'name' => $driver->fullName(),
+            'name' => DriverName::display($driver->slug, $driver->fullName()),
             'flag' => CountryFlag::iso2($driver->country_code),
             'team' => $driver->team?->name,
             'position' => $driver->position,
@@ -74,7 +75,7 @@ class F2Controller extends Controller
             ->get()
             ->map(fn (F2Driver $d) => [
                 'slug' => $d->slug,
-                'name' => $d->fullName(),
+                'name' => DriverName::display($d->slug, $d->fullName()),
                 'flag' => CountryFlag::iso2($d->country_code),
                 'team' => $d->team?->name,
                 'position' => $d->position,
@@ -97,7 +98,7 @@ class F2Controller extends Controller
             ->sortByDesc(fn (F2Driver $d) => $d->season?->year)
             ->map(fn (F2Driver $d) => [
                 'year' => $d->season?->year,
-                'name' => $d->fullName(),
+                'name' => DriverName::display($d->slug, $d->fullName()),
                 'flag' => CountryFlag::iso2($d->country_code),
                 'team' => $d->team?->name,
             ])

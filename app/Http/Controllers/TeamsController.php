@@ -14,6 +14,7 @@ use App\Models\TeamNewsItem;
 use App\Services\Standings\StandingsService;
 use App\Services\Teams\TeamStatsService;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use App\Support\Seo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -105,7 +106,7 @@ class TeamsController extends Controller
             'stats' => $this->stats->getStatsForCanonical($canonical),
             'drivers' => $roster->map(fn (Driver $d) => [
                 'slug' => $d->slug,
-                'name' => $d->fullName(),
+                'name' => DriverName::display($d->slug, $d->fullName()),
                 'number' => $d->permanent_number,
                 'code' => $d->driver_code,
                 'flag' => CountryFlag::iso2($d->country_code),
@@ -168,7 +169,9 @@ class TeamsController extends Controller
                     ->where('session_type', ResultSessionType::Race)
                     ->sortBy('position')
                     ->map(fn ($r) => [
-                        'driver' => $r->driver?->fullName(),
+                        'driver' => $r->driver
+                            ? DriverName::display($r->driver->slug, $r->driver->fullName())
+                            : null,
                         'position' => $r->position,
                     ])->values(),
             ]);

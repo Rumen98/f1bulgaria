@@ -13,6 +13,7 @@ use App\Services\Homepage\ThisDayInF1Service;
 use App\Services\LiveTiming\OpenF1Client;
 use App\Services\LiveTiming\OpenF1TokenManager;
 use App\Services\Races\RaceNameLocalizer;
+use App\Support\DriverName;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -106,7 +107,9 @@ class HomeController extends Controller
                 'at_sofia' => $s->scheduled_at_utc
                     ?->copy()->setTimezone('Europe/Sofia')->format('d.m H:i'),
             ])->values(),
-            'winner' => $ctx->winner ? ['name' => $ctx->winner->fullName()] : null,
+            'winner' => $ctx->winner
+                ? ['name' => DriverName::display($ctx->winner->slug, $ctx->winner->fullName())]
+                : null,
         ];
     }
 }

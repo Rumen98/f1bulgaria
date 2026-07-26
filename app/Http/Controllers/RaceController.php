@@ -9,6 +9,7 @@ use App\Http\Resources\RaceResource;
 use App\Models\Driver;
 use App\Models\Race;
 use App\Services\Predictions\PredictionLockService;
+use App\Support\DriverName;
 use App\Support\Seo;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -39,8 +40,8 @@ class RaceController extends Controller
         $drivers = Driver::query()
             ->where('season_id', $race->season_id)
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name'])
-            ->map(fn ($d) => ['id' => $d->id, 'name' => $d->fullName()]);
+            ->get(['id', 'slug', 'first_name', 'last_name'])
+            ->map(fn ($d) => ['id' => $d->id, 'name' => DriverName::display($d->slug, $d->fullName())]);
 
         app(Seo::class)
             ->title($race->name_bg ?? $race->name)
