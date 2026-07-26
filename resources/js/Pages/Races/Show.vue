@@ -61,6 +61,12 @@ const showsTime = computed(() => active.value?.rows.some((r) => r.time));
                             @click="selected = c.type">{{ c.label }}</button>
                     </div>
 
+                    <!-- Класация от бързия източник: показваме я веднага след
+                         финала, но казваме, че точките още не са официални. -->
+                    <p v-if="active.provisional" class="border-b border-zinc-800 bg-amber-500/5 px-4 py-2 text-xs text-amber-400">
+                        Временна класация — официалните резултати и точките предстоят.
+                    </p>
+
                     <table class="w-full whitespace-nowrap text-sm">
                         <thead class="bg-zinc-900/80 text-left text-xs uppercase tracking-wide text-zinc-500">
                             <tr>
