@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Jolpica;
 
 use App\Enums\ResultSessionType;
+use App\Enums\SessionType;
 use App\Models\Constructor;
 use App\Models\Driver;
 use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
+use App\Models\SessionResult;
 use App\Services\Predictions\PredictionScoringService;
 use App\Support\Nationality;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +46,7 @@ class ResultSyncService
         $counts = DB::transaction(function () use ($race, $season, $mainRows, $sprintRows, $qualifying) {
             $main = $this->upsertResults($race, $season, $mainRows, ResultSessionType::Race);
             $sprint = $this->upsertResults($race, $season, $sprintRows, ResultSessionType::Sprint);
-            $this->syncPole($race, $season, $qualifying);
+            $this->syncQualifying($race, $season, $qualifying);
 
             return ['results' => $main, 'sprint' => $sprint];
         });
@@ -91,16 +93,39 @@ class ResultSyncService
     }
 
     /**
+     * Пълната класация от квалификацията плюс pole позицията.
+     *
+     * Jolpica я връща цялата и досега ползвахме само първия ред. Класацията
+     * трябва и на канала, и на страницата на състезанието.
+     *
      * @param  array<int, array<string, mixed>>  $qualifying
      */
-    private function syncPole(Race $race, Season $season, array $qualifying): void
+    private function syncQualifying(Race $race, Season $season, array $qualifying): void
     {
         foreach ($qualifying as $row) {
-            if (($row['position'] ?? null) === '1') {
-                $poleDriver = $this->resolveDriver($season, $row['Driver'], $row['Constructor'] ?? null);
-                $race->update(['pole_driver_id' => $poleDriver->id]);
+            $driver = $this->resolveDriver($season, $row['Driver'], $row['Constructor'] ?? null);
+            $position = (int) ($row['position'] ?? 0);
 
-                return;
+            // Пълната класация отива в `session_results`, а НЕ в `results`:
+            // там редовете без точки биха се броели като старт и подиум
+            // от статистиките, които не филтрират по session_type.
+            SessionResult::query()->updateOrCreate(
+                [
+                    'race_id' => $race->id,
+                    'session_type' => SessionType::Qualifying->value,
+                    'driver_id' => $driver->id,
+                ],
+                [
+                    'position' => $position > 0 ? $position : null,
+                    'q1' => $row['Q1'] ?? null,
+                    'q2' => $row['Q2'] ?? null,
+                    'q3' => $row['Q3'] ?? null,
+                    'source' => 'jolpica',
+                ],
+            );
+
+            if ($position === 1) {
+                $race->update(['pole_driver_id' => $driver->id]);
             }
         }
     }

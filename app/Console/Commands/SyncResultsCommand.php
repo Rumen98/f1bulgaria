@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\Race;
 use App\Services\Badges\BadgeService;
 use App\Services\Jolpica\ResultSyncService;
+use App\Services\Telegram\F1ChannelEnqueuer;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -16,7 +17,7 @@ class SyncResultsCommand extends Command
 
     protected $description = 'Синхрон на резултатите от състезание, точкуване на прогнозите и присъждане на значки.';
 
-    public function handle(ResultSyncService $sync, BadgeService $badges): int
+    public function handle(ResultSyncService $sync, BadgeService $badges, F1ChannelEnqueuer $enqueuer): int
     {
         $race = $this->resolveRace();
 
@@ -42,6 +43,16 @@ class SyncResultsCommand extends Command
             ['Резултати', 'Спринт', 'Точкувани прогнози', 'Нови значки'],
             [[$stats['results'], $stats['sprint'], $stats['scored'], $newBadges]],
         );
+
+        // Синхронът само пълни опашката; изпращането е на channel:post, за да
+        // не блокира точкуването при проблем с Telegram.
+        $queued = $enqueuer->enqueuePending();
+
+        $this->line("В опашката на канала: {$queued['queued']} нови, {$queued['updated']} обновени");
+
+        foreach ($queued['errors'] as $error) {
+            $this->warn($error);
+        }
 
         $this->info('Готово.');
 
