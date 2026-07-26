@@ -29,6 +29,10 @@ class IcsCalendarBuilder
             'PRODID:-//Падок//Календар//BG',
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
+            // И двете, защото клиентите се разминават: Apple Calendar чете
+            // NAME (RFC 7986) и игнорира X-WR-CALNAME, а Google и Outlook —
+            // обратното. Само с едното брандираното име не се показва навсякъде.
+            'NAME:'.$this->escape($calendarName),
             'X-WR-CALNAME:'.$this->escape($calendarName),
             'X-WR-TIMEZONE:UTC',
         ];
