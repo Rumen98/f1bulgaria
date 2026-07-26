@@ -2,7 +2,7 @@
 import NewsCard from '@/Components/News/NewsCard.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, InfiniteScroll, Link } from '@inertiajs/vue3';
+import { InfiniteScroll, Link } from '@inertiajs/vue3';
 
 defineProps({
     featured: Object,
@@ -14,7 +14,6 @@ defineProps({
 
 <template>
     <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
-    <Head title="Новини" />
 
     <PublicLayout>
         <div class="mb-6 flex items-baseline justify-between">

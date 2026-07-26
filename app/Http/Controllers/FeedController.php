@@ -57,8 +57,8 @@ class FeedController extends Controller
             ]);
         })->implode("\n");
 
-        $self = route('feed');
-        $home = rtrim((string) config('app.url'), '/');
+        $self = $this->escape(route('feed'));
+        $home = $this->escape(rtrim((string) config('app.url'), '/'));
         $updated = $items->first()?->published_at?->toRfc2822String() ?? now()->toRfc2822String();
 
         return <<<XML
@@ -77,8 +77,15 @@ class FeedController extends Controller
             XML;
     }
 
+    /**
+     * Контролните знаци (0x00-0x08, 0x0B, 0x0C, 0x0E-0x1F) са НЕВАЛИДНИ в
+     * XML 1.0 и htmlspecialchars ги пропуска непокътнати. Един такъв байт,
+     * дошъл от scrape-нат текст, прави ЦЕЛИЯ фийд неразбираем — не един item.
+     */
     private function escape(string $value): string
     {
-        return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        $clean = preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}]/u', '', $value) ?? '';
+
+        return htmlspecialchars($clean, ENT_XML1 | ENT_QUOTES, 'UTF-8');
     }
 }

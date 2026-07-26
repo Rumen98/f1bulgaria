@@ -2,7 +2,7 @@
 import PredictionForm from '@/Components/PredictionForm.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -18,7 +18,6 @@ const finished = computed(() => props.race.results && props.race.results.length 
 </script>
 
 <template>
-    <Head :title="race.name_bg ?? race.name" />
 
     <PublicLayout>
         <div class="mb-6">

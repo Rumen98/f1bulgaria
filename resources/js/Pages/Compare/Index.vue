@@ -1,6 +1,6 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -70,7 +70,6 @@ const goPreset = (p) => router.visit(route('compare.show', [p.a, p.b]));
 </script>
 
 <template>
-    <Head title="Сравнение на пилоти" />
 
     <PublicLayout>
         <h1 class="mb-2 font-display text-2xl font-black sm:text-3xl">Сравни пилоти</h1>

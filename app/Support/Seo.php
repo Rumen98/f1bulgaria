@@ -24,6 +24,10 @@ class Seo
 
     private ?string $image = null;
 
+    private ?int $imageWidth = null;
+
+    private ?int $imageHeight = null;
+
     private string $type = 'website';
 
     private ?string $canonical = null;
@@ -38,6 +42,26 @@ class Seo
     public const DEFAULT_TITLE = 'Падок — Формула 1 на български';
 
     public const DEFAULT_DESCRIPTION = 'Формула 1 на български — новини, календар на състезанията, класирания, статистика и прогнози.';
+
+    /**
+     * Нулира всичко. ЗАДЪЛЖИТЕЛНО в началото на всяка заявка: инстанцията е
+     * scoped, а при long-lived runtime (Octane, FrankenPHP) контейнерът живее
+     * между заявките. Без reset canonical от предишна статия изтича в следваща
+     * страница — Google я приема за дубликат и я маха от индекса.
+     */
+    public function reset(): void
+    {
+        $this->title = null;
+        $this->description = null;
+        $this->image = null;
+        $this->imageWidth = null;
+        $this->imageHeight = null;
+        $this->type = 'website';
+        $this->canonical = null;
+        $this->publishedAt = null;
+        $this->modifiedAt = null;
+        $this->schema = [];
+    }
 
     /**
      * Заглавие на страницата. Без суфикса на бранда — той се добавя тук.
@@ -58,9 +82,17 @@ class Seo
         return $this;
     }
 
-    public function image(?string $url): self
+    /**
+     * Размерите се обявяват САМО когато са известни. Facebook и LinkedIn
+     * избират layout-а на картата по обявените размери, преди да са изтеглили
+     * файла — грешно обявени 1200x630 върху портретна снимка дава жестоко
+     * изрязано изображение, а първият scrape се кешира.
+     */
+    public function image(?string $url, ?int $width = null, ?int $height = null): self
     {
         $this->image = $url;
+        $this->imageWidth = $width;
+        $this->imageHeight = $height;
 
         return $this;
     }
@@ -131,6 +163,33 @@ class Seo
     public function resolvedImage(): string
     {
         return $this->image ?: asset('og-image.jpg');
+    }
+
+    /**
+     * Размери само за собствения og-image.jpg (1200x630) или ако са подадени
+     * изрично. За външни снимки връща null — по-добре без размери, отколкото
+     * с грешни.
+     *
+     * @return array{0:int, 1:int}|null
+     */
+    public function resolvedImageSize(): ?array
+    {
+        if ($this->image === null) {
+            return [1200, 630]; // дефолтният банер
+        }
+
+        return $this->imageWidth !== null && $this->imageHeight !== null
+            ? [$this->imageWidth, $this->imageHeight]
+            : null;
+    }
+
+    /**
+     * summary_large_image само при известно широкоформатно изображение;
+     * иначе портретна снимка на пилот се реже през лицето.
+     */
+    public function twitterCard(): string
+    {
+        return $this->resolvedImageSize() !== null ? 'summary_large_image' : 'summary';
     }
 
     public function resolvedType(): string

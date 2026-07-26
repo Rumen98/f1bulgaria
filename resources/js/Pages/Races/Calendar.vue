@@ -3,7 +3,7 @@ import CalendarSubscribe from '@/Components/Calendar/CalendarSubscribe.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { useCountdown } from '@/composables/useCountdown';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -47,7 +47,6 @@ const countdownText = computed(() => {
 
 <template>
     <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
-    <Head title="Календар" />
 
     <PublicLayout>
         <div class="mb-6 flex items-center justify-between gap-3">

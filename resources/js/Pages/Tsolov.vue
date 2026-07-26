@@ -2,7 +2,7 @@
 import Card from '@/Components/UI/Card.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -41,7 +41,6 @@ const tsolovShare = computed(() => {
 </script>
 
 <template>
-    <Head title="Никола Цолов" />
 
     <PublicLayout>
         <!-- Hero банер — актуално позициониране като лидер във Формула 2 -->

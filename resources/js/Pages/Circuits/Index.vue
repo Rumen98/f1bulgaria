@@ -1,7 +1,7 @@
 <script setup>
 import CircuitCard from '@/Components/Circuit/CircuitCard.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -21,7 +21,6 @@ const tabs = [
 </script>
 
 <template>
-    <Head title="Писти" />
 
     <PublicLayout>
         <h1 class="mb-2 font-display text-2xl font-black sm:text-3xl">Писти</h1>

@@ -6,7 +6,7 @@ import DriverStatsGrid from '@/Components/Driver/DriverStatsGrid.vue';
 import HeadToHeadBars from '@/Components/Driver/HeadToHeadBars.vue';
 import FlagIcon from '@/Components/FlagIcon.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
 const props = defineProps({
@@ -36,7 +36,6 @@ watch(() => props.driver.photo, () => (photoFailed.value = false));
 
 <template>
     <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
-    <Head :title="driver.name" />
 
     <PublicLayout>
         <div class="flex items-center justify-between gap-3">
@@ -105,7 +104,6 @@ watch(() => props.driver.photo, () => (photoFailed.value = false));
 
         <div class="mt-8 grid gap-8 lg:grid-cols-2">
             <DriverRecentResults :results="recentResults" />
-            <HeadToHeadBars :h2h="headToHead" :driver-name="driver.name" :color="driver.color_hex" />
         </div>
 
         <div class="mt-10">

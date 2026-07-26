@@ -2,7 +2,7 @@
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 defineProps({
@@ -21,7 +21,6 @@ const podium = (pos) => ({
 
 <template>
     <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
-    <Head title="Класиране на прогнозите" />
 
     <PublicLayout>
         <div class="mb-2 flex flex-wrap items-center justify-between gap-3">

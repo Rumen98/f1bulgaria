@@ -4,7 +4,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     email: { type: String, required: true },
@@ -27,7 +27,6 @@ const submit = () => {
 
 <template>
     <AuthLayout title="Нова парола" subtitle="Избери си нова парола за акаунта.">
-        <Head title="Нова парола" />
 
         <form @submit.prevent="submit">
             <div>

@@ -2,7 +2,7 @@
 import FlagIcon from '@/Components/FlagIcon.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -24,7 +24,6 @@ const tabs = computed(() => [
 
 <template>
     <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
-    <Head title="Пилоти" />
 
     <PublicLayout>
         <h1 class="mb-4 font-display text-2xl font-black sm:text-3xl">Пилоти <span class="text-red-600">{{ season }}</span></h1>

@@ -1,7 +1,6 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
-import { Head } from '@inertiajs/vue3';
 
 defineProps({
     profile: Object,
@@ -11,7 +10,6 @@ defineProps({
 </script>
 
 <template>
-    <Head :title="profile.name" />
 
     <PublicLayout>
         <div class="grid gap-6 md:grid-cols-3">

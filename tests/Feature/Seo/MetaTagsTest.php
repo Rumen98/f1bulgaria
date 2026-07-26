@@ -99,3 +99,69 @@ it('първоначалният HTML съдържа noscript навигация
     expect($html)->toContain('<noscript>')
         ->and($html)->toContain('href="'.route('news.index').'"');
 });
+
+it('нулира SEO състоянието между заявките (scoped singleton не изтича)', function () {
+    $item = publishedArticle();
+
+    // Статия → og:type=article, canonical към статията, NewsArticle schema.
+    $this->get("/news/{$item->slug}")->assertOk();
+
+    // Следваща заявка в СЪЩИЯ контейнер не бива да наследи нищо от нея.
+    $html = $this->get('/calendar')->assertOk()->getContent();
+
+    expect($html)->toContain('property="og:type" content="website"')
+        ->and($html)->not->toContain($item->slug)
+        ->and($html)->not->toContain('NewsArticle')
+        ->and($html)->not->toContain('article:published_time');
+});
+
+it('заглавието не носи inertia атрибут — клиентът не бива да го трие', function () {
+    $html = $this->get('/calendar')->assertOk()->getContent();
+
+    expect($html)->toContain('<title>Календар на Формула 1 — Падок</title>')
+        ->and($html)->not->toContain('<title inertia>');
+});
+
+it('подава заглавието и като prop за SPA навигация', function () {
+    $this->get('/calendar')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('seoTitle', 'Календар на Формула 1 — Падок'));
+});
+
+it('не обявява размери за външна снимка на пилот', function () {
+    $item = publishedArticle([
+        'featured_image' => [
+            'type' => 'driver_photo',
+            'data' => ['photo_url' => 'https://example.com/portrait.jpg', 'name' => 'Норис'],
+        ],
+    ]);
+
+    $html = $this->get("/news/{$item->slug}")->assertOk()->getContent();
+
+    // Портретна снимка + обявени 1200x630 = отрязана глава в социалната карта.
+    expect($html)->not->toContain('og:image:width')
+        ->and($html)->toContain('name="twitter:card" content="summary"');
+});
+
+it('обявява размери за собствения банер', function () {
+    $html = $this->get('/calendar')->assertOk()->getContent();
+
+    expect($html)->toContain('property="og:image:width" content="1200"')
+        ->and($html)->toContain('name="twitter:card" content="summary_large_image"');
+});
+
+it('непозната категория се канонизира към /news, не към себе си', function () {
+    $html = $this->get('/news?cat=junk-value')->assertOk()->getContent();
+
+    // Canonical и og:url сочат чистия /news — иначе всеки произволен ?cat=
+    // ражда self-canonical дубликат и яде crawl бюджета.
+    expect($html)->toContain('rel="canonical" href="'.route('news.index').'"')
+        ->and($html)->toContain('property="og:url" content="'.route('news.index').'"')
+        ->and($html)->not->toContain('cat=junk-value"'); // не и в мета таг
+});
+
+it('третира непознатата категория като „Всички“', function () {
+    $this->get('/news?cat=junk-value')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('activeCat', 'all'));
+});

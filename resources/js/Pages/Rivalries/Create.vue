@@ -1,6 +1,6 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -88,7 +88,6 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Създай дуел" />
 
     <PublicLayout>
         <Link :href="route('rivalries.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички дуели</Link>

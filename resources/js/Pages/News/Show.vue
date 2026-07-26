@@ -5,7 +5,7 @@ import NewsImage from '@/Components/News/NewsImage.vue';
 import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { NEUTRAL_DOT_COLOR } from '@/utils/racing';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -43,7 +43,6 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
     <!-- Само title-ът се обновява клиентски при SPA навигация. Всички
          meta/og/canonical тагове се рендерират сървърно (App\Support\Seo),
          защото социалните скрейпъри не изпълняват JavaScript. -->
-    <Head :title="article.title" />
 
     <PublicLayout>
         <Link :href="route('news.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички новини</Link>

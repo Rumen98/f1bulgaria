@@ -26,7 +26,10 @@ class NewsController extends Controller
 
     public function index(Request $request): Response
     {
-        $cat = (string) $request->query('cat', 'all');
+        // Непозната стойност се третира като 'all'. Иначе всеки ?cat=каквото-и-да-е
+        // дава страница с идентично съдържание, която канонизира САМА СЕБЕ СИ —
+        // безброй дубликати, които изяждат crawl бюджета на нов домейн.
+        $cat = $this->normalizeCat((string) $request->query('cat', 'all'));
 
         // Featured = най-важната измежду най-новите (без активен филтър).
         $featured = $cat === 'all'
@@ -136,6 +139,16 @@ class NewsController extends Controller
         }
 
         return asset('og-image.jpg');
+    }
+
+    /**
+     * Валидните категории са тези от табовете; всичко друго → 'all'.
+     */
+    private function normalizeCat(string $cat): string
+    {
+        $valid = ['all', 'analysis', ...array_map(fn (NewsClassification $c) => $c->value, NewsClassification::cases())];
+
+        return in_array($cat, $valid, true) ? $cat : 'all';
     }
 
     private function catLabel(string $cat): string

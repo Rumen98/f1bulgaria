@@ -2,7 +2,7 @@
 import FlagIcon from '@/Components/FlagIcon.vue';
 import Card from '@/Components/UI/Card.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -29,7 +29,6 @@ const better = (a, b) => (a > b ? 'a' : b > a ? 'b' : 'tie');
 </script>
 
 <template>
-    <Head :title="rivalry.title" />
 
     <PublicLayout>
         <Link :href="route('rivalries.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички съперничества</Link>

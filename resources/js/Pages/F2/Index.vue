@@ -4,7 +4,7 @@ import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
 import { hasRoute } from '@/utils/routes';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     season: Number,
@@ -20,7 +20,6 @@ const goToSeason = (e) => {
 </script>
 
 <template>
-    <Head title="Формула 2" />
 
     <PublicLayout>
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">

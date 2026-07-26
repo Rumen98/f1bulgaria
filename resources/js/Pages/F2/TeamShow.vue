@@ -2,7 +2,7 @@
 import FlagIcon from '@/Components/FlagIcon.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 
 defineProps({
     team: { type: Object, required: true },
@@ -20,7 +20,6 @@ const statCards = [
 </script>
 
 <template>
-    <Head :title="team.name" />
 
     <PublicLayout>
         <Link :href="route('f2.teams.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Отбори F2</Link>

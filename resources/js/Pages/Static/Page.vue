@@ -1,7 +1,6 @@
 <script setup>
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head } from '@inertiajs/vue3';
 
 defineProps({
     title: { type: String, required: true },
@@ -13,7 +12,6 @@ defineProps({
 </script>
 
 <template>
-    <Head :title="title" />
 
     <PublicLayout>
         <article class="mx-auto max-w-3xl">

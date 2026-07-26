@@ -17,7 +17,11 @@
              Социалните скрейпъри (Facebook, Viber, Telegram, X) не изпълняват
              JavaScript, затова тези тагове НЕ бива да се дублират във Vue
              <Head> — иначе скрейпърът чете първото (генерично) срещане. --}}
-        <title inertia>{{ $seo->resolvedTitle() }}</title>
+        {{-- БЕЗ `inertia` атрибут: Inertia head manager-ът притежава всеки
+             елемент с този атрибут и го ЗАМЕНЯ при монтиране — така сървърното
+             заглавие се губеше още преди Googlebot да го прочете. Клиентът
+             обновява document.title от seoTitle prop-а при SPA навигация. --}}
+        <title>{{ $seo->resolvedTitle() }}</title>
         <meta name="description" content="{{ $seo->resolvedDescription() }}">
         <link rel="canonical" href="{{ $seo->resolvedCanonical() }}">
 
@@ -27,8 +31,10 @@
         <meta property="og:description" content="{{ $seo->resolvedDescription() }}">
         <meta property="og:url" content="{{ $seo->resolvedCanonical() }}">
         <meta property="og:image" content="{{ $seo->resolvedImage() }}">
-        <meta property="og:image:width" content="1200">
-        <meta property="og:image:height" content="630">
+        @if ($size = $seo->resolvedImageSize())
+            <meta property="og:image:width" content="{{ $size[0] }}">
+            <meta property="og:image:height" content="{{ $size[1] }}">
+        @endif
         <meta property="og:image:alt" content="{{ $seo->socialTitle() }}">
         <meta property="og:locale" content="bg_BG">
         @if ($seo->publishedAt())
@@ -36,7 +42,7 @@
             <meta property="article:modified_time" content="{{ $seo->modifiedAt() ?? $seo->publishedAt() }}">
         @endif
 
-        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:card" content="{{ $seo->twitterCard() }}">
         <meta name="twitter:title" content="{{ $seo->socialTitle() }}">
         <meta name="twitter:description" content="{{ $seo->resolvedDescription() }}">
         <meta name="twitter:image" content="{{ $seo->resolvedImage() }}">

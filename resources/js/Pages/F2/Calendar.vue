@@ -4,7 +4,7 @@ import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
 import { hasRoute } from '@/utils/routes';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     season: Number,
@@ -16,7 +16,6 @@ const goToSeason = (e) => router.visit(route('f2.calendar.year', e.target.value)
 </script>
 
 <template>
-    <Head :title="`Календар Формула 2 — ${season}`" />
 
     <PublicLayout>
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">

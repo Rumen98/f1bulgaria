@@ -1,6 +1,6 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -24,7 +24,6 @@ const scrollTo = (id) => {
 </script>
 
 <template>
-    <Head title="F1 в България" />
 
     <PublicLayout>
         <article class="mx-auto max-w-3xl">

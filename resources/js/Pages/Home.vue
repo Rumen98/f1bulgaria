@@ -5,7 +5,7 @@ import LiveSessionBanner from '@/Components/LiveSessionBanner.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { hasRoute } from '@/utils/routes';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 defineProps({
@@ -34,7 +34,6 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
 
 <template>
     <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
-    <Head title="Падок — Формула 1 на български" />
 
     <PublicLayout>
         <h1 class="sr-only">Падок — новини, календар и класиране от Формула 1 на български</h1>

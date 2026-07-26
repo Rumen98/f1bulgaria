@@ -5,7 +5,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 
 const form = useForm({
     name: '',
@@ -23,7 +23,6 @@ const submit = () => {
 
 <template>
     <AuthLayout title="Стани част от общността" subtitle="Прави прогнози, събирай точки и значки, следи историята на F1.">
-        <Head title="Регистрация" />
 
         <form @submit.prevent="submit">
             <div>

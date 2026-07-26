@@ -4,7 +4,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 
 defineProps({
     status: { type: String },
@@ -21,7 +21,6 @@ const submit = () => {
 
 <template>
     <AuthLayout title="Възстанови достъп" subtitle="Ще ти изпратим линк за нова парола на имейла.">
-        <Head title="Забравена парола" />
 
         <div v-if="status" class="mb-4 text-sm font-medium text-green-400">
             {{ status }}

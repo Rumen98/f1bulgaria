@@ -1,7 +1,7 @@
 <script setup>
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 
 defineProps({
     rivalries: { type: Array, default: () => [] },
@@ -10,7 +10,6 @@ defineProps({
 </script>
 
 <template>
-    <Head title="Съперничества" />
 
     <PublicLayout>
         <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

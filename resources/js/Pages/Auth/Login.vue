@@ -6,7 +6,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 
 defineProps({
     canResetPassword: { type: Boolean },
@@ -28,7 +28,6 @@ const submit = () => {
 
 <template>
     <AuthLayout title="Влез в Падок" subtitle="Прогнози. Класирания. История.">
-        <Head title="Вход" />
 
         <div v-if="status" class="mb-4 text-sm font-medium text-green-400">
             {{ status }}

@@ -1,7 +1,7 @@
 <script setup>
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 
 defineProps({
     predictions: Array,
@@ -9,7 +9,6 @@ defineProps({
 </script>
 
 <template>
-    <Head title="Моите прогнози" />
 
     <PublicLayout>
         <h1 class="mb-6 font-display text-2xl font-black sm:text-3xl">Моите прогнози</h1>

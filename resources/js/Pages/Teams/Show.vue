@@ -7,7 +7,7 @@ import Card from '@/Components/UI/Card.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { TEAM_COLOR_FALLBACK } from '@/utils/racing';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     team: Object,
@@ -27,7 +27,6 @@ const goToSeason = (e) => {
 
 <template>
     <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
-    <Head :title="team.name" />
 
     <PublicLayout>
         <div class="flex items-center justify-between gap-3">

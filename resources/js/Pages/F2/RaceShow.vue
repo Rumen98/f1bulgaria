@@ -3,7 +3,7 @@ import FlagIcon from '@/Components/FlagIcon.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { hasRoute } from '@/utils/routes';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
     race: { type: Object, required: true },
@@ -20,7 +20,6 @@ const rowClass = (p) => ({ 1: 'bg-amber-500/10', 2: 'bg-zinc-400/10', 3: 'bg-ora
 </script>
 
 <template>
-    <Head :title="`F2 ${race.location} — ${sessionLabel}`" />
 
     <PublicLayout>
         <Link :href="route('f2.calendar.year', race.season)" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Календар F2 {{ race.season }}</Link>

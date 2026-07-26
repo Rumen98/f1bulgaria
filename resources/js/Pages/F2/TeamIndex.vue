@@ -1,7 +1,7 @@
 <script setup>
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 
 defineProps({
     season: Number,
@@ -10,7 +10,6 @@ defineProps({
 </script>
 
 <template>
-    <Head title="Отбори Формула 2" />
 
     <PublicLayout>
         <Link :href="route('f2')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Формула 2</Link>

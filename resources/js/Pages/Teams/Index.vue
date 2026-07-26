@@ -3,7 +3,7 @@ import TeamBrand from '@/Components/Team/TeamBrand.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { TEAM_COLOR_FALLBACK } from '@/utils/racing';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
@@ -40,7 +40,6 @@ const filtered = computed(() => {
 
 <template>
     <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
-    <Head title="Отбори" />
 
     <PublicLayout>
         <h1 class="mb-6 font-display text-2xl font-black sm:text-3xl">Отбори</h1>

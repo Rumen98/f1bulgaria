@@ -3,7 +3,7 @@ import FlagIcon from '@/Components/FlagIcon.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -48,7 +48,6 @@ const betterResult = (a, b) => {
 </script>
 
 <template>
-    <Head :title="`${a.name} срещу ${b.name}`" />
 
     <PublicLayout>
         <h1 class="sr-only">{{ a.name }} срещу {{ b.name }}</h1>

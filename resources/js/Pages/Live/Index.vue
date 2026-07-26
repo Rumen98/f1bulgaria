@@ -2,7 +2,7 @@
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const props = defineProps({
@@ -110,7 +110,6 @@ const nextRaceCountdown = computed(() => {
 </script>
 
 <template>
-    <Head title="На живо" />
 
     <PublicLayout>
         <!-- Активна сесия -->

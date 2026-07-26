@@ -4,7 +4,7 @@ import StatTile from '@/Components/UI/StatTile.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { hasRoute } from '@/utils/routes';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
     driver: { type: Object, required: true },
@@ -24,7 +24,6 @@ const statCards = [
 </script>
 
 <template>
-    <Head :title="driver.name" />
 
     <PublicLayout>
         <Link :href="route('f2.drivers.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Пилоти F2</Link>

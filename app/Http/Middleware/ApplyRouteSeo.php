@@ -19,6 +19,11 @@ class ApplyRouteSeo
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Seo е scoped singleton — при long-lived runtime (Octane) контейнерът
+        // преживява заявката. Без този reset canonical/og:type/JSON-LD от
+        // предишната страница изтичат в следващата.
+        app(Seo::class)->reset();
+
         $name = $request->route()?->getName();
 
         if ($name !== null) {

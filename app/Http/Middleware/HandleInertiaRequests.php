@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Seo;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -39,6 +40,10 @@ class HandleInertiaRequests extends Middleware
             ],
             'teamBrands' => fn () => config('team-brands'),
             'features' => fn () => config('features'),
+            // Заглавието се решава сървърно (App\Support\Seo). Подава се и като
+            // prop, за да го приложи клиентът при SPA навигация — така таб
+            // заглавието и индексираното от Google съвпадат.
+            'seoTitle' => fn () => app(Seo::class)->resolvedTitle(),
         ];
     }
 }

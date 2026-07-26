@@ -9,7 +9,7 @@ import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { NEUTRAL_DOT_COLOR } from '@/utils/racing';
 import { hasRoute } from '@/utils/routes';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 
 defineProps({
     circuit: Object,
@@ -23,7 +23,6 @@ defineProps({
 </script>
 
 <template>
-    <Head :title="circuit.name" />
 
     <PublicLayout>
         <Link :href="route('circuits.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички писти</Link>

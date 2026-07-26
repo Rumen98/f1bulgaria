@@ -1,6 +1,6 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -16,7 +16,6 @@ const readingMinutes = computed(() => {
 </script>
 
 <template>
-    <Head title="Световна история на F1" />
 
     <PublicLayout>
         <article class="mx-auto max-w-3xl">

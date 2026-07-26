@@ -1,6 +1,6 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 
 const cards = [
     {
@@ -19,7 +19,6 @@ const cards = [
 </script>
 
 <template>
-    <Head title="Историята на Формула 1" />
 
     <PublicLayout>
         <header class="relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-br from-red-950/40 via-zinc-950 to-black p-8 sm:p-12">

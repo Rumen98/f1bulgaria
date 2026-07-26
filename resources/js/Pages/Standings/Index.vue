@@ -3,7 +3,7 @@ import TeamBrand from '@/Components/Team/TeamBrand.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { NEUTRAL_DOT_COLOR } from '@/utils/racing';
-import { Head, router } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 const props = defineProps({
@@ -23,7 +23,6 @@ const goToSeason = (e) => {
 
 <template>
     <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
-    <Head title="Класиране" />
 
     <PublicLayout>
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
