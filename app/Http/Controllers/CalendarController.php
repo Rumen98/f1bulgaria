@@ -38,7 +38,7 @@ class CalendarController extends Controller
     public function ics(IcsCalendarBuilder $builder): Response
     {
         return $this->icsResponse(
-            $builder->build($this->feedRaces(), 'F1 Календар'),
+            $builder->build($this->feedRaces(), 'Падок — Календар'),
             'f1-calendar',
         );
     }
@@ -59,7 +59,7 @@ class CalendarController extends Controller
         $driverName = DriverName::display($driver->slug, $driver->fullName());
 
         return $this->icsResponse(
-            $builder->build($this->seasonRaces($season), "F1 Календар — {$driverName}"),
+            $builder->build($this->seasonRaces($season), "Падок — Календар на {$driverName}"),
             "f1-{$slug}",
         );
     }
@@ -78,7 +78,7 @@ class CalendarController extends Controller
             ->firstOrFail();
 
         return $this->icsResponse(
-            $builder->build($this->seasonRaces($season), "F1 Календар — {$team->name}"),
+            $builder->build($this->seasonRaces($season), "Падок — Календар на {$team->name}"),
             "f1-team-{$slug}",
         );
     }

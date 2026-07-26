@@ -13,6 +13,7 @@ use App\Models\Season;
 use App\Models\TeamNewsItem;
 use App\Services\Standings\StandingsService;
 use App\Services\Teams\TeamStatsService;
+use App\Support\BulgarianSort;
 use App\Support\CountryFlag;
 use App\Support\DriverName;
 use App\Support\Seo;
@@ -90,7 +91,9 @@ class TeamsController extends Controller
             ? $this->standings->drivers($season)->keyBy(fn ($r) => $r['driver']->id)
             : collect();
 
-        $roster = $team ? $team->drivers->sortBy('last_name')->values() : collect();
+        // Редът на състава се определя след map-ването, по кирилското име;
+        // тук колекцията служи и за ID-тата на последните резултати.
+        $roster = $team ? $team->drivers : collect();
 
         return Inertia::render('Teams/Show', [
             'team' => [
@@ -112,7 +115,9 @@ class TeamsController extends Controller
                 'flag' => CountryFlag::iso2($d->country_code),
                 'points' => $driverStandings->get($d->id)['points'] ?? 0,
                 'position' => $driverStandings->get($d->id)['position'] ?? null,
-            ]),
+            ])
+                ->sortBy(fn (array $d) => BulgarianSort::key($d['name']))
+                ->values(),
             'news' => $team ? $this->news($team) : collect(),
             'recentResults' => $this->recentResults($roster->pluck('id')),
             'season' => $selectedYear,

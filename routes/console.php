@@ -15,10 +15,25 @@ Schedule::command('f1:lock-predictions')
     ->everyMinute()
     ->withoutOverlapping();
 
-// Синхрон на резултати — на всеки час (състезанията са в неделя следобед).
+// Синхрон на резултати. На 15 мин, а не на час: каналът публикува от базата и
+// час закъснение се вижда. Jolpica прави 3 заявки на пускане при лимит ~500 на
+// час, така че честотата не е проблем — Jolpica обаче публикува със собствено
+// закъснение и това остава тясното място.
 Schedule::command('f1:sync-results')
-    ->hourly()
-    ->withoutOverlapping();
+    ->everyFifteenMinutes()
+    ->withoutOverlapping(14);
+
+// Разписание на сесиите + класации от тренировките и спринт квалификацията.
+//
+// Разписанието е критично, не украса: `race_sessions` се чете от
+// NextRaceResolver, за да разбере дали тече уикенд. Докато таблицата беше
+// празна, началната страница не показваше нито активен уикенд, нито
+// състояние след финала.
+Schedule::command('f1:sync-sessions')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping(14)
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
 
 // Неделен вечерен дайджест в 20:00 софийско време.
 // withoutOverlapping е задължително тук: изпраща имейли до всички абонати,

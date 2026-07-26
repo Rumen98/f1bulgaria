@@ -41,15 +41,23 @@ class F1SessionFormatter
             '',
         ];
 
-        $lines = [...$lines, ...match ($kind) {
-            ChannelPostKind::F1Qualifying => $this->qualifyingLines($race),
-            default => $this->raceLines($race, $kind),
-        }];
+        $sessionType = $kind->sessionType();
+
+        $lines = [...$lines, ...($sessionType !== null
+            ? $this->sessionResultLines($race, $sessionType)
+            : $this->raceLines($race, $kind)
+        )];
 
         $lines = [...$lines, ...$this->context($race, $kind)];
 
         $lines[] = '';
         $lines[] = '<a href="'.TelegramText::escape(route('races.show', $race)).'">Пълна класация в Падок</a>';
+
+        // CC BY-NC-SA изисква посочване на източника — това не е любезност,
+        // а условие на лиценза, при който ползваме данните за тренировките.
+        if ($kind->requiresOpenF1Attribution()) {
+            $lines[] = '<i>'.TelegramText::escape((string) config('channel.openf1_attribution')).'</i>';
+        }
 
         return implode("\n", $lines);
     }
@@ -116,13 +124,16 @@ class F1SessionFormatter
     }
 
     /**
+     * Класация от сесия без точки: квалификация, спринт квалификация,
+     * тренировки. Показва време на обиколка, не точки.
+     *
      * @return array<int, string>
      */
-    private function qualifyingLines(Race $race): array
+    private function sessionResultLines(Race $race, SessionType $type): array
     {
         $results = SessionResult::query()
             ->where('race_id', $race->id)
-            ->where('session_type', SessionType::Qualifying->value)
+            ->where('session_type', $type->value)
             ->with('driver.constructor')
             ->get();
 
@@ -138,10 +149,18 @@ class F1SessionFormatter
                 $parts[] = $team;
             }
 
+            // При квалификация показваме отсечката, до която пилотът е стигнал
+            // (Q3, иначе Q2, иначе Q1) — иначе редовете носят времена от
+            // различни етапи и подредбата изглежда сгрешена.
             $time = $result->bestQualifyingTime();
 
             if (filled($time)) {
                 $parts[] = TelegramText::escape((string) $time);
+            }
+
+            // Изоставането има смисъл само след лидера.
+            if ((int) $result->position > 1 && filled($result->gap)) {
+                $parts[] = TelegramText::escape((string) $result->gap);
             }
 
             $lines[] = implode(' · ', $parts);

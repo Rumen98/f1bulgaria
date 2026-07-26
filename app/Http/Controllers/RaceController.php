@@ -9,6 +9,7 @@ use App\Http\Resources\RaceResource;
 use App\Models\Driver;
 use App\Models\Race;
 use App\Services\Predictions\PredictionLockService;
+use App\Support\BulgarianSort;
 use App\Support\DriverName;
 use App\Support\Seo;
 use Inertia\Inertia;
@@ -37,11 +38,14 @@ class RaceController extends Controller
             $userPrediction = $prediction ? new PredictionResource($prediction) : null;
         }
 
+        // Падащото меню за прогнози е азбучно по показваното (кирилско) име,
+        // затова подредбата е след map-ването, а не в SQL.
         $drivers = Driver::query()
             ->where('season_id', $race->season_id)
-            ->orderBy('last_name')
             ->get(['id', 'slug', 'first_name', 'last_name'])
-            ->map(fn ($d) => ['id' => $d->id, 'name' => DriverName::display($d->slug, $d->fullName())]);
+            ->map(fn ($d) => ['id' => $d->id, 'name' => DriverName::display($d->slug, $d->fullName())])
+            ->sortBy(fn (array $d) => BulgarianSort::key($d['name']))
+            ->values();
 
         app(Seo::class)
             ->title($race->name_bg ?? $race->name)

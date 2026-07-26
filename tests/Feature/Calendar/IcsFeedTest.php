@@ -72,6 +72,25 @@ it('връща .ics за конкретен отбор от текущия се�
         ->assertSee('BEGIN:VCALENDAR', false);
 });
 
+it('брандира календара като „Падок“, без „F1“ в името и PRODID', function () {
+    Driver::factory()->create(['season_id' => $this->season->id, 'slug' => 'max-verstappen', 'first_name' => 'Max', 'last_name' => 'Verstappen']);
+    Constructor::factory()->create(['season_id' => $this->season->id, 'slug' => 'ferrari', 'name' => 'Ferrari']);
+
+    $feeds = [
+        '/calendar.ics' => 'X-WR-CALNAME:Падок — Календар',
+        '/calendar/max-verstappen.ics' => 'X-WR-CALNAME:Падок — Календар на ',
+        '/calendar/team/ferrari.ics' => 'X-WR-CALNAME:Падок — Календар на Ferrari',
+    ];
+
+    foreach ($feeds as $url => $expectedName) {
+        $body = $this->get($url)->assertOk()->getContent();
+
+        expect($body)->toContain($expectedName)
+            ->and($body)->toContain('PRODID:-//Падок//Календар//BG')
+            ->and($body)->not->toContain('F1 Календар');
+    }
+});
+
 it('връща 404 за несъществуващ пилот', function () {
     $this->get('/calendar/nonexistent.ics')->assertNotFound();
 });

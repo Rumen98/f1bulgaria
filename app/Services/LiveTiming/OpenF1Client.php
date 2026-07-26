@@ -106,6 +106,49 @@ class OpenF1Client
     }
 
     /**
+     * Всички сесии от даден сезон — календар с точни начало и край.
+     *
+     * Кешът е дълъг нарочно: OpenF1 обновява разписанието веднъж дневно в
+     * полунощ UTC, а безплатният лимит е 30 заявки в минута. Кратък кеш тук
+     * би го изял без никаква полза.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getSeasonSessions(int $year): Collection
+    {
+        return Cache::remember("openf1:sessions:{$year}", now()->addMinutes(30), function () use ($year) {
+            return $this->get('sessions', ['year' => $year])
+                ->filter(fn ($s) => is_array($s) && isset($s['session_key']))
+                ->values();
+        });
+    }
+
+    /**
+     * Крайната класация на сесия — позиция за всеки пилот.
+     *
+     * Работи за ВСИЧКИ видове сесии, включително тренировките и спринт
+     * квалификацията, което Jolpica изобщо не покрива.
+     *
+     * ВНИМАНИЕ при ползване: `duration` и `gap_to_leader` НЕ са с постоянен тип.
+     * В тренировка са число (най-добра обиколка в секунди), в квалификация са
+     * масив от три стойности [Q1, Q2, Q3], а в състезание изоставането може да
+     * е низ като „+1 LAP". Обработвай ги като mixed.
+     *
+     * Кешът е 6 часа: класацията на приключила сесия не се мени, а повторното
+     * дърпане на всяка сесия от уикенда би изчерпало лимита.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getSessionResult(int $sessionKey): Collection
+    {
+        return Cache::remember("openf1:session-result:{$sessionKey}", now()->addHours(6), function () use ($sessionKey) {
+            return $this->get('session_result', ['session_key' => $sessionKey])
+                ->filter(fn ($r) => is_array($r) && isset($r['driver_number']))
+                ->values();
+        });
+    }
+
+    /**
      * Всички обиколки в сесията. Кеш 5 секунди (rate-limit safety).
      *
      * @return Collection<int, array<string, mixed>>

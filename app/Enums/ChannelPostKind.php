@@ -103,6 +103,24 @@ enum ChannelPostKind: string
     }
 
     /**
+     * Сесията в `session_results`, ако постът се храни оттам.
+     *
+     * null означава, че данните идват от `results` (състезание и спринт —
+     * единствените с шампионатни точки).
+     */
+    public function sessionType(): ?SessionType
+    {
+        return match ($this) {
+            self::F1Fp1 => SessionType::FP1,
+            self::F1Fp2 => SessionType::FP2,
+            self::F1Fp3 => SessionType::FP3,
+            self::F1Qualifying => SessionType::Qualifying,
+            self::F1SprintQuali => SessionType::SprintQuali,
+            default => null,
+        };
+    }
+
+    /**
      * Съответствие с типа сесия в `race_sessions` / OpenF1 класификацията.
      */
     public static function fromF1SessionType(SessionType $type): self

@@ -6,6 +6,7 @@ use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\Constructor;
 use App\Models\Driver;
 use App\Models\Season;
+use App\Support\BulgarianSort;
 use App\Support\DriverName;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
@@ -30,10 +31,13 @@ class ProfileController extends Controller
             'status' => session('status'),
             // Google акаунтите нямат парола — формите за смяна/изтриване се съобразяват.
             'hasPassword' => $request->user()->password !== null,
+            // Подредбата е след map-ването — по показваното (кирилско) име.
             'drivers' => $seasonId
                 ? Driver::query()->where('season_id', $seasonId)
-                    ->orderBy('last_name')->get(['id', 'slug', 'first_name', 'last_name'])
+                    ->get(['id', 'slug', 'first_name', 'last_name'])
                     ->map(fn ($d) => ['id' => $d->id, 'name' => DriverName::display($d->slug, $d->fullName())])
+                    ->sortBy(fn (array $d) => BulgarianSort::key($d['name']))
+                    ->values()
                 : [],
             'constructors' => $seasonId
                 ? Constructor::query()->where('season_id', $seasonId)

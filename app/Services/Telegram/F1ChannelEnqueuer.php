@@ -9,6 +9,7 @@ use App\Enums\ChannelQueueOutcome;
 use App\Enums\ResultSessionType;
 use App\Enums\SessionType;
 use App\Models\Race;
+use App\Models\RaceSession;
 use App\Models\Result;
 use App\Models\SessionResult;
 use App\Services\Telegram\Formatters\F1SessionFormatter;
@@ -87,14 +88,41 @@ class F1ChannelEnqueuer
     private function readyKinds(Race $race): array
     {
         $kinds = [];
+        $cutoff = now()->subHours((int) config('channel.max_backfill_hours', 24));
 
-        $hasQualifying = SessionResult::query()
+        // Разписанието идва от OpenF1 (виж OpenF1SessionSync::syncSchedule).
+        $schedule = RaceSession::query()
             ->where('race_id', $race->id)
-            ->where('session_type', SessionType::Qualifying->value)
-            ->exists();
+            ->get()
+            ->mapWithKeys(fn (RaceSession $s): array => [$s->type->value => $s->scheduled_at_utc]);
 
-        if ($hasQualifying) {
-            $kinds[ChannelPostKind::F1Qualifying->value] = $race->qualifying_datetime_utc;
+        $present = SessionResult::query()
+            ->where('race_id', $race->id)
+            ->distinct()
+            ->pluck('session_type');
+
+        foreach ($present as $value) {
+            // pluck минава през каста на модела и връща вече готов enum;
+            // низът е за случая, в който колоната се чете сурово.
+            $type = $value instanceof SessionType
+                ? $value
+                : SessionType::tryFrom((string) $value);
+
+            if ($type === null) {
+                continue;
+            }
+
+            $at = $schedule[$type->value]
+                ?? ($type === SessionType::Qualifying ? $race->qualifying_datetime_utc : null);
+
+            // Тренировките са в петък, състезанието в неделя. Без проверка по
+            // собственото им време, петъчната тренировка би тръгнала в неделя,
+            // защото кръгът още е в прозореца.
+            if ($at === null || $at->lt($cutoff)) {
+                continue;
+            }
+
+            $kinds[ChannelPostKind::fromF1SessionType($type)->value] = $at;
         }
 
         if ($this->hasResults($race, ResultSessionType::Sprint)) {

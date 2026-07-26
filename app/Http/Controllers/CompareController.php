@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Driver;
 use App\Models\DriverCanonical;
 use App\Services\Drivers\ComparisonService;
+use App\Support\BulgarianSort;
 use App\Support\CountryFlag;
 use App\Support\DriverName;
 use Inertia\Inertia;
@@ -49,8 +50,6 @@ class CompareController extends Controller
     private function driverOptions(): array
     {
         return DriverCanonical::query()
-            ->orderByDesc('total_wins')
-            ->orderBy('last_name')
             ->get(['slug', 'first_name', 'last_name', 'total_wins', 'is_active'])
             ->map(fn (DriverCanonical $c) => [
                 'slug' => $c->slug,
@@ -58,6 +57,12 @@ class CompareController extends Controller
                 'wins' => $c->total_wins,
                 'is_active' => $c->is_active,
             ])
+            // Победите водят (празното поле показва най-успешните), но при
+            // равенство редът е азбучен на кирилица. Сортирането е на два
+            // етапа, защото sort-ът на PHP 8 е стабилен и пази имената.
+            ->sortBy(fn (array $d) => BulgarianSort::key($d['name']))
+            ->sortByDesc('wins')
+            ->values()
             ->all();
     }
 

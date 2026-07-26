@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\DriverCanonical;
 use App\Models\Rivalry;
 use App\Services\Drivers\ComparisonService;
+use App\Support\BulgarianSort;
 use App\Support\CountryFlag;
 use App\Support\DriverName;
 use App\Support\Seo;
@@ -55,14 +56,18 @@ class RivalriesController extends Controller
     {
         return Inertia::render('Rivalries/Create', [
             'drivers' => DriverCanonical::query()
-                ->orderByDesc('total_wins')
-                ->orderBy('last_name')
                 ->get(['slug', 'first_name', 'last_name', 'total_wins'])
                 ->map(fn (DriverCanonical $c) => [
                     'slug' => $c->slug,
                     'name' => DriverName::display($c->slug, $c->fullName()),
                     'wins' => $c->total_wins,
-                ]),
+                ])
+                // Победите водят (празното поле показва най-успешните), но при
+                // равенство редът е азбучен на кирилица. Сортирането е на два
+                // етапа, защото sort-ът на PHP 8 е стабилен и пази имената.
+                ->sortBy(fn (array $d) => BulgarianSort::key($d['name']))
+                ->sortByDesc('wins')
+                ->values(),
         ]);
     }
 
