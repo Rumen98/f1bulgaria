@@ -105,21 +105,39 @@ it('взима най-добрата отсечка при спринт квал
         ->toBe('1:23.456');
 });
 
-it('не дублира квалификацията и състезанието — те идват от Jolpica', function () {
+it('не дублира квалификацията — тя пристига навреме от Jolpica', function () {
     seedF1Weekend();
 
     fakeOpenF1(
-        [
-            openF1Session('Qualifying', '400', now()->subDay()->toIso8601String(), now()->subDay()->addHour()->toIso8601String()),
-            openF1Session('Race', '401', now()->subHours(6)->toIso8601String(), now()->subHours(4)->toIso8601String()),
-        ],
+        [openF1Session('Qualifying', '400', now()->subDay()->toIso8601String(), now()->subDay()->addHour()->toIso8601String())],
         [['driver_number' => 1, 'position' => 1, 'duration' => 83.456]],
     );
 
     app(OpenF1SessionSync::class)->syncSeason(2026);
 
-    // Jolpica няма лицензно ограничение — не му дублираме данните.
+    // Jolpica публикува квалификацията бързо и няма лицензно ограничение —
+    // няма причина да я дърпаме и от източник с некомерсиален лиценз.
     expect(SessionResult::query()->count())->toBe(0);
+});
+
+it('взима класацията от състезанието за бързо показване', function () {
+    seedF1Weekend();
+
+    fakeOpenF1(
+        [openF1Session('Race', '401', now()->subHours(6)->toIso8601String(), now()->subHours(4)->toIso8601String())],
+        [['driver_number' => 1, 'position' => 1, 'duration' => 5504.742, 'gap_to_leader' => 0, 'dnf' => false]],
+    );
+
+    app(OpenF1SessionSync::class)->syncSeason(2026);
+
+    $result = SessionResult::query()->where('session_type', SessionType::Race->value)->first();
+
+    expect($result)->not->toBeNull()
+        ->and($result->position)->toBe(1)
+        // В състезание `duration` е ОБЩОТО време, не обиколка — форматирано
+        // като време на обиколка би било безсмислица.
+        ->and($result->best_time)->toBeNull()
+        ->and($result->source)->toBe('openf1');
 });
 
 it('не взима класация от сесия, която още не е приключила', function () {
