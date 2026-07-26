@@ -21,9 +21,12 @@ Schedule::command('f1:sync-results')
     ->withoutOverlapping();
 
 // Неделен вечерен дайджест в 20:00 софийско време.
+// withoutOverlapping е задължително тук: изпраща имейли до всички абонати,
+// а дублиран cron (напр. и на root, и на www-data) би го пуснал два пъти.
 Schedule::command('f1:weekly-digest')
     ->weeklyOn(0, '20:00')
-    ->timezone('Europe/Sofia');
+    ->timezone('Europe/Sofia')
+    ->withoutOverlapping(120);
 
 // News pipeline — новини през целия ден: вземане на всеки 30 мин, LLM
 // превод + автоматична публикация 5 мин по-късно. LLM разходът зависи от
