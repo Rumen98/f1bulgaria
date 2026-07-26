@@ -176,12 +176,21 @@ class F2SessionFormatter
             return null;
         }
 
+        // Вземаме няколко и подреждаме в PHP: при неизвестен час всички сесии
+        // от кръга носят едно и също време и SQL подредбата ги разбърква —
+        // така постът обявяваше квалификацията преди тренировката.
         $next = F2RaceSession::query()
             ->whereHas('race', fn ($query) => $query->where('f2_season_id', $seasonId))
             ->whereNotNull('scheduled_at_utc')
             ->where('scheduled_at_utc', '>', now())
             ->orderBy('scheduled_at_utc')
             ->with('race')
+            ->limit(8)
+            ->get()
+            ->sortBy(fn (F2RaceSession $s): array => [
+                $s->scheduled_at_utc->getTimestamp(),
+                $s->session_type->order(),
+            ])
             ->first();
 
         if ($next === null) {
@@ -189,15 +198,22 @@ class F2SessionFormatter
         }
 
         $sofia = $next->scheduled_at_utc->copy()->setTimezone('Europe/Sofia');
-        $when = self::WEEKDAYS[(int) $sofia->dayOfWeek].', '.$sofia->format('H:i');
+        $sameWeekend = $next->f2_race_id === $session->f2_race_id;
 
-        // Ако следващата сесия е от друг кръг, самò „Спринт, Сб 15:15" е
-        // подвеждащо — човек ще го чака този уикенд.
+        // Часът се показва само ако наистина е обявен. Иначе API-то дава 00:00
+        // местно време, което в софийско става 01:00 — час, в който F2 не кара.
+        $when = match (true) {
+            $next->time_tbc && $sameWeekend => 'предстои',
+            $next->time_tbc => $sofia->format('d.m'),
+            $sameWeekend => self::WEEKDAYS[(int) $sofia->dayOfWeek].', '.$sofia->format('H:i'),
+            default => $sofia->format('d.m').', '.$sofia->format('H:i'),
+        };
+
+        // Сесия от друг кръг без уточнение е подвеждаща — човек я чака този уикенд.
         $label = $next->session_type->label();
 
-        if ($next->f2_race_id !== $session->f2_race_id) {
+        if (! $sameWeekend) {
             $label .= ', кръг '.$next->race?->round;
-            $when = $sofia->format('d.m').', '.$sofia->format('H:i');
         }
 
         return TelegramText::escape("{$label} — {$when}");
