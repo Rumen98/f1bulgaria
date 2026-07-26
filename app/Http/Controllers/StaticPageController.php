@@ -165,9 +165,9 @@ class StaticPageController extends Controller
 
         if ($email !== '') {
             $paragraphs[] = "Имейл: {$email}";
-        } else {
-            $paragraphs[] = 'Каналите ни за връзка са в процес на настройка — междувременно можеш да ни намериш в Telegram общността (линкът е във футъра).';
         }
+
+        $paragraphs[] = 'Резултатите от всяка сесия и важните новини излизат в Telegram канала ни: https://t.me/padokbg';
 
         app(Seo::class)->title('Контакт')->description('Свържи се с екипа на Падок.');
 
