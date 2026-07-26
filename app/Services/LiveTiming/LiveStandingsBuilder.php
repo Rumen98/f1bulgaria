@@ -8,10 +8,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Сглобява live класиране за практика/квалификация от OpenF1 данните —
- * подредено по най-добра обиколка, с интервали, сектори и гуми.
+ * Сглобява live класиране от OpenF1 данните — с интервали, сектори и гуми.
  *
- * Race режимът (по трак-позиция и интервали) се добавя в следващ етап.
+ * Подредбата зависи от типа сесия:
+ * - практика/квалификация → по най-добра обиколка;
+ * - състезание/спринт → по реалната позиция на трасето, с изоставане от лидера.
  */
 class LiveStandingsBuilder
 {
@@ -22,7 +23,7 @@ class LiveStandingsBuilder
      */
     public function build(int $sessionKey, string $sessionType): Collection
     {
-        return Cache::remember("live-standings:{$sessionKey}", now()->addSeconds(5), function () use ($sessionKey) {
+        return Cache::remember("live-standings:{$sessionKey}", now()->addSeconds(5), function () use ($sessionKey, $sessionType) {
             $drivers = $this->client->getSessionDrivers($sessionKey)->keyBy('driver_number');
 
             if ($drivers->isEmpty()) {
@@ -38,8 +39,19 @@ class LiveStandingsBuilder
                 return $this->driverRow($driver, $laps, $tyreByDriver[$driver['driver_number']] ?? null);
             })->values();
 
-            return $this->rankByBestLap($rows);
+            return $this->isRaceSession($sessionType)
+                ? $this->rankByTrackPosition($rows, $sessionKey)
+                : $this->rankByBestLap($rows);
         });
+    }
+
+    /**
+     * OpenF1 дава `session_type` = Race и за състезанието, и за спринта
+     * (спринтовата квалификация е Qualifying, така че не се хваща тук).
+     */
+    private function isRaceSession(string $sessionType): bool
+    {
+        return str_contains(mb_strtolower($sessionType), 'race');
     }
 
     /**
@@ -73,7 +85,8 @@ class LiveStandingsBuilder
     }
 
     /**
-     * Подрежда по най-добра обиколка (без време → накрая) и смята интервалите.
+     * Практика/квалификация: подрежда по най-добра обиколка (без време → накрая)
+     * и смята изоставането спрямо най-бързия.
      *
      * @param  Collection<int, array<string, mixed>>  $rows
      * @return Collection<int, array<string, mixed>>
@@ -83,22 +96,103 @@ class LiveStandingsBuilder
         $sorted = $rows->sortBy(fn ($r) => $r['best_lap_seconds'] ?? PHP_FLOAT_MAX)->values();
         $leader = $sorted->first()['best_lap_seconds'] ?? null;
 
-        // Сесийно-най-добри сектори (за лилаво оцветяване).
+        $sorted = $sorted->map(function ($row, $i) use ($leader) {
+            if ($leader !== null && $row['best_lap_seconds'] !== null) {
+                $row['gap_to_leader'] = $i === 0
+                    ? '—'
+                    : '+'.number_format($row['best_lap_seconds'] - $leader, 3);
+            }
+
+            return $row;
+        });
+
+        return $this->withSessionBests($sorted);
+    }
+
+    /**
+     * Състезание/спринт: подрежда по реалната позиция на трасето, а изоставането
+     * идва от OpenF1 `intervals` (не от обиколките — там то е безсмислено).
+     *
+     * Без позиционни данни (старт на сесията / API проблем) падаме към обиколките,
+     * за да не остане таблицата в произволен ред.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function rankByTrackPosition(Collection $rows, int $sessionKey): Collection
+    {
+        $positions = $this->latestByDriver($this->client->getPositions($sessionKey), 'position');
+
+        if ($positions === []) {
+            return $this->rankByBestLap($rows);
+        }
+
+        $gaps = $this->latestByDriver($this->client->getIntervals($sessionKey), 'gap_to_leader');
+
+        $sorted = $rows
+            ->sortBy(fn ($r) => $positions[$r['driver_number']] ?? PHP_INT_MAX)
+            ->values()
+            ->map(function ($row, $i) use ($gaps) {
+                $row['gap_to_leader'] = $i === 0
+                    ? '—'
+                    : $this->formatGap($gaps[$row['driver_number']] ?? null);
+
+                return $row;
+            });
+
+        return $this->withSessionBests($sorted);
+    }
+
+    /**
+     * Последната стойност на `$key` за всеки пилот (по хронология).
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array<int, mixed>
+     */
+    private function latestByDriver(Collection $rows, string $key): array
+    {
+        return $rows
+            ->groupBy('driver_number')
+            ->map(fn (Collection $items) => $items->sortBy('date')->last()[$key] ?? null)
+            ->filter(fn ($value) => $value !== null)
+            ->all();
+    }
+
+    /**
+     * OpenF1 връща изоставането в секунди (число) или текст „+1 LAP“ за
+     * изостаналите с обиколка.
+     */
+    private function formatGap(mixed $gap): ?string
+    {
+        if ($gap === null || $gap === '') {
+            return null;
+        }
+
+        if (is_numeric($gap)) {
+            return '+'.number_format((float) $gap, 3);
+        }
+
+        return preg_replace('/\s*LAPS?$/i', ' об.', (string) $gap);
+    }
+
+    /**
+     * Номерира редовете по вече определената подредба и маркира сесийните
+     * рекорди (лилаво) за обиколка и сектори.
+     *
+     * @param  Collection<int, array<string, mixed>>  $sorted
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function withSessionBests(Collection $sorted): Collection
+    {
+        $bestLap = $sorted->pluck('best_lap_seconds')->filter(fn ($v) => $v !== null)->min();
         $bestS1 = $this->sessionBest($sorted, 'sector1_best');
         $bestS2 = $this->sessionBest($sorted, 'sector2_best');
         $bestS3 = $this->sessionBest($sorted, 'sector3_best');
 
-        return $sorted->map(function ($row, $i) use ($leader, $bestS1, $bestS2, $bestS3) {
+        return $sorted->map(function ($row, $i) use ($bestLap, $bestS1, $bestS2, $bestS3) {
             $row['position'] = $i + 1;
 
-            if ($leader !== null && $row['best_lap_seconds'] !== null && $i > 0) {
-                $row['gap_to_leader'] = '+'.number_format($row['best_lap_seconds'] - $leader, 3);
-            } elseif ($i === 0 && $row['best_lap_seconds'] !== null) {
-                $row['gap_to_leader'] = '—';
-            }
-
-            // Флагове за оцветяване: лилаво = сесиен рекорд за обиколката/сектора.
-            $row['is_overall_best'] = $leader !== null && $row['best_lap_seconds'] === $leader;
+            $row['is_overall_best'] = $bestLap !== null && $row['best_lap_seconds'] === $bestLap;
             $row['sector1_overall'] = $bestS1 !== null && $row['sector1_best'] === $bestS1;
             $row['sector2_overall'] = $bestS2 !== null && $row['sector2_best'] === $bestS2;
             $row['sector3_overall'] = $bestS3 !== null && $row['sector3_best'] === $bestS3;

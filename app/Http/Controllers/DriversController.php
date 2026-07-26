@@ -11,6 +11,7 @@ use App\Models\Season;
 use App\Services\Drivers\DriverStatsService;
 use App\Services\Standings\StandingsService;
 use App\Support\CountryFlag;
+use App\Support\DriverName;
 use App\Support\Seo;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -36,7 +37,7 @@ class DriversController extends Controller
         $drivers = $season->drivers()->with('constructor')->get()
             ->map(fn (Driver $d) => [
                 'slug' => $d->slug,
-                'name' => $d->fullName(),
+                'name' => DriverName::display($d->slug, $d->fullName()),
                 'code' => $d->driver_code,
                 'number' => $d->permanent_number,
                 'flag' => CountryFlag::iso2($d->country_code),
@@ -62,11 +63,24 @@ class DriversController extends Controller
 
         abort_if($canonical === null, 404);
 
+        // Кирилицата води в заглавието — българинът търси „Люис Хамилтън“.
+        // Латиницата остава в описанието, за да хващаме и двете заявки.
+        $latin = $canonical->fullName();
+        $displayName = DriverName::display($canonical->slug, $latin);
+
         app(Seo::class)
-            ->title($canonical->fullName())
-            ->description("Статистика и кариера на {$canonical->fullName()} във Формула 1 — победи, подиуми, поул позиции и класиране по сезони.")
+            ->title($displayName)
+            ->description("Статистика и кариера на {$displayName} във Формула 1 — победи, подиуми, поул позиции, класиране по сезони и резултати. ".DriverName::both($canonical->slug, $latin).'.')
             ->image(filled($canonical->photo_url) ? $canonical->photo_url : null)
-            ->canonical(route('drivers.show', $slug));
+            ->canonical(route('drivers.show', $slug))
+            ->schema([
+                '@type' => 'Person',
+                'name' => $displayName,
+                'alternateName' => $latin,
+                'url' => route('drivers.show', $slug),
+                'jobTitle' => 'Пилот от Формула 1',
+                ...(filled($canonical->photo_url) ? ['image' => $canonical->photo_url] : []),
+            ]);
 
         // Годините, в които пилотът е карал (за season dropdown), най-новите първо.
         $years = Driver::query()
@@ -113,7 +127,10 @@ class DriversController extends Controller
         return Inertia::render('Drivers/Show', [
             'driver' => [
                 'slug' => $canonical->slug,
-                'name' => $canonical->fullName(),
+                'name' => $displayName,
+                // Латинското име се показва като подзаглавие — разпознаваемост
+                // плюс покритие на заявките на латиница.
+                'name_latin' => $displayName === $latin ? null : $latin,
                 'number' => $canonical->permanent_number ?? $driver?->permanent_number,
                 'code' => $canonical->code,
                 'photo' => $canonical->photo_url ?? $driver?->photo_url,

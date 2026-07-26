@@ -120,6 +120,41 @@ class OpenF1Client
     }
 
     /**
+     * Позиции по трасето. OpenF1 записва ред само при ПРОМЯНА на позицията,
+     * така че цялата сесия е поносим обем. Кеш 5 секунди.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getPositions(int $sessionKey): Collection
+    {
+        return Cache::remember("openf1:positions:{$sessionKey}", now()->addSeconds(5), function () use ($sessionKey) {
+            return $this->get('position', ['session_key' => $sessionKey])
+                ->filter(fn ($p) => is_array($p) && isset($p['driver_number'], $p['position']))
+                ->values();
+        });
+    }
+
+    /**
+     * Интервали (изоставане от лидера / от предния). Само за състезания, ~на 4
+     * секунди за всеки пилот — затова дърпаме единствено последните минути;
+     * цяло състезание са десетки хиляди записа. Кеш 5 секунди.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getIntervals(int $sessionKey): Collection
+    {
+        return Cache::remember("openf1:intervals:{$sessionKey}", now()->addSeconds(5), function () use ($sessionKey) {
+            return $this->get('intervals', [
+                'session_key' => $sessionKey,
+                // OpenF1 носи оператора в ИМЕТО на параметъра („date>“), не в стойността.
+                'date>' => now()->subMinutes(3)->utc()->toIso8601String(),
+            ])
+                ->filter(fn ($i) => is_array($i) && isset($i['driver_number']))
+                ->values();
+        });
+    }
+
+    /**
      * Стинтове (гумени състави) по пилот. Кеш 30 секунди.
      *
      * @return Collection<int, array<string, mixed>>

@@ -66,6 +66,31 @@ it('парсва обиколките', function () {
     expect(client()->getLatestLaps(9999))->toHaveCount(2);
 });
 
+it('парсва позициите и пропуска редовете без позиция', function () {
+    Http::fake(['*/position*' => Http::response([
+        ['driver_number' => 1, 'position' => 1, 'date' => '2026-07-26T13:20:00+00:00'],
+        ['driver_number' => 44, 'position' => 2, 'date' => '2026-07-26T13:20:00+00:00'],
+        ['driver_number' => 16, 'date' => '2026-07-26T13:20:00+00:00'],
+    ])]);
+
+    expect(client()->getPositions(9999))->toHaveCount(2);
+});
+
+it('дърпа само последните минути интервали (иначе са десетки хиляди записа)', function () {
+    Http::fake(['*/intervals*' => Http::response([
+        ['driver_number' => 44, 'gap_to_leader' => 5.123, 'date' => '2026-07-26T13:20:04+00:00'],
+    ])]);
+
+    expect(client()->getIntervals(9999))->toHaveCount(1);
+
+    Http::assertSent(function ($request) {
+        // OpenF1 носи оператора в името на параметъра: „date>“ (URL-кодирано).
+        return str_contains($request->url(), '/intervals')
+            && str_contains($request->url(), 'date%3E=')
+            && str_contains($request->url(), 'session_key=9999');
+    });
+});
+
 it('връща празна колекция при timeout (graceful)', function () {
     Http::fake(fn () => throw new ConnectionException('timeout'));
 

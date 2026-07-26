@@ -41,10 +41,22 @@ class TeamsController extends Controller
         $canonical = $this->stats->getCanonicalBySlug($slug);
         abort_if($canonical === null, 404);
 
+        // Кирилицата води — българинът търси „Ферари“, не „Ferrari“.
+        $nameBg = config("team-brands.{$canonical->slug}.name_bg");
+        $displayName = is_string($nameBg) && $nameBg !== '' ? $nameBg : $canonical->name;
+        $both = $displayName === $canonical->name ? $canonical->name : "{$displayName} ({$canonical->name})";
+
         app(Seo::class)
-            ->title($canonical->name)
-            ->description("{$canonical->name} във Формула 1 — статистика, пилоти, победи и история на конструктора.")
-            ->canonical(route('teams.show', $slug));
+            ->title($displayName)
+            ->description("{$displayName} във Формула 1 — статистика, пилоти, победи, титли и история на конструктора. {$both}.")
+            ->canonical(route('teams.show', $slug))
+            ->schema([
+                '@type' => 'SportsTeam',
+                'name' => $displayName,
+                'alternateName' => $canonical->name,
+                'url' => route('teams.show', $slug),
+                'sport' => 'Формула 1',
+            ]);
 
         // Годините, в които отборът е участвал (за season dropdown), най-новите първо.
         $years = Constructor::query()

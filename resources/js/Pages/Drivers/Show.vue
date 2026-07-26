@@ -82,6 +82,11 @@ watch(() => props.driver.photo, () => (photoFailed.value = false));
                     <h1 class="font-display text-3xl font-black sm:text-4xl">
                         <FlagIcon :code="driver.flag" class="mr-1" />{{ driver.name }}
                     </h1>
+                    <!-- Оригиналното изписване — разпознаваемост + покрива
+                         търсенията на латиница. -->
+                    <p v-if="driver.name_latin" class="mt-0.5 text-sm font-medium text-zinc-500">
+                        {{ driver.name_latin }}
+                    </p>
                     <div class="mt-2 flex flex-wrap items-center gap-3 text-zinc-300">
                         <Link
                             v-if="driver.team_slug"

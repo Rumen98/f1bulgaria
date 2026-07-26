@@ -10,12 +10,14 @@ beforeEach(function () {
     Cache::flush();
 });
 
-function fakeSession(array $drivers, array $laps, array $stints = []): void
+function fakeSession(array $drivers, array $laps, array $stints = [], array $positions = [], array $intervals = []): void
 {
     Http::fake([
         '*/drivers*' => Http::response($drivers),
         '*/laps*' => Http::response($laps),
         '*/stints*' => Http::response($stints),
+        '*/position*' => Http::response($positions),
+        '*/intervals*' => Http::response($intervals),
     ]);
 }
 
@@ -105,4 +107,105 @@ it('връща празна колекция когато няма пилоти 
     fakeSession(drivers: [], laps: []);
 
     expect(app(LiveStandingsBuilder::class)->build(9999, 'Qualifying'))->toBeEmpty();
+});
+
+it('в състезание подрежда по позиция на трасето, а не по най-бърза обиколка', function () {
+    fakeSession(
+        drivers: [
+            ['driver_number' => 1, 'name_acronym' => 'VER', 'full_name' => 'Max', 'team_name' => 'RB', 'team_colour' => '3671C6'],
+            ['driver_number' => 44, 'name_acronym' => 'HAM', 'full_name' => 'Lewis', 'team_name' => 'Ferrari', 'team_colour' => 'E8002D'],
+        ],
+        laps: [
+            // HAM има най-бързата обиколка, но VER води състезанието.
+            ['driver_number' => 1, 'lap_number' => 12, 'lap_duration' => 92.500],
+            ['driver_number' => 44, 'lap_number' => 12, 'lap_duration' => 91.200],
+        ],
+        positions: [
+            // По-ранни записи с обратна подредба — трябва да се вземе последният.
+            ['driver_number' => 44, 'position' => 1, 'date' => '2026-07-26T13:00:00+00:00'],
+            ['driver_number' => 1, 'position' => 2, 'date' => '2026-07-26T13:00:00+00:00'],
+            ['driver_number' => 1, 'position' => 1, 'date' => '2026-07-26T13:20:00+00:00'],
+            ['driver_number' => 44, 'position' => 2, 'date' => '2026-07-26T13:20:00+00:00'],
+        ],
+        intervals: [
+            ['driver_number' => 1, 'gap_to_leader' => null, 'interval' => null, 'date' => '2026-07-26T13:20:04+00:00'],
+            ['driver_number' => 44, 'gap_to_leader' => 5.123, 'interval' => 5.123, 'date' => '2026-07-26T13:20:04+00:00'],
+        ],
+    );
+
+    $rows = app(LiveStandingsBuilder::class)->build(9999, 'Race');
+
+    $leader = $rows->first();
+    expect($leader['driver_number'])->toBe(1)
+        ->and($leader['position'])->toBe(1)
+        ->and($leader['gap_to_leader'])->toBe('—')
+        // Лилавото остава при най-бързата обиколка, независимо от позицията.
+        ->and($leader['is_overall_best'])->toBeFalse();
+
+    $second = $rows->last();
+    expect($second['driver_number'])->toBe(44)
+        ->and($second['position'])->toBe(2)
+        ->and($second['gap_to_leader'])->toBe('+5.123')
+        ->and($second['is_overall_best'])->toBeTrue();
+});
+
+it('показва изоставане с обиколка на български', function () {
+    fakeSession(
+        drivers: [
+            ['driver_number' => 1, 'name_acronym' => 'VER', 'full_name' => 'Max', 'team_name' => 'RB', 'team_colour' => '3671C6'],
+            ['driver_number' => 2, 'name_acronym' => 'LAW', 'full_name' => 'Liam', 'team_name' => 'RB', 'team_colour' => '3671C6'],
+        ],
+        laps: [],
+        positions: [
+            ['driver_number' => 1, 'position' => 1, 'date' => '2026-07-26T13:20:00+00:00'],
+            ['driver_number' => 2, 'position' => 2, 'date' => '2026-07-26T13:20:00+00:00'],
+        ],
+        intervals: [
+            ['driver_number' => 2, 'gap_to_leader' => '+1 LAP', 'interval' => '+1 LAP', 'date' => '2026-07-26T13:20:04+00:00'],
+        ],
+    );
+
+    $rows = app(LiveStandingsBuilder::class)->build(9999, 'Race');
+
+    expect($rows->last()['gap_to_leader'])->toBe('+1 об.');
+});
+
+it('пада към подредба по обиколка когато няма позиционни данни', function () {
+    fakeSession(
+        drivers: [
+            ['driver_number' => 1, 'name_acronym' => 'VER', 'full_name' => 'Max', 'team_name' => 'RB', 'team_colour' => '3671C6'],
+            ['driver_number' => 44, 'name_acronym' => 'HAM', 'full_name' => 'Lewis', 'team_name' => 'Ferrari', 'team_colour' => 'E8002D'],
+        ],
+        laps: [
+            ['driver_number' => 1, 'lap_number' => 1, 'lap_duration' => 92.500],
+            ['driver_number' => 44, 'lap_number' => 1, 'lap_duration' => 91.200],
+        ],
+        positions: [],
+    );
+
+    $rows = app(LiveStandingsBuilder::class)->build(9999, 'Race');
+
+    expect($rows->first()['driver_number'])->toBe(44)
+        ->and($rows->first()['gap_to_leader'])->toBe('—')
+        ->and($rows->last()['gap_to_leader'])->toBe('+1.300');
+});
+
+it('спринтът също се подрежда по позиция на трасето', function () {
+    fakeSession(
+        drivers: [
+            ['driver_number' => 1, 'name_acronym' => 'VER', 'full_name' => 'Max', 'team_name' => 'RB', 'team_colour' => '3671C6'],
+            ['driver_number' => 44, 'name_acronym' => 'HAM', 'full_name' => 'Lewis', 'team_name' => 'Ferrari', 'team_colour' => 'E8002D'],
+        ],
+        laps: [
+            ['driver_number' => 1, 'lap_number' => 3, 'lap_duration' => 92.500],
+            ['driver_number' => 44, 'lap_number' => 3, 'lap_duration' => 91.200],
+        ],
+        positions: [
+            ['driver_number' => 1, 'position' => 1, 'date' => '2026-07-26T13:20:00+00:00'],
+            ['driver_number' => 44, 'position' => 2, 'date' => '2026-07-26T13:20:00+00:00'],
+        ],
+    );
+
+    // OpenF1 дава session_type „Race“ и за спринта.
+    expect(app(LiveStandingsBuilder::class)->build(9999, 'Race')->first()['driver_number'])->toBe(1);
 });
