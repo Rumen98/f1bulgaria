@@ -8,26 +8,21 @@ return [
     |--------------------------------------------------------------------------
     | Server Side Rendering
     |--------------------------------------------------------------------------
-    | ИЗКЛЮЧЕНО. Кодът е готов (resources/js/ssr.js, `npm run build:ssr`), но
-    | преди включване трябва да се дорешат три неща — всяко проверено емпирично:
+    | Ботовете получават пълния HTML на първата вълна, вместо да чакат Google
+    | да изпълни JavaScript-а.
     |
-    |  1. resources/js/utils/routes.js вика глобалния `route()` от @routes,
-    |     който в Node не съществува — try/catch го гълта, но nav линковете
-    |     изчезват от SSR HTML-а и се появяват чак след хидратация.
-    |  2. resources/js/ssr.js чете Ziggy от build-time генерирания ziggy.js —
-    |     APP_URL се запича в bundle-а при билда.
-    |  3. vue и @inertiajs/vue3 са в devDependencies, а SSR bundle-ът ги
-    |     externalize-ва → `npm ci --omit=dev` чупи демона.
+    | Изисква ЖИВ демон на сървъра: `php artisan inertia:start-ssr` под
+    | supervisor (виж LAUNCH.md). Ако демонът падне, Inertia пада ГРАЦИОЗНО
+    | към клиентски рендер — сайтът работи, просто губи SSR предимството,
+    | затова health check-ът в LAUNCH.md не е излишен.
     |
-    | Освен това `npm run build` НЕ пресъздава SSR bundle-а (само build:ssr),
-    | а HttpGateway гълта грешките без лог — стар bundle би сервирал тихо.
-    |
-    | Приоритетът е нисък: сървърните мета тагове, JSON-LD и noscript блокът
-    | вече покриват скрейпърите, които не изпълняват JavaScript.
+    | `npm run build` вече вгражда и SSR bundle-а (ziggy:generate + двата
+    | vite билда), а vite.config.js го прави самодостатъчен (ssr.noExternal),
+    | така че демонът не зависи от node_modules по време на работа.
     */
 
     'ssr' => [
-        'enabled' => env('INERTIA_SSR_ENABLED', false),
+        'enabled' => env('INERTIA_SSR_ENABLED', true),
         'url' => env('INERTIA_SSR_URL', 'http://127.0.0.1:13714'),
     ],
 
