@@ -39,9 +39,8 @@ const filtered = computed(() => {
 </script>
 
 <template>
-    <Head title="Отбори">
-        <meta head-key="description" name="description" content="Всички отбори (конструктори) от Формула 1 — статистика, пилоти, титли и история. Българският справочник за отборите във F1." />
-    </Head>
+    <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
+    <Head title="Отбори" />
 
     <PublicLayout>
         <h1 class="mb-6 font-display text-2xl font-black sm:text-3xl">Отбори</h1>

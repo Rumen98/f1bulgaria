@@ -13,9 +13,8 @@ defineProps({
 </script>
 
 <template>
-    <Head title="Новини">
-        <meta head-key="description" name="description" content="Последните новини от Формула 1 на български — анализи, трансфери и новини за отборите и пилотите." />
-    </Head>
+    <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
+    <Head title="Новини" />
 
     <PublicLayout>
         <div class="mb-6 flex items-baseline justify-between">

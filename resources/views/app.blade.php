@@ -1,3 +1,7 @@
+@php
+    /** @var \App\Support\Seo $seo */
+    $seo = app(\App\Support\Seo::class);
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -9,31 +13,40 @@
         <link rel="icon" href="/favicon.ico" sizes="32x32">
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-        <title inertia>{{ config('app.name', 'Падок') }}</title>
+        {{-- SEO / Open Graph — рендерира се СЪРВЪРНО от App\Support\Seo.
+             Социалните скрейпъри (Facebook, Viber, Telegram, X) не изпълняват
+             JavaScript, затова тези тагове НЕ бива да се дублират във Vue
+             <Head> — иначе скрейпърът чете първото (генерично) срещане. --}}
+        <title inertia>{{ $seo->resolvedTitle() }}</title>
+        <meta name="description" content="{{ $seo->resolvedDescription() }}">
+        <link rel="canonical" href="{{ $seo->resolvedCanonical() }}">
 
-        <!-- SEO / Open Graph (по подразбиране; Inertia <Head> презаписва title-а на отделните страници) -->
-        <meta name="description" content="Падок — новини, календар, класирания, статистика и live тайминг от Формула 1 на български.">
-        <link rel="canonical" href="{{ url()->current() }}">
         <meta property="og:site_name" content="Падок">
-        <meta property="og:type" content="website">
-        <meta property="og:title" content="Падок — Формула 1 на български">
-        <meta property="og:description" content="Формула 1 на български — новини, календар, класирания и статистика.">
-        <meta property="og:url" content="{{ url()->current() }}">
-        <meta property="og:image" content="{{ asset('og-image.jpg') }}">
+        <meta property="og:type" content="{{ $seo->resolvedType() }}">
+        <meta property="og:title" content="{{ $seo->socialTitle() }}">
+        <meta property="og:description" content="{{ $seo->resolvedDescription() }}">
+        <meta property="og:url" content="{{ $seo->resolvedCanonical() }}">
+        <meta property="og:image" content="{{ $seo->resolvedImage() }}">
         <meta property="og:image:width" content="1200">
         <meta property="og:image:height" content="630">
-        <meta property="og:image:type" content="image/jpeg">
-        <meta property="og:image:alt" content="Падок — Формула 1 на български">
-        <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="Падок — Формула 1 на български">
-        <meta name="twitter:description" content="Формула 1 на български — новини, календар, класирания и статистика.">
-        <meta name="twitter:image" content="{{ asset('og-image.jpg') }}">
-        <meta name="twitter:image:alt" content="Падок — Формула 1 на български">
+        <meta property="og:image:alt" content="{{ $seo->socialTitle() }}">
         <meta property="og:locale" content="bg_BG">
+        @if ($seo->publishedAt())
+            <meta property="article:published_time" content="{{ $seo->publishedAt() }}">
+            <meta property="article:modified_time" content="{{ $seo->modifiedAt() ?? $seo->publishedAt() }}">
+        @endif
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{{ $seo->socialTitle() }}">
+        <meta name="twitter:description" content="{{ $seo->resolvedDescription() }}">
+        <meta name="twitter:image" content="{{ $seo->resolvedImage() }}">
+        <meta name="twitter:image:alt" content="{{ $seo->socialTitle() }}">
 
         {{-- Структурирани данни за търсачките. НЕ ги връщай в шаблона — Blade
              компилира "@context" като директива дори в PHP стринг (виж SeoSchema). --}}
-        <script type="application/ld+json">{!! \App\Support\SeoSchema::jsonLd() !!}</script>
+        <script type="application/ld+json">{!! \App\Support\SeoSchema::jsonLd($seo->schemaNodes()) !!}</script>
+
+        <link rel="alternate" type="application/rss+xml" title="Падок — новини" href="{{ route('feed') }}">
 
         <!-- PWA -->
         <link rel="manifest" href="/manifest.webmanifest">
@@ -42,6 +55,8 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600|exo-2:700,800,900&display=swap" rel="stylesheet" />
 
+        @include('partials.analytics')
+
         <!-- Scripts -->
         @routes
         @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
@@ -49,5 +64,20 @@
     </head>
     <body class="font-sans antialiased">
         @inertia
+
+        {{-- Съдържание за ботове, които не изпълняват JavaScript. Vue заменя
+             #app при монтиране, но <noscript> остава в първоначалния HTML —
+             това е единствената crawlable вътрешна структура преди рендер. --}}
+        <noscript>
+            <h1>{{ $seo->resolvedTitle() }}</h1>
+            <p>{{ $seo->resolvedDescription() }}</p>
+            <nav>
+                <a href="{{ route('news.index') }}">Новини</a> ·
+                <a href="{{ route('calendar') }}">Календар</a> ·
+                <a href="{{ route('standings') }}">Класиране</a> ·
+                <a href="{{ route('teams.index') }}">Отбори</a> ·
+                <a href="{{ route('drivers.index') }}">Пилоти</a>
+            </nav>
+        </noscript>
     </body>
 </html>

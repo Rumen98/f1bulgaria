@@ -35,9 +35,8 @@ watch(() => props.driver.photo, () => (photoFailed.value = false));
 </script>
 
 <template>
-    <Head :title="driver.name">
-        <meta head-key="description" name="description" :content="`Статистика и кариера на ${driver.name} във Формула 1 — победи, подиуми, поул позиции и класиране по сезони.`" />
-    </Head>
+    <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
+    <Head :title="driver.name" />
 
     <PublicLayout>
         <div class="flex items-center justify-between gap-3">

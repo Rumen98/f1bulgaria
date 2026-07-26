@@ -11,6 +11,7 @@ use App\Models\Season;
 use App\Services\Drivers\DriverStatsService;
 use App\Services\Standings\StandingsService;
 use App\Support\CountryFlag;
+use App\Support\Seo;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -60,6 +61,12 @@ class DriversController extends Controller
         $canonical = $this->stats->getCanonicalBySlug($slug);
 
         abort_if($canonical === null, 404);
+
+        app(Seo::class)
+            ->title($canonical->fullName())
+            ->description("Статистика и кариера на {$canonical->fullName()} във Формула 1 — победи, подиуми, поул позиции и класиране по сезони.")
+            ->image(filled($canonical->photo_url) ? $canonical->photo_url : null)
+            ->canonical(route('drivers.show', $slug));
 
         // Годините, в които пилотът е карал (за season dropdown), най-новите първо.
         $years = Driver::query()

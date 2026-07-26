@@ -20,9 +20,8 @@ const podium = (pos) => ({
 </script>
 
 <template>
-    <Head title="Класиране на прогнозите">
-        <meta head-key="description" name="description" content="Класиране на играта с прогнози — познай резултатите от Формула 1 и събирай точки." />
-    </Head>
+    <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
+    <Head title="Класиране на прогнозите" />
 
     <PublicLayout>
         <div class="mb-2 flex flex-wrap items-center justify-between gap-3">

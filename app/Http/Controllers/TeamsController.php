@@ -14,6 +14,7 @@ use App\Models\TeamNewsItem;
 use App\Services\Standings\StandingsService;
 use App\Services\Teams\TeamStatsService;
 use App\Support\CountryFlag;
+use App\Support\Seo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -39,6 +40,11 @@ class TeamsController extends Controller
         // Идентичността идва от каноничния модел (един запис на отбор, легендите включени).
         $canonical = $this->stats->getCanonicalBySlug($slug);
         abort_if($canonical === null, 404);
+
+        app(Seo::class)
+            ->title($canonical->name)
+            ->description("{$canonical->name} във Формула 1 — статистика, пилоти, победи и история на конструктора.")
+            ->canonical(route('teams.show', $slug));
 
         // Годините, в които отборът е участвал (за season dropdown), най-новите първо.
         $years = Constructor::query()

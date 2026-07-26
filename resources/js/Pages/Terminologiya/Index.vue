@@ -24,9 +24,8 @@ const filtered = computed(() => {
 </script>
 
 <template>
-    <Head title="Терминология">
-        <meta head-key="description" name="description" content="Речник на термините във Формула 1 на български — обяснения на основните понятия от спорта." />
-    </Head>
+    <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
+    <Head title="Терминология" />
 
     <PublicLayout>
         <h1 class="mb-2 font-display text-2xl font-black sm:text-3xl">Речник на Формула 1</h1>

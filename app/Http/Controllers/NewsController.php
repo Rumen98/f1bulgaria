@@ -8,6 +8,8 @@ use App\Enums\NewsClassification;
 use App\Enums\NewsStatus;
 use App\Models\Comment;
 use App\Models\TeamNewsItem;
+use App\Support\Seo;
+use App\Support\SeoSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -42,6 +44,11 @@ class NewsController extends Controller
             ->withQueryString()
             ->through(fn (TeamNewsItem $i) => $this->card($i));
 
+        app(Seo::class)
+            ->title($cat === 'all' ? 'Новини от Формула 1' : 'Новини: '.$this->catLabel($cat))
+            ->description('Последните новини от Формула 1 на български — състезания, пилоти, техника и трансфери. Обновява се непрекъснато.')
+            ->canonical($cat === 'all' ? route('news.index') : route('news.index', ['cat' => $cat]));
+
         return Inertia::render('News/Index', [
             'featured' => $featured ? $this->card($featured) : null,
             'items' => Inertia::scroll($items),
@@ -59,6 +66,8 @@ class NewsController extends Controller
 
         abort_if($item === null, 404);
 
+        $this->applyArticleSeo($item);
+
         return Inertia::render('News/Show', [
             'article' => [
                 ...$this->card($item),
@@ -72,6 +81,72 @@ class NewsController extends Controller
             'related' => $this->related($item),
             'comments' => $this->comments($item, $request),
         ]);
+    }
+
+    /**
+     * Сървърни SEO метаданни за страницата на статия. Критично за социалните
+     * мрежи: Facebook/Viber/Telegram четат само първоначалния HTML.
+     */
+    private function applyArticleSeo(TeamNewsItem $item): void
+    {
+        $title = $item->title_bg ?? $item->title_original;
+        $description = $item->summary_bg ?? $item->content_snippet;
+        $url = route('news.show', $item->slug);
+        $image = $this->shareImage($item);
+        $published = $item->published_at?->toIso8601String();
+        $modified = $item->updated_at?->toIso8601String();
+
+        app(Seo::class)
+            ->title($title)
+            ->description($description)
+            ->image($image)
+            ->type('article')
+            ->canonical($url)
+            ->dates($published, $modified)
+            ->schema(SeoSchema::newsArticle(
+                headline: $title,
+                description: (string) $description,
+                url: $url,
+                image: $image,
+                publishedAt: $published,
+                modifiedAt: $modified,
+                keyFacts: $item->key_facts ?? [],
+            ))
+            ->schema(SeoSchema::breadcrumbs([
+                ['name' => 'Начало', 'url' => route('home')],
+                ['name' => 'Новини', 'url' => route('news.index')],
+                ['name' => $title, 'url' => $url],
+            ]));
+    }
+
+    /**
+     * Картинка за социалните карти. Снимка на пилот (когато новината е за
+     * конкретен пилот) дава реална диференциация; иначе брандовият банер.
+     */
+    private function shareImage(TeamNewsItem $item): string
+    {
+        $image = $item->featured_image;
+
+        if (is_array($image) && ($image['type'] ?? null) === 'driver_photo') {
+            $photo = $image['data']['photo_url'] ?? null;
+
+            if (is_string($photo) && str_starts_with($photo, 'http')) {
+                return $photo;
+            }
+        }
+
+        return asset('og-image.jpg');
+    }
+
+    private function catLabel(string $cat): string
+    {
+        return match ($cat) {
+            'analysis' => 'Анализи',
+            'race' => 'Състезания',
+            'driver' => 'Пилоти',
+            'business' => 'Бизнес',
+            default => NewsClassification::tryFrom($cat)?->label() ?? 'Всички',
+        };
     }
 
     /**
@@ -186,6 +261,8 @@ class NewsController extends Controller
             'color' => $item->constructor?->color_hex,
             'image' => $item->featured_image,
             'published_at' => $item->published_at?->copy()->setTimezone('Europe/Sofia')->format('d.m.Y H:i'),
+            // Машинно четима дата за <time datetime> — свежестта е ранкинг сигнал.
+            'published_at_iso' => $item->published_at?->toIso8601String(),
             'url' => $item->external_url,
         ];
     }

@@ -31,8 +31,6 @@ const deleteComment = (id) => {
     }
 };
 
-const metaDescription = (props.article.summary ?? props.article.title ?? '').slice(0, 200);
-
 // Разделя текст на параграфи по празни редове.
 const toParagraphs = (text) => (text ?? '').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
 
@@ -41,13 +39,10 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
 </script>
 
 <template>
-    <Head :title="article.title">
-        <meta head-key="description" name="description" :content="metaDescription" />
-        <meta head-key="og:title" property="og:title" :content="article.title" />
-        <meta head-key="og:description" property="og:description" :content="metaDescription" />
-        <meta head-key="og:type" property="og:type" content="article" />
-        <link head-key="canonical" rel="canonical" :href="article.canonical" />
-    </Head>
+    <!-- Само title-ът се обновява клиентски при SPA навигация. Всички
+         meta/og/canonical тагове се рендерират сървърно (App\Support\Seo),
+         защото социалните скрейпъри не изпълняват JavaScript. -->
+    <Head :title="article.title" />
 
     <PublicLayout>
         <Link :href="route('news.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички новини</Link>
@@ -66,7 +61,9 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                             <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: article.color ?? NEUTRAL_DOT_COLOR }" />
                             {{ article.team }}
                         </span>
-                        <span class="ml-auto text-zinc-500">{{ article.published_at }}</span>
+                        <time v-if="article.published_at_iso" :datetime="article.published_at_iso" class="ml-auto text-zinc-500">
+                            {{ article.published_at }}
+                        </time>
                     </div>
 
                     <h1 class="mt-3 font-display text-3xl font-black leading-tight text-white sm:text-4xl">{{ article.title }}</h1>

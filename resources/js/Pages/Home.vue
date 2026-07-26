@@ -33,9 +33,8 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
 </script>
 
 <template>
-    <Head title="Падок — Формула 1 на български">
-        <meta head-key="description" name="description" content="Формула 1 на български: новини, календар на състезанията, класиране на пилоти и конструктори, статистика и профили. Независима общност на българските F1 фенове." />
-    </Head>
+    <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
+    <Head title="Падок — Формула 1 на български" />
 
     <PublicLayout>
         <h1 class="sr-only">Падок — новини, календар и класиране от Формула 1 на български</h1>

@@ -26,9 +26,8 @@ const goToSeason = (e) => {
 </script>
 
 <template>
-    <Head :title="team.name">
-        <meta head-key="description" name="description" :content="`${team.name} във Формула 1 — статистика, пилоти, победи и история на конструктора.`" />
-    </Head>
+    <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
+    <Head :title="team.name" />
 
     <PublicLayout>
         <div class="flex items-center justify-between gap-3">

@@ -22,9 +22,8 @@ const goToSeason = (e) => {
 </script>
 
 <template>
-    <Head title="Класиране">
-        <meta head-key="description" name="description" content="Класиране във Формула 1 — пилоти и конструктори по сезони, точки, победи и подиуми." />
-    </Head>
+    <!-- meta/og таговете идват сървърно от App\Support\Seo (виж app.blade.php). -->
+    <Head title="Класиране" />
 
     <PublicLayout>
         <div class="mb-6 flex flex-wrap items-center justify-between gap-3">

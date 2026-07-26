@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Listeners\AuthEventSubscriber;
+use App\Support\Seo;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Vite;
@@ -15,7 +16,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Една инстанция на заявка — контролерите я пълнят, app.blade.php я чете.
+        $this->app->scoped(Seo::class);
     }
 
     /**

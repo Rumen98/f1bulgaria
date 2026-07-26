@@ -12,6 +12,7 @@ use App\Http\Controllers\F2Controller;
 use App\Http\Controllers\F2DriversController;
 use App\Http\Controllers\F2RaceController;
 use App\Http\Controllers\F2TeamsController;
+use App\Http\Controllers\FeedController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
@@ -97,6 +98,9 @@ Route::middleware('feature:rivalries')->group(function () {
     });
     Route::get('/rivalries/{slug}', [RivalriesController::class, 'show'])->name('rivalries.show');
 });
+
+// RSS за агрегатори и Telegram ботове — безплатен дистрибуционен канал.
+Route::get('/feed', FeedController::class)->name('feed');
 
 Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [NewsController::class, 'show'])->name('news.show');
