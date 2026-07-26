@@ -70,18 +70,53 @@ Nginx сочи към `public/`; задай crontab (раздел 5) и `queue` 
 ## 3. Рутинен деплой (нова версия)
 
 ```bash
-cd /var/www/f1bulgaria
-php artisan down --render="errors::503"
-git pull
-composer install --no-dev --optimize-autoloader
-npm ci && npm run build
-php artisan migrate --force
-php artisan optimize:clear && php artisan config:cache route:cache view:cache event:cache
-php artisan sitemap:generate
-php artisan up
+cd /var/www/f1bulgaria && sudo bash deploy.sh
 ```
 
+Скриптът ([deploy.sh](deploy.sh)) прави всичко в правилния ред и **като `www-data`** —
+git pull, composer, `npm run build` (клиентски + SSR bundle), миграции, кешове,
+рестарт на SSR демона и проверка накрая.
+
+> **Никога не пускай artisan като root.** Оставя root-owned файлове в `storage/`
+> и `bootstrap/cache/`; php-fpm не може да пише в тях и сайтът връща 500 **без
+> нищо в лога** (защото и логърът не може да пише). Ако се случи:
+> `chown -R www-data:www-data storage bootstrap/cache && sudo -u www-data php artisan optimize:clear`
+
 > След промяна на routes/config ВИНАГИ `route:cache`/`config:cache` отново — иначе старите кеширани routes се сервират (вкл. feature middleware-а).
+
+## 3а. Inertia SSR (сървърно рендериране)
+
+Ботовете (Google на първата вълна, Facebook, Telegram, Viber, GPTBot) получават
+пълния HTML, вместо празен `<div id="app">`. Изисква Node демон.
+
+**Еднократна настройка:**
+
+```bash
+sudo cp docs/supervisor-padok-ssr.conf /etc/supervisor/conf.d/padok-ssr.conf
+sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl start padok-ssr
+sudo -u www-data php artisan inertia:check-ssr    # → "Inertia SSR server is running."
+```
+
+Плюс `INERTIA_SSR_ENABLED=true` в `.env` (стойността по подразбиране е `true`,
+т.е. достатъчно е да НЕ я задаваш на false), после `config:cache`.
+
+**Как да не пада:**
+
+| Механизъм | Какво прави |
+|---|---|
+| `autorestart=true` в supervisor | Вдига демона при всяко падане |
+| `startretries=3` | Ако падне 3 пъти за 10 сек, спира — значи bundle-ът е счупен, не е временно |
+| Grateful fallback в Inertia | Ако демонът не отговаря, страницата се рендира клиентски — **сайтът не гърми**, само губи SSR |
+| Рестарт в `deploy.sh` | Демонът зарежда bundle-а веднъж при старт; без рестарт сервира стар Vue срещу нов клиентски bundle |
+
+**Проверка, че наистина работи** (не просто че процесът е жив):
+
+```bash
+curl -s https://padok.bg/news | grep -c "<article"
+```
+
+Число > 0 значи SSR рендира. `0` значи, че се сервира клиентски — виж
+`storage/logs/ssr.log` и `supervisorctl status padok-ssr`.
 
 ## 4. Включване на V2 модул след launch
 
