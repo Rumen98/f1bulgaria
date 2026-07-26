@@ -50,6 +50,12 @@ class F2ChannelEnqueuer
                     $session,
                     $session->session_type->channelPostKind(),
                     $this->formatter->format($session),
+                    // available_at = краят на сесията, макар и в миналото.
+                    // Опашката се подрежда по него, така публикуването следва
+                    // хронологията на уикенда. Без това редът е този на
+                    // вмъкване и каналът може да обяви резултата от
+                    // състезанието преди квалификацията — спойлер отгоре.
+                    $session->ends_at_utc,
                 );
 
                 if ($queued) {
