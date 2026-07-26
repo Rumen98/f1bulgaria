@@ -223,6 +223,36 @@ it('съставя четим пост с медал, отбор и време',
         ->and($body)->toContain('1:30.720');
 });
 
+it('публикува сесиите в хронологичен ред, не по реда на вмъкване', function () {
+    // Наваксването може да вмъкне състезанието първо (планировчикът го е
+    // хванал по-рано от останалите). Без подредба по време на сесията каналът
+    // би обявил резултата преди квалификацията.
+    $season = F2Season::query()->create(['year' => 2026, 'is_current' => true]);
+    $race = F2Race::query()->create([
+        'f2_season_id' => $season->id, 'round' => 9, 'location_name' => 'Budapest', 'slug' => '2026-budapest',
+    ]);
+
+    $create = function (F2SessionType $type, string $endsAt) use ($race): F2RaceSession {
+        return F2RaceSession::query()->create([
+            'f2_race_id' => $race->id,
+            'session_type' => $type->value,
+            'state' => 'completed',
+            'version' => $type->isRace() ? 'Final' : null,
+            'ends_at_utc' => $endsAt,
+        ]);
+    };
+
+    // Нарочно вмъкнати наопаки.
+    $create(F2SessionType::FeatureRace, now()->subHours(2)->toDateTimeString());
+    $create(F2SessionType::Practice, now()->subHours(10)->toDateTimeString());
+    $create(F2SessionType::Qualifying, now()->subHours(8)->toDateTimeString());
+
+    app(F2ChannelEnqueuer::class)->enqueuePending();
+
+    expect(ChannelPost::query()->ready()->pluck('kind')->map(fn ($k) => $k->value)->all())
+        ->toBe(['f2_practice', 'f2_qualifying', 'f2_feature_race']);
+});
+
 it('праща тренировките без звук', function () {
     telegramOk();
     $session = makeF2Session(F2SessionType::Practice);
