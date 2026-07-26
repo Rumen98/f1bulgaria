@@ -88,6 +88,25 @@ git pull, composer, `npm run build` (клиентски + SSR bundle), мигр�
 
 > След промяна на routes/config ВИНАГИ `route:cache`/`config:cache` отново — иначе старите кеширани routes се сервират (вкл. feature middleware-а).
 
+## 3б. Queue worker (задължителен)
+
+`QUEUE_CONNECTION=database`, а нюзлетърът и седмичният дайджест пращат през
+`Mail::queue()`. **Без работещ worker тези писма седят в таблицата `jobs`
+завинаги — без грешка и без следа в лога.**
+
+```bash
+sudo cp docs/supervisor-padok-queue.conf /etc/supervisor/conf.d/padok-queue.conf
+sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl start padok-queue:*
+```
+
+Проверка, че реално дренира (не просто че процесът е жив):
+
+```bash
+sudo -u www-data php artisan tinker --execute 'echo DB::table("jobs")->count();'
+```
+
+Число, което расте между два прогона, значи спрял worker.
+
 ## 3а. Inertia SSR (сървърно рендериране)
 
 Ботовете (Google на първата вълна, Facebook, Telegram, Viber, GPTBot) получават
