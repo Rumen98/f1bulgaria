@@ -38,7 +38,9 @@ it('показва F2 секция на пистата с победителит
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->has('f2Winners', 1)
-            ->where('f2Winners.0.driver', 'Nikola Tsolov')
+            // Име за екрана през DriverName::display — кирилица за slug-овете
+            // от config/driver-names-bg.php.
+            ->where('f2Winners.0.driver', 'Никола Цолов')
             ->where('f2Winners.0.year', 2026));
 });
 

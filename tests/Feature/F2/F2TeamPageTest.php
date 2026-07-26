@@ -45,7 +45,9 @@ it('/f2/teams/{slug} показва Campos с Цолов', function () {
             ->component('F2/TeamShow')
             ->where('team.name', 'Campos Racing')
             ->where('stats.wins', 1)
-            ->where('currentDrivers.0.name', 'Nikola Tsolov')
+            // Име на пилота за екрана през DriverName::display — кирилица.
+            // Името на отбора (`team.name`) НЕ се локализира.
+            ->where('currentDrivers.0.name', 'Никола Цолов')
             ->where('currentDrivers.0.is_bulgarian', true)
             ->has('alumni', 1));
 });

@@ -81,6 +81,17 @@ Schedule::command('news:generate-articles --limit=10')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
+// Най-важните новини към канала. На 15 мин, изместено от news:* слотовете
+// (:00/:30 fetch, :05/:35 enrich, :20 publish-pending, :25 generate-articles),
+// за да не се блъска с тях.
+//
+// Само поставя в опашката — изпращането е на channel:post.
+Schedule::command('channel:enqueue-news')
+    ->cron('8,23,38,53 * * * *')
+    ->withoutOverlapping(14)
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
 // Изпразва изходящата опашка към Telegram канала. На 5 мин: синхроните само
 // пълнят опашката, а тя трябва да тръгва бързо след сесия.
 //

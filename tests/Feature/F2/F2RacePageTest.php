@@ -52,10 +52,12 @@ it('/f2/races/{race}/feature показва резултатите с Цолов
             // класация е мъртъв клик. Спринтът тук е без резултати.
             ->has('sessions', 1)
             ->where('sessions.0.segment', 'feature')
-            ->where('results.0.driver', 'Nikola Tsolov')
+            // Имената за екрана минават през DriverName::display — кирилица за
+            // slug-овете от config/driver-names-bg.php.
+            ->where('results.0.driver', 'Никола Цолов')
             ->where('results.0.position', 1)
             ->where('results.0.is_bulgarian', true)
-            ->where('fastestLap.driver', 'Nikola Tsolov'));
+            ->where('fastestLap.driver', 'Никола Цолов'));
 });
 
 it('връща 404 при несъществуваща сесия', function () {

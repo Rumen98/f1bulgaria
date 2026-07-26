@@ -99,7 +99,11 @@ class ChannelPublisher
         // случай минаваме на ново изпращане.
         if ($post->telegram_message_id !== null && count($chunks) === 1) {
             try {
-                $this->client->edit((int) $post->telegram_message_id, $chunks[0]);
+                $this->client->edit(
+                    (int) $post->telegram_message_id,
+                    $chunks[0],
+                    linkPreview: $post->kind->showsLinkPreview(),
+                );
 
                 $post->update([
                     'status' => ChannelPostStatus::Sent->value,
@@ -122,7 +126,11 @@ class ChannelPublisher
                 usleep($sleepMs * 1000);
             }
 
-            $messageId = $this->client->send($chunk, silent: $post->kind->isSilent());
+            $messageId = $this->client->send(
+                $chunk,
+                silent: $post->kind->isSilent(),
+                linkPreview: $post->kind->showsLinkPreview(),
+            );
 
             $firstMessageId ??= $messageId;
         }

@@ -35,7 +35,10 @@ it('връща all-time класиране, групирано по canonical_id
 
     $top = $standings->first();
     expect($top['code'])->toBe('HAM')
-        ->and($top['name'])->toBe('Lewis Hamilton')
+        // Името за екрана минава през DriverName::display — за известните slug-ове
+        // е кирилско (config/driver-names-bg.php), латиницата остава само в
+        // first_name/last_name.
+        ->and($top['name'])->toBe('Люис Хамилтън')
         ->and($top['races'])->toBe(2)
         ->and($top['wins'])->toBe(1)
         ->and($top['poles'])->toBe(2)
@@ -89,7 +92,8 @@ it('връща пилота с най-много pole позиции на пис
     $most = app(CircuitStatsService::class)->getMostPolePosDriver('monaco');
 
     expect($most)->not->toBeNull()
-        ->and($most['name'])->toBe('Lewis Hamilton')
+        // Кирилско име — виж бележката в първия тест.
+        ->and($most['name'])->toBe('Люис Хамилтън')
         ->and($most['count'])->toBe(2);
 
     // Писта без pole данни → null.
@@ -118,9 +122,10 @@ it('връща рекорди и последни победители', functio
     app(CanonicalDriverBackfiller::class)->backfill();
     $service = app(CircuitStatsService::class);
 
-    expect($service->getRecords('monaco')['most_wins']['name'])->toBe('Max Verstappen')
-        ->and($service->getRecords('monaco')['most_poles']['name'])->toBe('Max Verstappen')
-        ->and($service->getLastWinners('monaco')->first()['driver'])->toBe('Max Verstappen');
+    // Кирилско име — виж бележката в първия тест.
+    expect($service->getRecords('monaco')['most_wins']['name'])->toBe('Макс Верстапен')
+        ->and($service->getRecords('monaco')['most_poles']['name'])->toBe('Макс Верстапен')
+        ->and($service->getLastWinners('monaco')->first()['driver'])->toBe('Макс Верстапен');
 });
 
 it('изчислява разширените рекорди (серия, първи/последен, конверсия, средна стартова поз.)', function () {
@@ -142,9 +147,11 @@ it('изчислява разширените рекорди (серия, пър
     app(CanonicalDriverBackfiller::class)->backfill();
     $r = app(CircuitStatsService::class)->getRecords('monaco');
 
-    expect($r['longest_winning_streak'])->toMatchArray(['name' => 'Ayrton Senna', 'count' => 3])
-        ->and($r['first_winner'])->toMatchArray(['year' => 1988, 'driver' => 'Alain Prost'])
-        ->and($r['latest_winner'])->toMatchArray(['year' => 1992, 'driver' => 'Michael Schumacher'])
+    // Кирилски имена — виж бележката в първия тест. Броенето на серията си остава
+    // по canonical_id, тоест изписването не влияе на числата отдолу.
+    expect($r['longest_winning_streak'])->toMatchArray(['name' => 'Айртон Сена', 'count' => 3])
+        ->and($r['first_winner'])->toMatchArray(['year' => 1988, 'driver' => 'Ален Прост'])
+        ->and($r['latest_winner'])->toMatchArray(['year' => 1992, 'driver' => 'Михаел Шумахер'])
         ->and($r['pole_to_win_conversion_rate'])->toBe(60.0)         // 3 от pole / 5 победи
         ->and($r['avg_winner_starting_position'])->toBe(1.6);        // (2+1+1+1+3)/5
 });

@@ -38,7 +38,9 @@ it('/f2/calendar показва текущия сезон с кръгове', fu
             ->has('rounds', 1)
             ->where('rounds.0.location', 'Melbourne')
             ->where('rounds.0.circuit_jolpica_id', 'albert_park')
-            ->where('rounds.0.feature.podium.0.driver', 'Nikola Tsolov'));
+            // Име за екрана през DriverName::display — кирилица за slug-овете
+            // от config/driver-names-bg.php.
+            ->where('rounds.0.feature.podium.0.driver', 'Никола Цолов'));
 });
 
 it('/f2/calendar/{year} показва конкретен сезон', function () {

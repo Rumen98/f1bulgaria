@@ -34,7 +34,9 @@ it('/f2/drivers показва пилотите от текущия сезон',
         ->assertInertia(fn (Assert $page) => $page
             ->component('F2/DriverIndex')
             ->where('season', 2026)
-            ->where('drivers.0.name', 'Nikola Tsolov')
+            // Име за екрана през DriverName::display — кирилица за slug-овете
+            // от config/driver-names-bg.php. Slug-ът в URL-а остава латински.
+            ->where('drivers.0.name', 'Никола Цолов')
             ->where('drivers.0.is_bulgarian', true));
 });
 
@@ -45,7 +47,8 @@ it('/f2/drivers/{slug} агрегира кариерата през сезони
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('F2/DriverShow')
-            ->where('driver.name', 'Nikola Tsolov')
+            // Кирилско име за екрана — виж бележката в теста по-горе.
+            ->where('driver.name', 'Никола Цолов')
             ->where('driver.is_bulgarian', true)
             ->where('stats.seasons', 2)
             ->where('stats.starts', 2)   // 1 резултат × 2 сезона

@@ -51,6 +51,8 @@ it('/f2 показва spotlight за българския състезател'
     $this->get('/f2')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('bulgarianSpotlight.name', 'Nikola Tsolov')
+            // Име на пилота за екрана през DriverName::display — кирилица.
+            // Името на отбора НЕ се локализира.
+            ->where('bulgarianSpotlight.name', 'Никола Цолов')
             ->where('bulgarianSpotlight.team', 'Campos Racing'));
 });

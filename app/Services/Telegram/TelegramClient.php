@@ -55,11 +55,12 @@ class TelegramClient
      * @param  string  $html  Готов HTML — подадените стойности вече трябва да са
      *                        минали през TelegramText::escape().
      * @param  bool  $silent  Без звук при получаване (за по-маловажни постове).
+     * @param  bool  $linkPreview  Картинка под линка — за новини да, за класации не.
      *
      * @throws TelegramException
      * @throws TelegramPermanentException
      */
-    public function send(string $html, bool $silent = false): int
+    public function send(string $html, bool $silent = false, bool $linkPreview = false): int
     {
         $chatId = config('services.telegram.chat_id');
 
@@ -73,7 +74,7 @@ class TelegramClient
             'parse_mode' => 'HTML',
             // disable_web_page_preview е премахнат в Bot API 7.0 (дек. 2023) —
             // подаването му днес няма ефект.
-            'link_preview_options' => ['is_disabled' => true],
+            'link_preview_options' => ['is_disabled' => ! $linkPreview],
             'disable_notification' => $silent,
         ]);
 
@@ -89,7 +90,7 @@ class TelegramClient
      * @throws TelegramException
      * @throws TelegramPermanentException
      */
-    public function edit(int $messageId, string $html): void
+    public function edit(int $messageId, string $html, bool $linkPreview = false): void
     {
         $chatId = config('services.telegram.chat_id');
 
@@ -103,7 +104,7 @@ class TelegramClient
                 'message_id' => $messageId,
                 'text' => $html,
                 'parse_mode' => 'HTML',
-                'link_preview_options' => ['is_disabled' => true],
+                'link_preview_options' => ['is_disabled' => ! $linkPreview],
             ]);
         } catch (TelegramPermanentException $e) {
             // Telegram отказва редакция с идентичен текст. Това означава, че

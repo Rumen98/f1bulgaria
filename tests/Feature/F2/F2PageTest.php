@@ -25,7 +25,9 @@ it('/f2/seasons/{year} показва конкретен сезон с шамп�
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('season', 2017)
-            ->where('standings.0.name', 'Charles Leclerc')
+            // Име за екрана през DriverName::display — кирилица за slug-овете
+            // от config/driver-names-bg.php („Льоклер", не буквалното „Леклерк").
+            ->where('standings.0.name', 'Шарл Льоклер')
             ->where('standings.0.is_champion', true));
 });
 

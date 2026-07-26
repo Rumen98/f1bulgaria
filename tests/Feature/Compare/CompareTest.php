@@ -59,8 +59,11 @@ it('сравнението на двама пилоти връща 200', functio
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Compare/Show')
-            ->where('a.name', 'Ayrton Senna')
-            ->where('b.name', 'Alain Prost')
+            // `name` е името за екрана — DriverName::display дава кирилица за
+            // slug-овете от config/driver-names-bg.php. Ключовете и slug-овете
+            // в URL-а остават на латиница.
+            ->where('a.name', 'Айртон Сена')
+            ->where('b.name', 'Ален Прост')
             ->has('comparison.career.a')
             ->has('comparison.era_overlap')
             ->has('comparison.common_circuits'));
