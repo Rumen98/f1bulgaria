@@ -49,9 +49,11 @@ echo "→ PHP зависимости"
 $RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 echo "→ Frontend билд (клиент + SSR bundle)"
+# npm ci трие node_modules преди да инсталира — ако гръмне по средата, ги
+# оставя в счупено състояние. Затова билдът е отделна стъпка след него.
+$RUN npm ci
 # npm run build прави ziggy:generate + vite build + vite build --ssr.
 # ziggy:generate чете production .env, така че APP_URL в bundle-а е верният.
-$RUN npm ci
 $RUN npm run build
 
 echo "→ Миграции"
