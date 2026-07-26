@@ -232,14 +232,24 @@ it('публикува сесиите в хронологичен ред, не �
         'f2_season_id' => $season->id, 'round' => 9, 'location_name' => 'Budapest', 'slug' => '2026-budapest',
     ]);
 
-    $create = function (F2SessionType $type, string $endsAt) use ($race): F2RaceSession {
-        return F2RaceSession::query()->create([
+    $driver = F2Driver::query()->create([
+        'f2_season_id' => $season->id, 'first_name' => 'Nikola', 'last_name' => 'Tsolov', 'slug' => 'nikola-tsolov',
+    ]);
+
+    $create = function (F2SessionType $type, string $endsAt) use ($race, $driver): F2RaceSession {
+        $session = F2RaceSession::query()->create([
             'f2_race_id' => $race->id,
             'session_type' => $type->value,
             'state' => 'completed',
             'version' => $type->isRace() ? 'Final' : null,
             'ends_at_utc' => $endsAt,
         ]);
+
+        F2Result::query()->create([
+            'f2_race_session_id' => $session->id, 'f2_driver_id' => $driver->id, 'position' => 1,
+        ]);
+
+        return $session;
     };
 
     // Нарочно вмъкнати наопаки.
