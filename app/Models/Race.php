@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Races\RaceNameLocalizer;
 use Database\Factories\RaceFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,6 +42,23 @@ class Race extends Model
             'has_sprint' => 'boolean',
             'had_safety_car' => 'boolean',
         ];
+    }
+
+    /**
+     * Българското име на Гран При-то, с падане към оригиналното.
+     *
+     * Съществува като АКСЕСОР, а не само в RaceResource: няколко места
+     * (заглавие на страница, SEO описание, седмичният имейл) пишеха
+     * `$race->name_bg ?? $race->name` и мълчаливо получаваха латиницата,
+     * защото атрибут с това име нямаше.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function nameBg(): Attribute
+    {
+        return Attribute::get(
+            fn (): string => app(RaceNameLocalizer::class)->localize($this->jolpica_id, $this->name),
+        );
     }
 
     /** @return BelongsTo<Season, $this> */

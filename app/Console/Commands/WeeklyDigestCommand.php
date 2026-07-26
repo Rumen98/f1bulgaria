@@ -10,6 +10,7 @@ use App\Models\Race;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Predictions\LeaderboardService;
+use App\Support\DriverName;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 
@@ -98,7 +99,9 @@ class WeeklyDigestCommand extends Command
             ->get()
             ->map(fn ($result) => [
                 'position' => $result->position,
-                'driver' => $result->driver?->fullName(),
+                'driver' => $result->driver
+                    ? DriverName::display($result->driver->slug, $result->driver->fullName())
+                    : null,
                 'fastest_lap' => $result->fastest_lap,
             ])
             ->all();

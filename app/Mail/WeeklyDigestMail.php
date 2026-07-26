@@ -32,7 +32,7 @@ class WeeklyDigestMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "Падок — рекап: {$this->race->name}",
+            subject: "Падок — рекап: {$this->race->name_bg}",
         );
     }
 
