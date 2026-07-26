@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\ChannelPostStatus;
 use App\Models\ChannelPost;
 use App\Services\Telegram\ChannelPublisher;
 use Illuminate\Console\Command;
