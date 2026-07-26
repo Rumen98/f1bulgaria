@@ -85,7 +85,9 @@ it('е идемпотентна — втори синхрон не дублир�
 });
 
 it('командата работи end-to-end', function () {
-    $this->artisan('f2:sync-wikipedia', ['--year' => '2026'])->assertSuccessful();
+    // Wikipedia вече е само за история; 2026 се покрива от официалния API,
+    // затова е нужен и --force.
+    $this->artisan('f2:sync-wikipedia', ['--year' => '2026', '--historical' => true, '--force' => true])->assertSuccessful();
 
     expect(F2Race::where('location_name', 'Melbourne')->exists())->toBeTrue();
 });
@@ -97,7 +99,7 @@ it('--rebuild за конкретна година не трие данните 
         'f2_season_id' => $other->id, 'location_name' => 'Sakhir', 'round' => 1, 'slug' => '2024-sakhir',
     ]);
 
-    $this->artisan('f2:sync-wikipedia', ['--year' => '2026', '--rebuild' => true])->assertSuccessful();
+    $this->artisan('f2:sync-wikipedia', ['--year' => '2026', '--rebuild' => true, '--historical' => true, '--force' => true])->assertSuccessful();
 
     expect(F2Race::whereKey($otherRace->id)->exists())->toBeTrue()      // 2024 оцелява
         ->and(F2Race::where('location_name', 'Melbourne')->exists())->toBeTrue(); // 2026 е презаписан

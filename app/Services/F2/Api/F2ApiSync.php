@@ -85,6 +85,24 @@ class F2ApiSync
         return ['season' => $year, ...$this->stats];
     }
 
+    /**
+     * Номерът на кръга идва от `roundText` („ROUND 9").
+     *
+     * НЕ ползвай `meetingNumber` — то е номерът на събитието във Формула 1
+     * (за Унгария 2026: 11), а F2 не кара на всеки Гран при. Двете се
+     * разминават и подмяната би разместила целия календар.
+     *
+     * @param  array<string, mixed>  $meeting
+     */
+    private function roundNumber(array $meeting): ?int
+    {
+        if (preg_match('/(\d+)/', (string) ($meeting['roundText'] ?? ''), $matches) !== 1) {
+            return null;
+        }
+
+        return (int) $matches[1];
+    }
+
     private function season(int $year): F2Season
     {
         $isCurrent = $year >= (int) (F2Season::query()->max('year') ?? $year);
@@ -162,7 +180,40 @@ class F2ApiSync
             }
         }
 
+        $this->propagatePole($race);
+
         return $synced;
+    }
+
+    /**
+     * Пренася pole от квалификацията върху главното състезание.
+     *
+     * Прави се в края на кръга, а не при синхрона на квалификацията: сесиите
+     * пристигат в ред p, q, r, тоест редът на състезанието още не съществува,
+     * когато квалификацията се обработва.
+     */
+    private function propagatePole(F2Race $race): void
+    {
+        $qualifying = F2RaceSession::query()
+            ->where('f2_race_id', $race->id)
+            ->whereIn('session_type', [
+                F2SessionType::Qualifying->value,
+                F2SessionType::QualifyingGroupA->value,
+            ])
+            ->whereNotNull('pole_position_driver_id')
+            ->first();
+
+        if ($qualifying === null) {
+            return;
+        }
+
+        F2RaceSession::query()
+            ->where('f2_race_id', $race->id)
+            ->where('session_type', F2SessionType::FeatureRace->value)
+            ->update([
+                'pole_position_driver_id' => $qualifying->pole_position_driver_id,
+                'pole_position_time' => $qualifying->pole_position_time,
+            ]);
     }
 
     /**
@@ -229,22 +280,16 @@ class F2ApiSync
 
         $updates = ['version' => (string) ($rows[0]['version'] ?? '') ?: null];
 
-        // Пол позицията живее върху квалификацията и се пренася върху главното
-        // състезание, защото сайтът я чете оттам.
+        // Пол позицията живее върху квалификацията. Пренасянето ѝ върху
+        // главното състезание става чак в края на кръга (propagatePole),
+        // защото сесиите идват в ред p, q, r — при обработката на
+        // квалификацията редът на състезанието още не съществува.
         if ($poleDriverId !== null && in_array($type, [
             F2SessionType::Qualifying,
             F2SessionType::QualifyingGroupA,
         ], strict: true)) {
             $updates['pole_position_driver_id'] = $poleDriverId;
             $updates['pole_position_time'] = $poleTime;
-
-            F2RaceSession::query()
-                ->where('f2_race_id', $race->id)
-                ->where('session_type', F2SessionType::FeatureRace->value)
-                ->update([
-                    'pole_position_driver_id' => $poleDriverId,
-                    'pole_position_time' => $poleTime,
-                ]);
         }
 
         $sessionModel->update($updates);

@@ -56,7 +56,13 @@ function f2Session(string $code, string $state = 'completed'): array
     ];
 }
 
-beforeEach(function () {
+/**
+ * Пуска се изрично, а не в beforeEach: Http::fake трупа stub-ове и печели
+ * първият съвпаднал, тоест регистриран в beforeEach шаблон би засенчил
+ * всеки по-специфичен, зададен после в самия тест.
+ */
+function fakeF2Api(): void
+{
     Http::fake([
         'www.fiaformula2.com/*' => Http::response(f2KeyPage()),
 
@@ -105,9 +111,10 @@ beforeEach(function () {
             ['driverReference' => 'NOELEO01', 'driverFirstName' => 'Noel', 'driverLastName' => 'Leon', 'championshipPoints' => 94],
         ]]),
     ]);
-});
+}
 
 it('вади ключа от escape-натия payload на страницата', function () {
+    fakeF2Api();
     app(F2ApiClient::class)->meetings(2026);
 
     Http::assertSent(fn ($request) => $request->hasHeader('apikey', 'TESTKEY1234567890ABC'));
@@ -121,6 +128,7 @@ it('се проваля разбираемо, когато ключът липс
 });
 
 it('създава кръг, сесии и резултати от календара', function () {
+    fakeF2Api();
     $stats = app(F2ApiSync::class)->syncSeason(2026);
 
     expect($stats['rounds'])->toBe(1)
@@ -138,6 +146,7 @@ it('създава кръг, сесии и резултати от календ�
 });
 
 it('превръща местното време на сесията в UTC', function () {
+    fakeF2Api();
     app(F2ApiSync::class)->syncSeason(2026);
 
     // 12:30 при отместване +02:00 е 10:30 UTC.
@@ -146,6 +155,7 @@ it('превръща местното време на сесията в UTC', fu
 });
 
 it('пази абсолютната обиколка за тренировка и квалификация', function () {
+    fakeF2Api();
     app(F2ApiSync::class)->syncSeason(2026);
 
     $practice = F2RaceSession::query()->where('session_type', F2SessionType::Practice->value)->first();
@@ -154,6 +164,7 @@ it('пази абсолютната обиколка за тренировка �
 });
 
 it('превръща сентинела 666 в липсваща позиция, а не го записва', function () {
+    fakeF2Api();
     app(F2ApiSync::class)->syncSeason(2026);
 
     $tsolov = F2Driver::query()->where('driver_reference', 'NIKTSO01')->first();
@@ -164,6 +175,7 @@ it('превръща сентинела 666 в липсваща позиция, 
 });
 
 it('взима класирането наготово от API-то, без да го смята', function () {
+    fakeF2Api();
     app(F2ApiSync::class)->syncSeason(2026);
 
     $tsolov = F2Driver::query()->where('driver_reference', 'NIKTSO01')->first();
@@ -175,6 +187,7 @@ it('взима класирането наготово от API-то, без д�
 });
 
 it('записва pole върху квалификацията и го пренася върху главното състезание', function () {
+    fakeF2Api();
     app(F2ApiSync::class)->syncSeason(2026);
 
     $feature = F2RaceSession::query()->where('session_type', F2SessionType::FeatureRace->value)->first();
@@ -185,6 +198,7 @@ it('записва pole върху квалификацията и го прен
 });
 
 it('не дърпа наново класация на вече свалена тренировка', function () {
+    fakeF2Api();
     app(F2ApiSync::class)->syncSeason(2026);
     $first = count(Http::recorded());
 
@@ -197,6 +211,7 @@ it('не дърпа наново класация на вече свалена �
 });
 
 it('не създава дубликати при повторен синхрон', function () {
+    fakeF2Api();
     app(F2ApiSync::class)->syncSeason(2026);
     app(F2ApiSync::class)->syncSeason(2026);
 
@@ -223,10 +238,12 @@ it('презарежда ключа при 401 и повтаря веднъж', 
         'www.fiaformula2.com/*' => Http::response(f2KeyPage()),
         'api.formula1.com/*' => Http::sequence()
             ->push(['detail' => 'unauthorized'], 401)
-            ->push(f2Meeting([]), 200),
+            ->push(['meetings' => []], 200),
     ]);
 
     expect(app(F2ApiClient::class)->meetings(2026))->toBe([]);
+    // Ключът, календарът с 401, ключът наново и повторният календар.
+    expect(count(Http::recorded()))->toBe(4);
 });
 
 it('пропуска тестовите събития, за да не разместят номерата на кръговете', function () {

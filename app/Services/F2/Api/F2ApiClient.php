@@ -9,6 +9,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Клиент за официалните F2 резултати (api.formula1.com, scope /f2/).
@@ -190,7 +191,11 @@ class F2ApiClient
                 ])
                 ->acceptJson()
                 ->timeout($config['timeout'])
-                ->retry(3, 500, throw: false)
+                // `when` не е излишно: Laravel хвърля вътрешно, за да задейства
+                // повторението, независимо от throw: false. Без филтъра 401
+                // също се повтаря и пътят за презареждане на ключа по-долу
+                // никога не се стига.
+                ->retry(3, 500, $this->shouldRetry(...), throw: false)
                 ->get('/'.ltrim($endpoint, '/'), $query);
         } catch (ConnectionException) {
             throw new F2ApiException("Мрежова грешка при връзка с F2 API ({$endpoint}).");
@@ -210,6 +215,20 @@ class F2ApiClient
         }
 
         return (array) $response->json();
+    }
+
+    /**
+     * Повтаряме само мрежови грешки и 5xx. 401/403 значи ротирал ключ и се
+     * обработва отделно; останалите 4xx повтарянето няма да оправи.
+     */
+    private function shouldRetry(Throwable $exception): bool
+    {
+        if ($exception instanceof ConnectionException) {
+            return true;
+        }
+
+        return $exception instanceof RequestException
+            && $exception->response->serverError();
     }
 
     /**

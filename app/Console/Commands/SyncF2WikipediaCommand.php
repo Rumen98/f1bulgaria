@@ -27,6 +27,7 @@ class SyncF2WikipediaCommand extends Command
 
     protected $signature = 'f2:sync-wikipedia
         {--historical : Задължителен — потвърждава, че това е ръчен синхрон на стар сезон}
+        {--force : Позволява синхрон и на сезони, покрити от официалния API}
         {--year= : Конкретна година (напр. 2024) или "all"}
         {--since=2025 : Начална година при --year=all}
         {--rebuild : Изтрива F2 race данните преди синхрон (внимателно)}';
@@ -53,13 +54,14 @@ class SyncF2WikipediaCommand extends Command
 
         $covered = array_filter($years, fn (int $year): bool => $year >= self::API_COVERAGE_FROM);
 
-        if ($covered !== []) {
-            $this->warn('ВНИМАНИЕ: '.implode(', ', $covered).' се покрива(т) от официалния API.');
-            $this->warn('Синхронът от Wikipedia ще презапише по-пресните данни с по-бедни.');
+        // Изричен флаг, не интерактивно потвърждение: командата трябва да е
+        // използваема и от скрипт, а `confirm()` под cron виси до таймаут.
+        if ($covered !== [] && ! $this->option('force')) {
+            $this->error(implode(', ', $covered).' се покрива(т) от официалния API (`f2:sync`).');
+            $this->line('Синхронът от Wikipedia би презаписал по-пресните данни с по-бедни.');
+            $this->line('Ако наистина това искаш, добави --force.');
 
-            if (! $this->confirm('Да продължа ли въпреки това?', false)) {
-                return self::SUCCESS;
-            }
+            return self::FAILURE;
         }
 
         if ($this->option('rebuild')) {
