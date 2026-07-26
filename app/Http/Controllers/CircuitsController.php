@@ -9,6 +9,7 @@ use App\Models\Race;
 use App\Models\Season;
 use App\Services\Circuits\CircuitStatsService;
 use App\Support\CountryFlag;
+use App\Support\Seo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
@@ -80,6 +81,11 @@ class CircuitsController extends Controller
         $refRace = $next ?? $reference;
 
         $meta = $this->meta($slug);
+
+        app(Seo::class)
+            ->title($reference->circuit)
+            ->description($reference->circuit.' — очертание на пистата, рекорди и статистика от Формула 1.')
+            ->canonical(route('circuits.show', $slug));
 
         return Inertia::render('Circuits/Show', [
             'circuit' => [

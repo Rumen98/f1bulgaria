@@ -8,6 +8,7 @@ use App\Models\DriverCanonical;
 use App\Models\Rivalry;
 use App\Services\Drivers\ComparisonService;
 use App\Support\CountryFlag;
+use App\Support\Seo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -109,6 +110,11 @@ class RivalriesController extends Controller
             ->with(['driverOne', 'driverTwo'])
             ->where('slug', $slug)
             ->firstOrFail();
+
+        app(Seo::class)
+            ->title($rivalry->title_bg)
+            ->description($rivalry->description_bg)
+            ->canonical(route('rivalries.show', $slug));
 
         return Inertia::render('Rivalries/Show', [
             'rivalry' => [

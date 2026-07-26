@@ -165,3 +165,32 @@ it('третира непознатата категория като „Вси�
         ->assertOk()
         ->assertInertia(fn ($page) => $page->where('activeCat', 'all'));
 });
+
+it('всяка публична страница има собствено заглавие, не дефолтното', function (string $path) {
+    $html = $this->get($path)->assertOk()->getContent();
+
+    preg_match('/<title>(.*?)<\/title>/u', $html, $m);
+
+    expect($m[1] ?? '')->not->toBe(Seo::DEFAULT_TITLE, "Липсва заглавие за {$path}");
+})->with([
+    '/calendar',
+    '/standings',
+    '/leaderboard',
+    '/teams',
+    '/drivers',
+    '/news',
+    '/terminologiya',
+    '/poveritelnost',
+    '/usloviya',
+    '/kontakt',
+    '/circuits',
+    '/compare',
+    '/rivalries',
+    '/tsolov',
+    '/istoria',
+    '/istoria/svetovna',
+    '/istoria/bulgaria',
+    '/f2',
+    '/f2/drivers',
+    '/f2/teams',
+]);

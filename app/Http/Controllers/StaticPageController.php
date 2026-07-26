@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Support\Seo;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -18,6 +19,8 @@ class StaticPageController extends Controller
 
     public function privacy(): Response
     {
+        app(Seo::class)->title('Политика за поверителност')->description('Как обработваме и защитаваме личните ти данни.');
+
         return Inertia::render('Static/Page', [
             'title' => 'Политика за поверителност',
             'intro' => 'Как обработваме и защитаваме личните ти данни.',
@@ -93,6 +96,8 @@ class StaticPageController extends Controller
 
     public function terms(): Response
     {
+        app(Seo::class)->title('Условия за ползване')->description('Правилата, с които се съгласяваш, използвайки Падок.');
+
         return Inertia::render('Static/Page', [
             'title' => 'Условия за ползване',
             'intro' => 'Правилата, с които се съгласяваш, използвайки Падок.',
@@ -163,6 +168,8 @@ class StaticPageController extends Controller
         } else {
             $paragraphs[] = 'Каналите ни за връзка са в процес на настройка — междувременно можеш да ни намериш в Telegram общността (линкът е във футъра).';
         }
+
+        app(Seo::class)->title('Контакт')->description('Свържи се с екипа на Падок.');
 
         return Inertia::render('Static/Page', [
             'title' => 'Контакт',

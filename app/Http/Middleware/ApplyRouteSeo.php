@@ -27,13 +27,22 @@ class ApplyRouteSeo
         $name = $request->route()?->getName();
 
         if ($name !== null) {
-            /** @var array{title:?string, description:string}|null $meta */
-            $meta = config("seo.{$name}");
+            // ВАЖНО: config("seo.{$name}") НЕ работи — имената на рутовете
+            // съдържат точки ('teams.index'), а config() ги тълкува като
+            // вложени ключове. Взимаме масива и търсим по литерален ключ.
+            /** @var array{title:?string, description:?string}|null $meta */
+            $meta = config('seo')[$name] ?? null;
 
             if ($meta !== null) {
                 app(Seo::class)
                     ->title($meta['title'] ?? null)
                     ->description($meta['description'] ?? null);
+            } elseif (! $request->routeIs('*.show', 'races.show', 'f2.*', 'profiles.show')) {
+                // Липсващ запис за статична страница е пропуск, не дизайн —
+                // в local го правим шумно, за да не тръгне с дефолтно заглавие.
+                if (config('app.debug') && $request->isMethod('GET')) {
+                    logger()->debug("Липсва config/seo.php запис за рут [{$name}].");
+                }
             }
         }
 

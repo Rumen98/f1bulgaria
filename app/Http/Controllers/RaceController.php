@@ -9,6 +9,7 @@ use App\Http\Resources\RaceResource;
 use App\Models\Driver;
 use App\Models\Race;
 use App\Services\Predictions\PredictionLockService;
+use App\Support\Seo;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -40,6 +41,11 @@ class RaceController extends Controller
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name'])
             ->map(fn ($d) => ['id' => $d->id, 'name' => $d->fullName()]);
+
+        app(Seo::class)
+            ->title($race->name_bg ?? $race->name)
+            ->description(($race->name_bg ?? $race->name).' — програма, стартова решетка и резултати от Формула 1. Часове в българско време.')
+            ->canonical(route('races.show', $race->id));
 
         return Inertia::render('Races/Show', [
             'race' => new RaceResource($race),
