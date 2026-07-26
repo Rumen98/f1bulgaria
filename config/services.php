@@ -76,6 +76,26 @@ return [
     ],
 
     /*
+    | Telegram Bot API — публикуване в канала на Падок.
+    |
+    | chat_id ТРЯБВА да е числовото id на канала (започва с -100…), не
+    | @username: username-ът се сменя при преименуване на канала и постовете
+    | спират тихо, докато id-то е непроменимо. Вади се веднъж с
+    | `php artisan channel:resolve-chat-id @padokbg`.
+    |
+    | Лимитът, който има значение, е 1 съобщение в секунда към един и същ чат
+    | (не 30/сек — това е за broadcast към различни чатове).
+    |
+    | @see https://core.telegram.org/bots/api#sendmessage
+    */
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'chat_id' => env('TELEGRAM_CHAT_ID'),
+        'base_url' => env('TELEGRAM_BASE_URL', 'https://api.telegram.org'),
+        'timeout' => (int) env('TELEGRAM_TIMEOUT', 15),
+    ],
+
+    /*
     | IndexNow — push уведомяване към Bing/Yandex при нова публикация.
     | Ключът е произволен низ (32-64 hex знака); същият низ трябва да е
     | достъпен като https://padok.bg/{key}.txt със съдържание самия ключ.
