@@ -43,7 +43,9 @@ it('показва детайлната страница на пилот', funct
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Drivers/Show')
-            ->where('driver.name', 'Lewis Hamilton')
+            // Кирилицата води — това е името в <h1> и <title> (SEO).
+            ->where('driver.name', 'Люис Хамилтън')
+            ->where('driver.name_latin', 'Lewis Hamilton')
             ->has('seasonStats')
             ->has('allTimeStats')
             ->has('achievements')
@@ -73,7 +75,7 @@ it('резолва исторически пилот извън текущия �
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Drivers/Show')
-            ->where('driver.name', 'Ayrton Senna')
+            ->where('driver.name', 'Айртон Сена')
             ->where('isHistorical', true)
             ->where('season', 1994)
             ->has('careerTimeline', 1));
