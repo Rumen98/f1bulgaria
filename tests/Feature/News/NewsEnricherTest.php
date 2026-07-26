@@ -147,11 +147,11 @@ it('подава прогрес callback за всеки обработен ел
     test()->mock(NewsClassifier::class, fn ($m) => $m->shouldReceive('classify')->andReturn(classResult()));
 
     $progress = [];
-    app(NewsEnricher::class)->enrichPending(50, function (TeamNewsItem $item, string $outcome, int $position, int $total) use (&$progress) {
-        $progress[] = [$position, $total, $outcome];
+    app(NewsEnricher::class)->enrichPending(50, function (TeamNewsItem $item, string $outcome, int $position, int $total, ?string $error) use (&$progress) {
+        $progress[] = [$position, $total, $outcome, $error];
     });
 
-    expect($progress)->toBe([[1, 2, 'published'], [2, 2, 'published']]);
+    expect($progress)->toBe([[1, 2, 'published', null], [2, 2, 'published', null]]);
 });
 
 it('подава пълния текст на оригинала към генератора на статии', function () {

@@ -18,8 +18,8 @@ class GenerateNewsArticlesCommand extends Command
     {
         $limit = (int) $this->option('limit');
 
-        $stats = $enricher->generateExtendedArticles($limit, function (TeamNewsItem $item, string $outcome, int $position, int $total): void {
-            $label = $outcome === 'generated' ? 'готова' : 'ГРЕШКА';
+        $stats = $enricher->generateExtendedArticles($limit, function (TeamNewsItem $item, string $outcome, int $position, int $total, ?string $error): void {
+            $label = $outcome === 'generated' ? 'готова' : 'ГРЕШКА ('.($error ?? '?').')';
 
             $this->line("[{$position}/{$total}] #{$item->id} {$label}: ".($item->title_bg ?? $item->title_original));
         });

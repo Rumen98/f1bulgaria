@@ -28,8 +28,8 @@ class NewsEnricher
     ) {}
 
     /**
-     * @param  Closure(TeamNewsItem, string, int, int): void|null  $onItem  Прогрес след
-     *                                                                      всеки елемент: (елемент, изход published|duplicate|failed, пореден, общо).
+     * @param  Closure(TeamNewsItem, string, int, int, ?string): void|null  $onItem  Прогрес след всеки
+     *                                                                               елемент: (елемент, изход published|duplicate|failed, пореден, общо, грешка).
      * @return array{processed:int, success:int, failed:int, duplicates:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
      */
     public function enrichPending(int $limit = 50, ?Closure $onItem = null): array
@@ -59,6 +59,7 @@ class NewsEnricher
         foreach ($items as $item) {
             $stats['processed']++;
             $outcome = 'failed';
+            $error = null;
 
             try {
                 $result = $this->classifier->classify($item);
@@ -102,11 +103,12 @@ class NewsEnricher
                 $stats['output_tokens'] += $result->tokenUsage['output_tokens'];
             } catch (Throwable $e) {
                 $stats['failed']++;
-                $stats['errors'][] = "item #{$item->id}: {$e->getMessage()}";
-                Log::warning("News enrich failed for item [{$item->id}]: {$e->getMessage()}");
+                $error = $e->getMessage();
+                $stats['errors'][] = "item #{$item->id}: {$error}";
+                Log::warning("News enrich failed for item [{$item->id}]: {$error}");
             }
 
-            $onItem?->__invoke($item, $outcome, $stats['processed'], $total);
+            $onItem?->__invoke($item, $outcome, $stats['processed'], $total, $error);
 
             if ($sleepMs > 0) {
                 usleep($sleepMs * 1000);
@@ -121,8 +123,8 @@ class NewsEnricher
      * одобрените новини, които още нямат такава. Грешка в един елемент се логва
      * и не спира batch-а.
      *
-     * @param  Closure(TeamNewsItem, string, int, int): void|null  $onItem  Прогрес след
-     *                                                                      всеки елемент: (елемент, изход generated|failed, пореден, общо).
+     * @param  Closure(TeamNewsItem, string, int, int, ?string): void|null  $onItem  Прогрес след всеки
+     *                                                                               елемент: (елемент, изход generated|failed, пореден, общо, грешка).
      * @return array{processed:int, success:int, failed:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
      */
     public function generateExtendedArticles(int $limit = 10, ?Closure $onItem = null): array
@@ -150,6 +152,7 @@ class NewsEnricher
         foreach ($items as $item) {
             $stats['processed']++;
             $outcome = 'failed';
+            $error = null;
 
             try {
                 // Пълният текст на оригинала дава реалните факти/резултати;
@@ -168,11 +171,12 @@ class NewsEnricher
                 $stats['output_tokens'] += $content->tokenUsage['output_tokens'];
             } catch (Throwable $e) {
                 $stats['failed']++;
-                $stats['errors'][] = "item #{$item->id}: {$e->getMessage()}";
-                Log::warning("News article generation failed for item [{$item->id}]: {$e->getMessage()}");
+                $error = $e->getMessage();
+                $stats['errors'][] = "item #{$item->id}: {$error}";
+                Log::warning("News article generation failed for item [{$item->id}]: {$error}");
             }
 
-            $onItem?->__invoke($item, $outcome, $stats['processed'], $total);
+            $onItem?->__invoke($item, $outcome, $stats['processed'], $total, $error);
 
             if ($sleepMs > 0) {
                 usleep($sleepMs * 1000);
