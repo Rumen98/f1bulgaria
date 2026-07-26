@@ -51,6 +51,13 @@ class OpenF1SessionSync
         'practice 3' => SessionType::FP3,
         'sprint qualifying' => SessionType::SprintQuali,
         'sprint shootout' => SessionType::SprintQuali,
+        // Състезанието и спринтът се взимат за БЪРЗО показване, не за точките.
+        // Jolpica публикува с часове закъснение, а дотогава сайтът и каналът
+        // мълчат за резултат, който всички вече знаят. Класацията оттук отива
+        // в `session_results` и се показва като временна, докато Jolpica
+        // пристигне; точките, класирането и прогнозите остават негови.
+        'sprint' => SessionType::Sprint,
+        'race' => SessionType::Race,
     ];
 
     /**
@@ -245,8 +252,12 @@ class OpenF1SessionSync
                     'position' => isset($row['position']) && $row['position'] !== null
                         ? (int) $row['position']
                         : null,
-                    'best_time' => $this->lapTime($row['duration'] ?? null),
+                    // В състезание `duration` е ОБЩОТО време, не обиколка —
+                    // форматирано като „1:23.456" би било безсмислица. Там
+                    // значение има само изоставането.
+                    'best_time' => $type->isRace() ? null : $this->lapTime($row['duration'] ?? null),
                     'gap' => $this->gap($row['gap_to_leader'] ?? null),
+                    'dnf' => (bool) ($row['dnf'] ?? false) || (bool) ($row['dns'] ?? false) || (bool) ($row['dsq'] ?? false),
                     'source' => 'openf1',
                 ],
             );

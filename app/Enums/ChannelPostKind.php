@@ -103,10 +103,10 @@ enum ChannelPostKind: string
     }
 
     /**
-     * Сесията в `session_results`, ако постът се храни оттам.
+     * Сесията от Формула 1, която постът описва. null за F2 и новини.
      *
-     * null означава, че данните идват от `results` (състезание и спринт —
-     * единствените с шампионатни точки).
+     * Кой източник се чете за нея НЕ се решава тук — това е работа на
+     * RaceClassificationProvider.
      */
     public function sessionType(): ?SessionType
     {
@@ -116,6 +116,8 @@ enum ChannelPostKind: string
             self::F1Fp3 => SessionType::FP3,
             self::F1Qualifying => SessionType::Qualifying,
             self::F1SprintQuali => SessionType::SprintQuali,
+            self::F1Sprint => SessionType::Sprint,
+            self::F1Race => SessionType::Race,
             default => null,
         };
     }

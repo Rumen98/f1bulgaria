@@ -5,23 +5,18 @@ declare(strict_types=1);
 namespace App\Services\Telegram\Formatters;
 
 use App\Enums\ChannelPostKind;
-use App\Enums\ResultSessionType;
-use App\Enums\SessionType;
-use App\Models\Driver;
 use App\Models\Race;
-use App\Models\Result;
-use App\Models\SessionResult;
-use App\Services\Races\RaceNameLocalizer;
+use App\Services\Races\RaceClassificationProvider;
 use App\Services\Telegram\TelegramText;
 use App\Support\DriverName;
-use Illuminate\Support\Collection;
 
 /**
  * Съставя поста за сесия от Формула 1.
  *
- * Състезанието и спринтът четат от `results` (там са точките), а
- * квалификацията — от `session_results`. Двете таблици са разделени нарочно;
- * виж миграцията на `session_results`.
+ * Откъде идва класацията решава RaceClassificationProvider — тук само се
+ * рисува. Затова постът за състезание излиза минути след финала с временната
+ * класация от OpenF1 и се РЕДАКТИРА на място, когато Jolpica донесе
+ * официалната с точките.
  */
 class F1SessionFormatter
 {
@@ -30,32 +25,56 @@ class F1SessionFormatter
     private const MEDALS = [1 => '🥇', 2 => '🥈', 3 => '🥉'];
 
     public function __construct(
-        private readonly RaceNameLocalizer $raceNames,
+        private readonly RaceClassificationProvider $classifications,
     ) {}
 
     public function format(Race $race, ChannelPostKind $kind): string
     {
+        $type = $kind->sessionType();
+        $section = $type !== null ? $this->classifications->for($race, $type) : null;
+
+        if ($section === null) {
+            return '';
+        }
+
         $lines = [
             '🏁 <b>Формула 1 · '.TelegramText::escape($kind->label()).'</b>',
             TelegramText::escape($this->subtitle($race)),
             '',
         ];
 
-        $sessionType = $kind->sessionType();
+        foreach (array_slice($section['rows'], 0, self::VISIBLE_POSITIONS) as $row) {
+            $lines[] = $this->line($row);
+        }
 
-        $lines = [...$lines, ...($sessionType !== null
-            ? $this->sessionResultLines($race, $sessionType)
-            : $this->raceLines($race, $kind)
-        )];
+        $retired = collect($section['rows'])
+            ->filter(fn (array $row): bool => (bool) $row['dnf'])
+            ->map(fn (array $row): string => (string) $row['driver'])
+            ->filter();
 
-        $lines = [...$lines, ...$this->context($race, $kind)];
+        if ($retired->isNotEmpty()) {
+            $lines[] = '';
+            $lines[] = '<i>Отпаднали: '.TelegramText::escape($retired->implode(', ')).'</i>';
+        }
+
+        if ($kind === ChannelPostKind::F1Race && $race->poleDriver !== null) {
+            $lines[] = '';
+            $lines[] = '🅿️ От пол позиция: <b>'.TelegramText::escape(
+                DriverName::display($race->poleDriver->slug, $race->poleDriver->fullName()),
+            ).'</b>';
+        }
+
+        if ($section['provisional']) {
+            $lines[] = '';
+            $lines[] = '<i>⚠️ Временна класация — точките още не са официални. Постът ще се обнови.</i>';
+        }
 
         $lines[] = '';
         $lines[] = '<a href="'.TelegramText::escape(route('races.show', $race)).'">Пълна класация в Падок</a>';
 
-        // CC BY-NC-SA изисква посочване на източника — това не е любезност,
-        // а условие на лиценза, при който ползваме данните за тренировките.
-        if ($kind->requiresOpenF1Attribution()) {
+        // CC BY-NC-SA изисква посочване на източника. Временната класация на
+        // състезание също идва от OpenF1, затова проверяваме и нея.
+        if ($kind->requiresOpenF1Attribution() || $section['provisional']) {
             $lines[] = '<i>'.TelegramText::escape((string) config('channel.openf1_attribution')).'</i>';
         }
 
@@ -65,153 +84,41 @@ class F1SessionFormatter
     private function subtitle(Race $race): string
     {
         return collect([
-            $this->raceNames->localize($race->jolpica_id, $race->name),
+            $this->classifications->raceName($race),
             $race->round !== null ? "кръг {$race->round}" : null,
         ])->filter()->implode(' · ');
     }
 
     /**
-     * @return array<int, string>
+     * @param  array<string, mixed>  $row
      */
-    private function raceLines(Race $race, ChannelPostKind $kind): array
+    private function line(array $row): string
     {
-        $type = $kind === ChannelPostKind::F1Sprint
-            ? ResultSessionType::Sprint
-            : ResultSessionType::Race;
+        $position = (int) $row['position'];
+        $prefix = self::MEDALS[$position] ?? str_pad((string) $position, 2, ' ', STR_PAD_LEFT).'.';
 
-        $results = Result::query()
-            ->where('race_id', $race->id)
-            ->where('session_type', $type->value)
-            ->with('driver.constructor')
-            ->get();
+        $parts = [$prefix.' <b>'.TelegramText::escape((string) $row['driver']).'</b>'];
 
-        $lines = [];
-
-        foreach ($this->classified($results)->take(self::VISIBLE_POSITIONS) as $result) {
-            $name = TelegramText::escape($this->name($result->driver));
-            $team = TelegramText::escape($result->driver?->constructor?->name ?? '');
-
-            $parts = [$this->prefix((int) $result->position)." <b>{$name}</b>"];
-
-            if ($team !== '') {
-                $parts[] = $team;
-            }
-
-            if ((float) $result->points > 0) {
-                $parts[] = TelegramText::escape($this->points((float) $result->points).' т.');
-            }
-
-            $line = implode(' · ', $parts);
-
-            if ($result->fastest_lap) {
-                $line .= ' 🟣';
-            }
-
-            $lines[] = $line;
+        if (filled($row['team'])) {
+            $parts[] = TelegramText::escape((string) $row['team']);
         }
 
-        $retired = $results
-            ->filter(fn (Result $r): bool => $r->dnf)
-            ->map(fn (Result $r): string => $this->name($r->driver))
-            ->filter();
-
-        if ($retired->isNotEmpty()) {
-            $lines[] = '';
-            $lines[] = '<i>Отпаднали: '.TelegramText::escape($retired->implode(', ')).'</i>';
+        if (filled($row['time'])) {
+            $parts[] = TelegramText::escape((string) $row['time']);
         }
 
-        return $lines;
-    }
-
-    /**
-     * Класация от сесия без точки: квалификация, спринт квалификация,
-     * тренировки. Показва време на обиколка, не точки.
-     *
-     * @return array<int, string>
-     */
-    private function sessionResultLines(Race $race, SessionType $type): array
-    {
-        $results = SessionResult::query()
-            ->where('race_id', $race->id)
-            ->where('session_type', $type->value)
-            ->with('driver.constructor')
-            ->get();
-
-        $lines = [];
-
-        foreach ($this->classified($results)->take(self::VISIBLE_POSITIONS) as $result) {
-            $name = TelegramText::escape($this->name($result->driver));
-            $team = TelegramText::escape($result->driver?->constructor?->name ?? '');
-
-            $parts = [$this->prefix((int) $result->position)." <b>{$name}</b>"];
-
-            if ($team !== '') {
-                $parts[] = $team;
-            }
-
-            // При квалификация показваме отсечката, до която пилотът е стигнал
-            // (Q3, иначе Q2, иначе Q1) — иначе редовете носят времена от
-            // различни етапи и подредбата изглежда сгрешена.
-            $time = $result->bestQualifyingTime();
-
-            if (filled($time)) {
-                $parts[] = TelegramText::escape((string) $time);
-            }
-
-            // Изоставането има смисъл само след лидера.
-            if ((int) $result->position > 1 && filled($result->gap)) {
-                $parts[] = TelegramText::escape((string) $result->gap);
-            }
-
-            $lines[] = implode(' · ', $parts);
+        // Изоставането има смисъл само след лидера.
+        if ($position > 1 && filled($row['gap'])) {
+            $parts[] = TelegramText::escape((string) $row['gap']);
         }
 
-        return $lines;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function context(Race $race, ChannelPostKind $kind): array
-    {
-        if ($kind !== ChannelPostKind::F1Race || $race->poleDriver === null) {
-            return [];
+        if ((float) ($row['points'] ?? 0) > 0) {
+            $points = rtrim(rtrim(number_format((float) $row['points'], 1, ',', ''), '0'), ',');
+            $parts[] = TelegramText::escape("{$points} т.");
         }
 
-        return [
-            '',
-            '🅿️ От пол позиция: <b>'.TelegramText::escape($this->name($race->poleDriver)).'</b>',
-        ];
-    }
+        $line = implode(' · ', $parts);
 
-    /**
-     * @param  Collection<int, Result|SessionResult>  $results
-     * @return Collection<int, Result|SessionResult>
-     */
-    private function classified(Collection $results): Collection
-    {
-        return $results
-            ->filter(fn ($result): bool => $result->position !== null)
-            ->sortBy('position')
-            ->values();
-    }
-
-    private function prefix(int $position): string
-    {
-        return self::MEDALS[$position] ?? str_pad((string) $position, 2, ' ', STR_PAD_LEFT).'.';
-    }
-
-    private function name(?Driver $driver): string
-    {
-        if ($driver === null) {
-            return '';
-        }
-
-        return DriverName::display($driver->slug, $driver->fullName());
-    }
-
-    private function points(float $points): string
-    {
-        return rtrim(rtrim(number_format($points, 1, ',', ''), '0'), ',');
+        return $row['fastest_lap'] ? $line.' 🟣' : $line;
     }
 }

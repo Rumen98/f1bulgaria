@@ -17,7 +17,6 @@ use App\Services\Telegram\F1ChannelEnqueuer;
 beforeEach(function () {
     config()->set('channel.enabled', true);
     config()->set('channel.max_backfill_hours', 24);
-    config()->set('channel.race_result_delay_minutes', 45);
 });
 
 function f1Race(): Race
@@ -76,26 +75,63 @@ it('поставя квалификацията в опашката от session
         ->and($post->body)->toContain('1:15.096');
 });
 
-it('отлага резултата от състезанието заради стюардите', function () {
+it('публикува временната класация от бързия източник, отбелязана като такава', function () {
     $race = f1Race();
-    $driver = f1Driver($race, 'Max', 'Verstappen', 'max-verstappen');
+    $driver = f1Driver($race, 'Max', 'Verstappen', 'max-verstappen', 'Red Bull');
 
-    Result::factory()->create([
+    // Само бързият източник. Официалният (Jolpica) още не е публикувал.
+    SessionResult::query()->create([
         'race_id' => $race->id,
+        'session_type' => SessionType::Race->value,
         'driver_id' => $driver->id,
-        'session_type' => ResultSessionType::Race->value,
         'position' => 1,
-        'points' => 25,
-        'dnf' => false,
+        'gap' => null,
+        'source' => 'openf1',
+    ]);
+
+    expect(app(F1ChannelEnqueuer::class)->enqueuePending()['queued'])->toBe(1);
+
+    $post = ChannelPost::query()->where('kind', ChannelPostKind::F1Race->value)->first();
+
+    expect($post->body)->toContain('Макс Верстапен')
+        ->and($post->body)->toContain('Временна класация')
+        // Лицензът на бързия източник изисква посочване.
+        ->and($post->body)->toContain('OpenF1');
+});
+
+it('пренаписва поста, щом официалните резултати с точките пристигнат', function () {
+    $race = f1Race();
+    $driver = f1Driver($race, 'Max', 'Verstappen', 'max-verstappen', 'Red Bull');
+
+    SessionResult::query()->create([
+        'race_id' => $race->id,
+        'session_type' => SessionType::Race->value,
+        'driver_id' => $driver->id,
+        'position' => 1,
+        'source' => 'openf1',
     ]);
 
     app(F1ChannelEnqueuer::class)->enqueuePending();
 
+    // Jolpica пристига с часове закъснение — и носи точките.
+    Result::factory()->create([
+        'race_id' => $race->id, 'driver_id' => $driver->id,
+        'session_type' => ResultSessionType::Race->value,
+        'position' => 1, 'points' => 25, 'dnf' => false,
+    ]);
+
+    $stats = app(F1ChannelEnqueuer::class)->enqueuePending();
+
+    // Не нов пост, а обновяване на същия — иначе каналът получава две
+    // съобщения за едно състезание.
+    expect($stats['queued'])->toBe(0)
+        ->and($stats['updated'])->toBe(1)
+        ->and(ChannelPost::query()->where('kind', ChannelPostKind::F1Race->value)->count())->toBe(1);
+
     $post = ChannelPost::query()->where('kind', ChannelPostKind::F1Race->value)->first();
 
-    // Jolpica няма поле „окончателна класация", затова отлагането е по часовник.
-    expect($post->available_at->timestamp)
-        ->toBe($race->race_datetime_utc->copy()->addMinutes(45)->timestamp);
+    expect($post->body)->toContain('25 т.')
+        ->and($post->body)->not->toContain('Временна класация');
 });
 
 it('подрежда квалификацията преди състезанието', function () {

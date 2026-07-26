@@ -20,6 +20,7 @@ class SessionResult extends Model
         'session_type',
         'driver_id',
         'position',
+        'dnf',
         'best_time',
         'gap',
         'q1',
@@ -33,6 +34,7 @@ class SessionResult extends Model
         return [
             'session_type' => SessionType::class,
             'position' => 'integer',
+            'dnf' => 'boolean',
         ];
     }
 

@@ -4,26 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\ResultSessionType;
-use App\Enums\SessionType;
 use App\Http\Resources\PredictionResource;
 use App\Http\Resources\RaceResource;
 use App\Models\Driver;
 use App\Models\Race;
-use App\Models\Result;
-use App\Models\SessionResult;
 use App\Services\Predictions\PredictionLockService;
+use App\Services\Races\RaceClassificationProvider;
 use App\Support\BulgarianSort;
 use App\Support\DriverName;
 use App\Support\Seo;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class RaceController extends Controller
 {
-    public function show(Race $race, PredictionLockService $lock): Response
+    public function show(Race $race, PredictionLockService $lock, RaceClassificationProvider $classifications): Response
     {
         $race->load([
             'sessions',
@@ -65,87 +60,7 @@ class RaceController extends Controller
                 ?->setTimezone('Europe/Sofia')->format('d.m.Y H:i'),
             'userPrediction' => $userPrediction,
             'drivers' => $drivers,
-            'classifications' => $this->classifications($race),
+            'classifications' => $classifications->all($race),
         ]);
-    }
-
-    /**
-     * Класациите от ВСИЧКИ сесии на уикенда, в реда на провеждането им.
-     *
-     * Дотук страницата показваше само състезанието, тоест до неделя следобед
-     * (а при забавяне на Jolpica — и след това) стоеше празна, макар
-     * квалификацията отдавна да е в базата.
-     *
-     * Два източника: `results` носи сесиите с точки, `session_results` —
-     * останалите. Разделени са нарочно (виж миграцията на `session_results`).
-     *
-     * @return array<int, array{type:string, label:string, rows:array<int, array<string, mixed>>}>
-     */
-    private function classifications(Race $race): array
-    {
-        $sections = [];
-
-        foreach (Result::query()
-            ->where('race_id', $race->id)
-            ->with('driver.constructor')
-            ->get()
-            ->groupBy(fn (Result $r): string => $r->session_type->value) as $type => $rows
-        ) {
-            $sessionType = $type === ResultSessionType::Sprint->value
-                ? SessionType::Sprint
-                : SessionType::Race;
-
-            $sections[] = [
-                'type' => $sessionType->value,
-                'label' => $sessionType->label(),
-                'order' => $sessionType->order(),
-                'rows' => $this->rows($rows, withPoints: true),
-            ];
-        }
-
-        foreach (SessionResult::query()
-            ->where('race_id', $race->id)
-            ->with('driver.constructor')
-            ->get()
-            ->groupBy(fn (SessionResult $r): string => $r->session_type->value) as $type => $rows
-        ) {
-            $sessionType = SessionType::from((string) $type);
-
-            $sections[] = [
-                'type' => $sessionType->value,
-                'label' => $sessionType->label(),
-                'order' => $sessionType->order(),
-                'rows' => $this->rows($rows, withPoints: false),
-            ];
-        }
-
-        usort($sections, fn (array $a, array $b): int => $a['order'] <=> $b['order']);
-
-        return array_map(fn (array $s): array => Arr::except($s, 'order'), $sections);
-    }
-
-    /**
-     * @param  Collection<int, Result|SessionResult>  $rows
-     * @return array<int, array<string, mixed>>
-     */
-    private function rows(Collection $rows, bool $withPoints): array
-    {
-        return $rows
-            // Некласираните (DNF, без време) отиват най-долу, а не най-горе,
-            // както би ги подредил null при обикновено сортиране.
-            ->sortBy(fn ($r): int => $r->position ?? 999)
-            ->values()
-            ->map(fn ($r): array => [
-                'position' => $r->position,
-                'driver' => $r->driver ? DriverName::display($r->driver->slug, $r->driver->fullName()) : null,
-                'slug' => $r->driver?->slug,
-                'team' => $r->driver?->constructor?->name,
-                'time' => $r instanceof SessionResult ? $r->bestQualifyingTime() : null,
-                'gap' => $r instanceof SessionResult ? $r->gap : null,
-                'points' => $withPoints ? (float) $r->points : null,
-                'dnf' => $r instanceof Result ? (bool) $r->dnf : false,
-                'fastest_lap' => $r instanceof Result ? (bool) $r->fastest_lap : false,
-            ])
-            ->all();
     }
 }

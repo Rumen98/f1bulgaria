@@ -15,6 +15,14 @@ enum SessionType: string
     case Race = 'race';
 
     /**
+     * Носи ли сесията шампионатни точки.
+     */
+    public function isRace(): bool
+    {
+        return in_array($this, [self::Sprint, self::Race], strict: true);
+    }
+
+    /**
      * Ред на показване в рамките на уикенда.
      *
      * Едната подредба покрива и двата формата: при обикновен уикенд дава
