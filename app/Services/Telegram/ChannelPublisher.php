@@ -93,21 +93,26 @@ class ChannelPublisher
 
         // Вече изпратен ред, върнат в pending, значи промяна в съдържанието —
         // редактираме на място, за да няма второ известие за едно събитие.
-        if ($post->telegram_message_id !== null) {
-            if (count($chunks) > 1) {
-                throw new TelegramPermanentException(
-                    'Обновеният текст не се събира в едно съобщение, а редакцията пази само първото.',
-                );
+        //
+        // Многочастов текст не се редактира: пазим само id-то на първото
+        // съобщение, а редакция само на него би отрязала останалото. В този
+        // случай минаваме на ново изпращане.
+        if ($post->telegram_message_id !== null && count($chunks) === 1) {
+            try {
+                $this->client->edit((int) $post->telegram_message_id, $chunks[0]);
+
+                $post->update([
+                    'status' => ChannelPostStatus::Sent->value,
+                    'last_error' => null,
+                ]);
+
+                return;
+            } catch (TelegramPermanentException $e) {
+                // Оригиналът го няма — например изтрит ръчно от канала
+                // (Telegram връща MESSAGE_ID_INVALID). Пращаме наново вместо
+                // да се предадем: инак постът остава грешен завинаги.
+                Log::warning("Telegram: редакцията на пост [{$post->id}] се провали ({$e->getMessage()}) — пращам наново.");
             }
-
-            $this->client->edit((int) $post->telegram_message_id, $chunks[0]);
-
-            $post->update([
-                'status' => ChannelPostStatus::Sent->value,
-                'last_error' => null,
-            ]);
-
-            return;
         }
 
         $firstMessageId = null;
