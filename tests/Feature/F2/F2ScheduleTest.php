@@ -11,7 +11,7 @@ function f2ScheduledEvent(string $command): ?Event
         ->first(fn (Event $e) => str_contains((string) $e->command, $command));
 }
 
-it('разписва f2:sync-wikipedia дневно в 06:45, преди sitemap-а', function () {
+it('разписва f2:sync-wikipedia дневно в 06:45 и sitemap ежечасно', function () {
     $sync = f2ScheduledEvent('f2:sync-wikipedia');
     $sitemap = f2ScheduledEvent('sitemap:generate');
 
@@ -20,6 +20,7 @@ it('разписва f2:sync-wikipedia дневно в 06:45, преди sitemap
         ->and($sync->withoutOverlapping)->toBeTrue()
         ->and($sync->runInBackground)->toBeTrue()
         ->and($sync->output)->toContain('scheduler.log')
-        // Sitemap-ът включва F2 слъговете → върви след синхрона.
-        ->and($sitemap->expression)->toBe('0 7 * * *');
+        // Sitemap-ът е ежечасен (новините излизат през целия ден) — F2
+        // слъговете от сутрешния синхрон влизат при следващото завъртане.
+        ->and($sitemap->expression)->toBe('45 * * * *');
 });

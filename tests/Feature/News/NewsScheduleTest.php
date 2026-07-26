@@ -11,23 +11,21 @@ function scheduledEvent(string $command): ?Event
         ->first(fn (Event $e) => str_contains((string) $e->command, $command));
 }
 
-it('разписва news:fetch ежедневно в 06:00 без застъпване', function () {
+it('разписва news:fetch на всеки 30 минути без застъпване', function () {
     $event = scheduledEvent('news:fetch');
 
     expect($event)->not->toBeNull()
-        ->and($event->expression)->toBe('0 6 * * *')
+        ->and($event->expression)->toBe('0,30 * * * *')
         ->and($event->withoutOverlapping)->toBeTrue();
 });
 
-it('разписва news:enrich ежедневно, след news:fetch', function () {
-    $fetch = scheduledEvent('news:fetch');
+it('разписва news:enrich на всеки 30 минути, отместен след news:fetch', function () {
     $enrich = scheduledEvent('news:enrich');
 
     expect($enrich)->not->toBeNull()
         ->and($enrich->withoutOverlapping)->toBeTrue()
-        // и двете в 06:xx, но enrich е на 30-ата минута → след fetch (00-ата).
-        ->and($fetch->expression)->toBe('0 6 * * *')
-        ->and($enrich->expression)->toBe('30 6 * * *');
+        // fetch е на :00/:30, enrich на :05/:35 → винаги след прясното вземане.
+        ->and($enrich->expression)->toBe('5,35 * * * *');
 });
 
 it('пуска news командите в background с лог файл', function () {
@@ -37,19 +35,19 @@ it('пуска news командите в background с лог файл', functi
         ->and($fetch->output)->toContain('scheduler.log');
 });
 
-it('разписва news:publish-pending след enrich', function () {
+it('разписва news:publish-pending ежечасно като осигурителна мрежа', function () {
     $publish = scheduledEvent('news:publish-pending');
 
     expect($publish)->not->toBeNull()
-        ->and($publish->expression)->toBe('50 6 * * *')
+        ->and($publish->expression)->toBe('20 * * * *')
         ->and($publish->withoutOverlapping)->toBeTrue();
 });
 
-it('разписва news:generate-articles дневно след публикацията', function () {
+it('разписва news:generate-articles ежечасно', function () {
     $generate = scheduledEvent('news:generate-articles');
 
     expect($generate)->not->toBeNull()
-        ->and($generate->expression)->toBe('10 7 * * *')
-        ->and((string) $generate->command)->toContain('--limit=40')
+        ->and($generate->expression)->toBe('25 * * * *')
+        ->and((string) $generate->command)->toContain('--limit=10')
         ->and($generate->withoutOverlapping)->toBeTrue();
 });

@@ -25,15 +25,17 @@ Schedule::command('f1:weekly-digest')
     ->weeklyOn(0, '20:00')
     ->timezone('Europe/Sofia');
 
-// News pipeline — вземане сутрин, после LLM обогатяване.
+// News pipeline — новини през целия ден: вземане на всеки 30 мин, LLM
+// превод + автоматична публикация 5 мин по-късно. LLM разходът зависи от
+// броя нови елементи, не от честотата — по-честият цикъл не струва повече.
 Schedule::command('news:fetch')
-    ->dailyAt('06:00')
+    ->cron('0,30 * * * *')
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
-Schedule::command('news:enrich --limit=50')
-    ->dailyAt('06:30')
+Schedule::command('news:enrich --limit=25')
+    ->cron('5,35 * * * *')
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
@@ -41,7 +43,7 @@ Schedule::command('news:enrich --limit=50')
 // Осигурителна мрежа: обогатени, но незавършили публикация елементи (напр.
 // грешка при featured_image) се публикуват тук, вместо да висят pending.
 Schedule::command('news:publish-pending')
-    ->dailyAt('06:50')
+    ->hourlyAt(20)
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
@@ -54,16 +56,16 @@ Schedule::command('f2:sync-wikipedia')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
-// Свеж sitemap всеки ден след новинарския цикъл — новите статии влизат
-// в индекса на Google без ръчна намеса.
+// Свеж sitemap всеки час — публикуваните през деня статии влизат в индекса
+// на Google без ръчна намеса.
 Schedule::command('sitemap:generate')
-    ->dailyAt('07:00')
+    ->hourlyAt(45)
     ->withoutOverlapping();
 
 // Пълни български статии за публикуваните новини — най-новите първо.
-// Лимитът покрива типичния дневен обем; изоставане се наваксва в следващи дни.
-Schedule::command('news:generate-articles --limit=40')
-    ->dailyAt('07:10')
+// Лимитът е per-run таван; реалният обем се определя от новите публикации.
+Schedule::command('news:generate-articles --limit=10')
+    ->hourlyAt(25)
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
