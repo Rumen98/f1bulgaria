@@ -88,16 +88,22 @@ git pull, composer, `npm run build` (клиентски + SSR bundle), мигр�
 
 > След промяна на routes/config ВИНАГИ `route:cache`/`config:cache` отново — иначе старите кеширани routes се сервират (вкл. feature middleware-а).
 
-## 3б. Queue worker (задължителен)
+## 3б. Queue worker
 
 `QUEUE_CONNECTION=database`, а нюзлетърът и седмичният дайджест пращат през
 `Mail::queue()`. **Без работещ worker тези писма седят в таблицата `jobs`
 завинаги — без грешка и без следа в лога.**
 
+Управлява се от **systemd** (не supervisor — там е само SSR демонът):
+
 ```bash
-sudo cp docs/supervisor-padok-queue.conf /etc/supervisor/conf.d/padok-queue.conf
-sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl start padok-queue:*
+systemctl status padok-queue
 ```
+
+> `ExecStart` съдържа `--max-time=3600`, тоест процесът излиза сам след час.
+> Затова unit-ът ТРЯБВА да е с `Restart=always` — при `on-failure` изходът
+> по max-time се брои за успешен и worker-ът остава мъртъв.
+> Провери: `systemctl show padok-queue -p Restart`
 
 Проверка, че реално дренира (не просто че процесът е жив):
 
@@ -105,7 +111,9 @@ sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl sta
 sudo -u www-data php artisan tinker --execute 'echo DB::table("jobs")->count();'
 ```
 
-Число, което расте между два прогона, значи спрял worker.
+Число, което расте между два прогона, значи спрял worker. `deploy.sh` пуска
+`queue:restart` — това вдига флаг в кеша и worker-ът се самозатваря, за да
+подхване новия код (systemd го рестартира).
 
 ## 3а. Inertia SSR (сървърно рендериране)
 
