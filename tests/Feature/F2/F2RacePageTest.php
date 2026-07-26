@@ -46,8 +46,12 @@ it('/f2/races/{race}/feature показва резултатите с Цолов
             ->where('race.location', 'Melbourne')
             ->where('sessionType', 'feature')
             ->where('sessionLabel', 'Главно състезание')
-            ->where('hasSprint', true)
-            ->where('hasFeature', true)
+            // Toggle-ът е списък от сесиите в реда на уикенда, а не два
+            // булеви флага. Показват се само сесии С резултати: синхронът
+            // създава редове и за бъдещите кръгове, а линк към празна
+            // класация е мъртъв клик. Спринтът тук е без резултати.
+            ->has('sessions', 1)
+            ->where('sessions.0.segment', 'feature')
             ->where('results.0.driver', 'Nikola Tsolov')
             ->where('results.0.position', 1)
             ->where('results.0.is_bulgarian', true)

@@ -36,6 +36,7 @@ function makeF2Session(F2SessionType $type, ?string $version = null, ?string $en
     $race = F2Race::query()->create([
         'f2_season_id' => $season->id, 'round' => 9, 'location_name' => 'Budapest',
         'country_name' => 'Hungary', 'slug' => '2026-budapest',
+        'circuit_jolpica_id' => 'hungaroring',
     ]);
 
     $session = F2RaceSession::query()->create([
@@ -188,11 +189,52 @@ it('поставя тренировката веднага', function () {
     expect(app(F2ChannelEnqueuer::class)->enqueuePending()['queued'])->toBe(1);
 });
 
-it('чака окончателна класация, преди да публикува състезание', function () {
+it('публикува временната класация, но я отбелязва като такава', function () {
     makeF2Session(F2SessionType::FeatureRace, version: 'Provisional');
 
-    // Временната класация не тръгва — стюардите още могат да разместят подиума.
+    expect(app(F2ChannelEnqueuer::class)->enqueuePending()['queued'])->toBe(1)
+        ->and(ChannelPost::query()->first()->body)->toContain('Временна класация');
+});
+
+it('не публикува състезание, докато резултатите не са свалени', function () {
+    // version = null значи, че синхронът още не е стигнал до класацията.
+    makeF2Session(F2SessionType::FeatureRace, version: null);
+
     expect(app(F2ChannelEnqueuer::class)->enqueuePending()['queued'])->toBe(0);
+});
+
+it('редактира вече изпратения пост, вместо да праща втори при окончателна класация', function () {
+    telegramOk();
+    $session = makeF2Session(F2SessionType::FeatureRace, version: 'Provisional');
+
+    app(F2ChannelEnqueuer::class)->enqueuePending();
+    app(ChannelPublisher::class)->publish();
+
+    $post = ChannelPost::query()->first();
+
+    expect($post->status)->toBe(ChannelPostStatus::Sent)
+        ->and($post->telegram_message_id)->toBe(55);
+
+    // Стюардите се произнасят: класацията става окончателна.
+    $session->update(['version' => 'Final']);
+    app(F2ChannelEnqueuer::class)->enqueuePending();
+
+    $post->refresh();
+
+    expect($post->status)->toBe(ChannelPostStatus::Pending)
+        ->and($post->body)->not->toContain('Временна класация')
+        // message_id се запазва — по него издателят разбира, че редактира.
+        ->and($post->telegram_message_id)->toBe(55);
+
+    app(ChannelPublisher::class)->publish();
+
+    // Второто извикване е editMessageText, не sendMessage — иначе каналът би
+    // получил втори пост и второ известие за едно и също събитие.
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'editMessageText')
+        && $request['message_id'] === 55);
+
+    expect(ChannelPost::query()->count())->toBe(1)
+        ->and($post->fresh()->status)->toBe(ChannelPostStatus::Sent);
 });
 
 it('публикува състезанието, щом класацията стане окончателна', function () {
@@ -216,11 +258,49 @@ it('съставя четим пост с медал, отбор и време',
     $body = ChannelPost::query()->first()->body;
 
     expect($body)->toContain('Формула 2 · Свободна тренировка')
-        ->and($body)->toContain('Hungary · кръг 9')
+        // Българското име на Гран При-то идва през връзката към F1 пистата;
+        // сайтът е само на български и „Hungary" стърчи.
+        ->and($body)->toContain('Гран При на Унгария · кръг 9')
         ->and($body)->toContain('🥇')
-        ->and($body)->toContain('Nikola Tsolov')
+        ->and($body)->toContain('Никола Цолов')
         ->and($body)->toContain('Campos Racing')
         ->and($body)->toContain('1:30.720');
+});
+
+it('дописва българския пилот, ако е извън първите десет', function () {
+    $season = F2Season::query()->create(['year' => 2026, 'is_current' => true]);
+    $race = F2Race::query()->create([
+        'f2_season_id' => $season->id, 'round' => 9, 'location_name' => 'Budapest',
+        'slug' => '2026-budapest', 'circuit_jolpica_id' => 'hungaroring',
+    ]);
+    $session = F2RaceSession::query()->create([
+        'f2_race_id' => $race->id, 'session_type' => F2SessionType::Practice->value,
+        'state' => 'completed', 'ends_at_utc' => now()->subHour(),
+    ]);
+
+    foreach (range(1, 14) as $position) {
+        $isTsolov = $position === 14;
+
+        $driver = F2Driver::query()->create([
+            'f2_season_id' => $season->id,
+            'first_name' => $isTsolov ? 'Nikola' : "Driver{$position}",
+            'last_name' => $isTsolov ? 'Tsolov' : 'Test',
+            'slug' => $isTsolov ? 'nikola-tsolov' : "driver{$position}-test",
+        ]);
+
+        F2Result::query()->create([
+            'f2_race_session_id' => $session->id, 'f2_driver_id' => $driver->id, 'position' => $position,
+        ]);
+    }
+
+    app(F2ChannelEnqueuer::class)->enqueuePending();
+    $body = ChannelPost::query()->first()->body;
+
+    // Класацията реже на 10, но заради Цолов се отваря постът — без него
+    // отговорът на въпроса, довел човека тук, липсва.
+    expect($body)->toContain('🇧🇬')
+        ->and($body)->toContain('Никола Цолов')
+        ->and($body)->toContain('14-и');
 });
 
 it('публикува сесиите в хронологичен ред, не по реда на вмъкване', function () {
