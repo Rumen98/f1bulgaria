@@ -25,6 +25,7 @@ class NewsEnricher
         private readonly NewsClassifier $classifier,
         private readonly NewsImageResolver $imageResolver,
         private readonly SourceArticleFetcher $sourceFetcher,
+        private readonly IndexNowPinger $indexNow,
     ) {}
 
     /**
@@ -56,6 +57,9 @@ class NewsEnricher
 
         $sleepMs = (int) config('news.enrich_sleep_ms', 500);
         $total = $items->count();
+
+        /** @var array<int, string> $publishedUrls */
+        $publishedUrls = [];
 
         foreach ($items as $item) {
             $stats['processed']++;
@@ -98,6 +102,7 @@ class NewsEnricher
 
                     $stats['success']++;
                     $outcome = 'published';
+                    $publishedUrls[] = route('news.show', $item->slug);
 
                     // Пълната статия се пише веднага след публикацията. Грешка
                     // тук не проваля елемента (той вече е публикуван) — часовият
@@ -128,6 +133,10 @@ class NewsEnricher
                 usleep($sleepMs * 1000);
             }
         }
+
+        // Едно push уведомление за целия batch — Bing/Yandex научават веднага,
+        // вместо да чакат следващото обхождане на sitemap-а.
+        $this->indexNow->ping($publishedUrls);
 
         return $stats;
     }

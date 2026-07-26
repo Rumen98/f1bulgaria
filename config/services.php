@@ -75,4 +75,13 @@ return [
         'rate_limit_ms' => (int) env('WIKIPEDIA_RATE_LIMIT_MS', 1000),
     ],
 
+    /*
+    | IndexNow — push уведомяване към Bing/Yandex при нова публикация.
+    | Ключът е произволен низ (32-64 hex знака); същият низ трябва да е
+    | достъпен като https://padok.bg/{key}.txt със съдържание самия ключ.
+    */
+    'indexnow' => [
+        'key' => env('INDEXNOW_KEY'),
+    ],
+
 ];

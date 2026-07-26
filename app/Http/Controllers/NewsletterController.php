@@ -22,7 +22,7 @@ class NewsletterController extends Controller
     {
         $data = $request->validate([
             'email' => ['required', 'email', 'max:255'],
-            'source' => ['nullable', 'string', 'in:homepage,footer,profile'],
+            'source' => ['nullable', 'string', 'in:homepage,footer,profile,article'],
         ]);
 
         $email = mb_strtolower(trim($data['email']));

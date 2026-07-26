@@ -22,3 +22,7 @@ yarn-error.log
 /.vscode
 /.zed
 /public/sitemap.xml
+/public/sitemap-news.xml
+/public/sitemap-content.xml
+/bootstrap/ssr
+/resources/js/ziggy.js
