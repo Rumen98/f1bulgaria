@@ -10,21 +10,34 @@
 set -euo pipefail
 
 APP_DIR="/var/www/f1bulgaria"
-ARTISAN="sudo -u www-data php artisan"
+RUN="sudo -u www-data"
+ARTISAN="$RUN php artisan"
 
 cd "$APP_DIR"
 
+# --- 0. Собственост -----------------------------------------------------
+# Ако някой е пускал git/artisan като root, файловете са root-owned и всяка
+# следваща команда като www-data гърми ("dubious ownership", Permission denied).
+# Оправяме го тук, вместо да гадаем после защо сайтът дава 500.
+echo "→ Проверка на собствеността"
+if [ "$(stat -c '%U' "$APP_DIR/.git")" != "www-data" ]; then
+    echo "  .git е на $(stat -c '%U' "$APP_DIR/.git") — прехвърлям на www-data"
+    chown -R www-data:www-data "$APP_DIR"
+fi
+# Git отказва да работи в чужда директория дори след chown, ако не е обявена.
+$RUN git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+
 echo "→ Изтегляне на кода"
-sudo -u www-data git pull --ff-only
+$RUN git pull --ff-only
 
 echo "→ PHP зависимости"
-sudo -u www-data composer install --no-dev --optimize-autoloader --no-interaction
+$RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 echo "→ Frontend билд (клиент + SSR bundle)"
 # npm run build прави ziggy:generate + vite build + vite build --ssr.
 # ziggy:generate чете production .env, така че APP_URL в bundle-а е верният.
-sudo -u www-data npm ci
-sudo -u www-data npm run build
+$RUN npm ci
+$RUN npm run build
 
 echo "→ Миграции"
 $ARTISAN migrate --force
@@ -40,11 +53,19 @@ echo "→ Рестарт на SSR демона"
 # следи файла. Без рестарт сервира стария компилиран Vue срещу новия клиентски
 # bundle → hydration mismatch и разбъркан екран.
 $ARTISAN inertia:stop-ssr || true
-sudo supervisorctl restart padok-ssr
+supervisorctl restart padok-ssr
 
 echo "→ Проверка"
 sleep 3
 $ARTISAN inertia:check-ssr
-curl -fsS -o /dev/null -w "  HTTP %{http_code}\n" https://padok.bg/
+
+# Не просто „процесът е жив", а „HTML-ът наистина съдържа съдържание".
+articles=$(curl -fsS https://padok.bg/news | grep -o '<article' | wc -l)
+if [ "$articles" -gt 0 ]; then
+    echo "  SSR рендира ($articles статии в първоначалния HTML) ✓"
+else
+    echo "  ВНИМАНИЕ: 0 статии в HTML-а — сервира се клиентски рендер."
+    echo "  Провери: supervisorctl status padok-ssr; tail storage/logs/ssr.log"
+fi
 
 echo "✓ Готово"
