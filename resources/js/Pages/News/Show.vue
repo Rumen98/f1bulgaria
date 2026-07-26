@@ -3,7 +3,6 @@ import ImportanceDots from '@/Components/News/ImportanceDots.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
 import NewsImage from '@/Components/News/NewsImage.vue';
 import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
-import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { NEUTRAL_DOT_COLOR } from '@/utils/racing';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
@@ -119,15 +118,6 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                         Прочетете оригинала<span v-if="article.source"> на {{ article.source }}</span> →
                     </a>
                 </div>
-
-                <!-- Абонамент — тук намерението е най-високо (човекът е дочел статията). -->
-                <section class="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                    <h2 class="font-display text-lg font-bold text-white">Новините от Ф1 всяка седмица</h2>
-                    <p class="mt-1 text-sm text-zinc-400">
-                        Обобщение на важното от кръга — на български, без спам.
-                    </p>
-                    <NewsletterForm source="article" class="mt-4" />
-                </section>
 
                 <!-- Абонамент — тук намерението е най-високо (човекът е дочел статията). -->
                 <section class="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
