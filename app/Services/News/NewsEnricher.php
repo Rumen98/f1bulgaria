@@ -14,8 +14,9 @@ use Throwable;
  * Обогатява pending новините чрез LLM класификатора: попълва title_bg,
  * summary_bg, classification, constructor_id и importance_score.
  *
- * Статусът ОСТАВА 'pending' — човешкият review е в стъпка 5. Грешка в един
- * елемент се логва и не спира batch-а.
+ * Успешно обогатените се публикуват автоматично (auto_published) — модерацията
+ * е постфактум през Filament (Reject). Грешка в един елемент се логва и не
+ * спира batch-а.
  */
 class NewsEnricher
 {
@@ -75,12 +76,16 @@ class NewsEnricher
                         'classification' => $result->classification->value,
                         'constructor_id' => $result->constructorId ?? $item->constructor_id,
                         'importance_score' => $result->importanceScore,
-                        // status НЕ се променя — остава pending за човешки review.
                     ]);
 
                     // Визуален header — резолвва се от вече попълнените класификация/отбор.
+                    // Публикуването е финалната стъпка: ако нещо гръмне преди нея,
+                    // елементът остава pending и news:publish-pending го досъбира.
                     $item->unsetRelation('constructor');
-                    $item->update(['featured_image' => $this->imageResolver->resolve($item)]);
+                    $item->update([
+                        'featured_image' => $this->imageResolver->resolve($item),
+                        'status' => NewsStatus::AutoPublished->value,
+                    ]);
 
                     $stats['success']++;
                 }

@@ -9,6 +9,7 @@ use App\Services\News\Llm\LlmException;
 use App\Services\News\Llm\NewsClassificationResult;
 use App\Services\News\Llm\NewsClassifier;
 use App\Services\News\NewsEnricher;
+use App\Services\News\NewsImageResolver;
 
 beforeEach(function () {
     // Без реална пауза между заявките в тестовете.
@@ -42,7 +43,7 @@ it('отхвърля автоматично крос-източниковите 
         ->and($duplicate->fresh()->status)->toBe(NewsStatus::Rejected);
 });
 
-it('попълва полетата на pending items и запазва статуса pending', function () {
+it('попълва полетата на pending items и ги публикува автоматично', function () {
     TeamNewsItem::factory()->count(2)->create(['title_bg' => null, 'classification' => null]);
 
     test()->mock(NewsClassifier::class, fn ($m) => $m->shouldReceive('classify')->andReturn(classResult()));
@@ -55,7 +56,7 @@ it('попълва полетата на pending items и запазва ста�
     expect($item->title_bg)->toBe('Българско заглавие')
         ->and($item->classification)->toBe(NewsClassification::Race)
         ->and($item->importance_score)->toBe(3)
-        ->and($item->status)->toBe(NewsStatus::Pending); // статусът остава pending
+        ->and($item->status)->toBe(NewsStatus::AutoPublished); // публикува се без ръчно одобрение
 });
 
 it('грешка в един item не спира batch-а', function () {
@@ -77,7 +78,29 @@ it('грешка в един item не спира batch-а', function () {
         ->and($stats['success'])->toBe(2)
         ->and($stats['failed'])->toBe(1)
         ->and($stats['errors'])->toHaveCount(1)
-        ->and(TeamNewsItem::find($badId)->title_bg)->toBeNull();
+        ->and(TeamNewsItem::find($badId)->title_bg)->toBeNull()
+        ->and(TeamNewsItem::find($badId)->status)->toBe(NewsStatus::Pending); // проваленият не се публикува
+});
+
+it('грешка при featured_image оставя елемента pending, а news:publish-pending го досъбира', function () {
+    $item = TeamNewsItem::factory()->create(['title_bg' => null, 'classification' => null]);
+
+    test()->mock(NewsClassifier::class, fn ($m) => $m->shouldReceive('classify')->andReturn(classResult()));
+    test()->mock(NewsImageResolver::class, fn ($m) => $m->shouldReceive('resolve')
+        ->andThrow(new RuntimeException('image boom')));
+
+    $stats = app(NewsEnricher::class)->enrichPending();
+
+    // Преводът е записан, но публикацията (финалната стъпка) не е минала.
+    $item->refresh();
+    expect($stats['failed'])->toBe(1)
+        ->and($item->title_bg)->toBe('Българско заглавие')
+        ->and($item->status)->toBe(NewsStatus::Pending);
+
+    // Осигурителната мрежа от scheduler-а го публикува на следващия pass.
+    $this->artisan('news:publish-pending')->assertSuccessful();
+
+    expect($item->fresh()->status)->toBe(NewsStatus::AutoPublished);
 });
 
 it('сумира token usage', function () {

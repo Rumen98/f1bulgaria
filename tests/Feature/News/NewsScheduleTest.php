@@ -36,3 +36,20 @@ it('пуска news командите в background с лог файл', functi
     expect($fetch->runInBackground)->toBeTrue()
         ->and($fetch->output)->toContain('scheduler.log');
 });
+
+it('разписва news:publish-pending след enrich', function () {
+    $publish = scheduledEvent('news:publish-pending');
+
+    expect($publish)->not->toBeNull()
+        ->and($publish->expression)->toBe('50 6 * * *')
+        ->and($publish->withoutOverlapping)->toBeTrue();
+});
+
+it('разписва news:generate-articles дневно след публикацията', function () {
+    $generate = scheduledEvent('news:generate-articles');
+
+    expect($generate)->not->toBeNull()
+        ->and($generate->expression)->toBe('10 7 * * *')
+        ->and((string) $generate->command)->toContain('--limit=40')
+        ->and($generate->withoutOverlapping)->toBeTrue();
+});

@@ -32,6 +32,11 @@ class RssFetcher
 
     private const SNIPPET_LENGTH = 500;
 
+    /**
+     * Идентифицируем UA — default-ният Guzzle UA често яде 403 от bot protection.
+     */
+    private const USER_AGENT = 'PadokNewsBot/1.0 (+https://padok.bg)';
+
     public function __construct(private readonly FeedIo $feedIo = new FeedIo) {}
 
     /**
@@ -53,6 +58,10 @@ class RssFetcher
     {
         try {
             $response = Http::timeout(self::TIMEOUT_SECONDS)
+                ->withHeaders([
+                    'User-Agent' => self::USER_AGENT,
+                    'Accept' => 'application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8',
+                ])
                 ->retry(
                     self::MAX_ATTEMPTS,
                     fn (int $attempt): int => (int) (200 * (2 ** ($attempt - 1))),
