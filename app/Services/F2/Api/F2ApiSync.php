@@ -413,7 +413,9 @@ class F2ApiSync
      */
     private function countryCode(string $slug): ?string
     {
-        $code = config('f2-driver-countries')[$slug] ?? null;
+        // Точкова нотация, а не индекс върху config('f2-driver-countries'):
+        // при кеширан конфиг отпреди този файл индексът би върнал warning.
+        $code = config("f2-driver-countries.{$slug}");
 
         return is_string($code) && $code !== '' ? $code : null;
     }
