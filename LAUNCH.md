@@ -73,6 +73,10 @@ Nginx сочи към `public/`; задай crontab (раздел 5) и `queue` 
 cd /var/www/f1bulgaria && sudo bash deploy.sh
 ```
 
+> **Само това.** НЕ пускай `git pull` преди скрипта — той пулва сам, като
+> `www-data`. Ръчен `git pull` като root връща файловете в root-owned
+> състояние и следващият деплой гърми с „dubious ownership".
+
 Скриптът ([deploy.sh](deploy.sh)) прави всичко в правилния ред и **като `www-data`** —
 git pull, composer, `npm run build` (клиентски + SSR bundle), миграции, кешове,
 рестарт на SSR демона и проверка накрая.

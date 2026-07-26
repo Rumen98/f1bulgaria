@@ -10,7 +10,8 @@
 set -euo pipefail
 
 APP_DIR="/var/www/f1bulgaria"
-RUN="sudo -u www-data"
+# -H задава HOME на www-data — npm и composer искат писаема HOME за кеша си.
+RUN="sudo -H -u www-data"
 ARTISAN="$RUN php artisan"
 
 cd "$APP_DIR"
@@ -24,8 +25,11 @@ if [ "$(stat -c '%U' "$APP_DIR/.git")" != "www-data" ]; then
     echo "  .git е на $(stat -c '%U' "$APP_DIR/.git") — прехвърлям на www-data"
     chown -R www-data:www-data "$APP_DIR"
 fi
-# Git отказва да работи в чужда директория дори след chown, ако не е обявена.
-$RUN git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+
+# Git отказва да работи в директория с чужда собственост. --system (в
+# /etc/gitconfig) важи и за root, и за www-data — --global би записал само в
+# HOME на текущия потребител и другият пак ще гърми.
+git config --system --add safe.directory "$APP_DIR" 2>/dev/null || true
 
 echo "→ Изтегляне на кода"
 $RUN git pull --ff-only
