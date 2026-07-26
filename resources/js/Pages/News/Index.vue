@@ -2,11 +2,11 @@
 import NewsCard from '@/Components/News/NewsCard.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, InfiniteScroll, Link } from '@inertiajs/vue3';
 
 defineProps({
     featured: Object,
-    items: Array,
+    items: Object,
     categories: Array,
     activeCat: String,
 });
@@ -38,8 +38,8 @@ defineProps({
             </Link>
         </div>
 
-        <EmptyState v-if="!featured && items.length === 0">
-            Все още няма одобрени новини в тази категория.
+        <EmptyState v-if="!featured && items.data.length === 0">
+            Все още няма новини в тази категория.
         </EmptyState>
 
         <!-- Featured -->
@@ -47,9 +47,15 @@ defineProps({
             <NewsCard :item="featured" featured />
         </div>
 
-        <!-- Grid -->
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <NewsCard v-for="(item, i) in items" :key="i" :item="item" />
-        </div>
+        <!-- Grid с безкраен скрол -->
+        <InfiniteScroll data="items" items-element="#news-grid" class="block">
+            <div id="news-grid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <NewsCard v-for="item in items.data" :key="item.slug" :item="item" />
+            </div>
+
+            <template #loading>
+                <div class="py-8 text-center text-sm text-zinc-500">Зареждане…</div>
+            </template>
+        </InfiniteScroll>
     </PublicLayout>
 </template>

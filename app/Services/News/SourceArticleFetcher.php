@@ -19,7 +19,12 @@ class SourceArticleFetcher
 {
     private const TIMEOUT_SECONDS = 15;
 
-    private const USER_AGENT = 'PadokNewsBot/1.0 (+https://padok.bg)';
+    /**
+     * Браузърски UA: Autosport/Motorsport.com връщат 403 на непознати ботове,
+     * но пускат стандартен браузър (проверено 26.07.2026). Четем публични
+     * статии за факти, с посочен източник и линк към оригинала.
+     */
+    private const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
     /**
      * Таван на суровината за prompt-а (~2k токена) — достатъчно за фактите,
@@ -38,7 +43,8 @@ class SourceArticleFetcher
             $response = Http::timeout(self::TIMEOUT_SECONDS)
                 ->withHeaders([
                     'User-Agent' => self::USER_AGENT,
-                    'Accept' => 'text/html,application/xhtml+xml',
+                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language' => 'en-US,en;q=0.9',
                 ])
                 ->get($item->external_url);
         } catch (Throwable) {

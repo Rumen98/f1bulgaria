@@ -31,7 +31,36 @@ it('показва само публикувани новини (не pending/re
         ->assertInertia(fn (Assert $page) => $page
             ->component('News/Index')
             ->has('featured')
-            ->has('items', 2));
+            ->has('items.data', 2));
+});
+
+it('страницира новините вместо да реже на твърд лимит', function () {
+    // 26 публикувани: 1 featured + 24 на първа страница + 1 на втора.
+    for ($i = 0; $i < 26; $i++) {
+        approvedNews('race', 2);
+    }
+
+    $this->get('/news')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('featured')
+            ->has('items.data', 24));
+
+    $this->get('/news?page=2')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('items.data', 1));
+});
+
+it('не повтаря featured новината в решетката', function () {
+    $top = approvedNews('race', 5);
+    approvedNews('race', 1);
+
+    $this->get('/news')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('featured.slug', $top->slug)
+            ->has('items.data', 1)
+            ->where('items.data.0.slug', fn (string $slug) => $slug !== $top->slug));
 });
 
 it('филтрира по категория', function () {
@@ -45,7 +74,7 @@ it('филтрира по категория', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->where('activeCat', 'driver')
             ->where('featured', null)
-            ->has('items', 1));
+            ->has('items.data', 1));
 });
 
 it('групира анализите (technical/rumor/business)', function () {
@@ -54,7 +83,7 @@ it('групира анализите (technical/rumor/business)', function () {
     approvedNews('race');
 
     $this->get('/news?cat=analysis')
-        ->assertInertia(fn (Assert $page) => $page->has('items', 2)); // technical + rumor
+        ->assertInertia(fn (Assert $page) => $page->has('items.data', 2)); // technical + rumor
 });
 
 it('началната страница показва само одобрени топ новини', function () {

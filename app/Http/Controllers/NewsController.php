@@ -19,15 +19,12 @@ class NewsController extends Controller
     /** Категориите, които третираме като „анализи". */
     private const ANALYSIS = ['technical', 'rumor', 'business'];
 
+    /** Новини на страница в безкрайния скрол. */
+    private const PER_PAGE = 24;
+
     public function index(Request $request): Response
     {
         $cat = (string) $request->query('cat', 'all');
-
-        $items = $this->visible()
-            ->when($cat !== 'all', fn (Builder $q) => $this->applyCategory($q, $cat))
-            ->orderByDesc('published_at')
-            ->limit(40)
-            ->get();
 
         // Featured = най-важната измежду най-новите (без активен филтър).
         $featured = $cat === 'all'
@@ -35,13 +32,19 @@ class NewsController extends Controller
                 ->sortByDesc('importance_score')->first()
             : null;
 
-        $list = $featured
-            ? $items->reject(fn (TeamNewsItem $i) => $i->id === $featured->id)->values()
-            : $items;
+        $items = $this->visible()
+            ->when($cat !== 'all', fn (Builder $q) => $this->applyCategory($q, $cat))
+            // Featured-ът е горе в собствен блок — изключваме го от решетката,
+            // иначе излиза два пъти на първата страница.
+            ->when($featured !== null, fn (Builder $q) => $q->whereKeyNot($featured->id))
+            ->orderByDesc('published_at')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString()
+            ->through(fn (TeamNewsItem $i) => $this->card($i));
 
         return Inertia::render('News/Index', [
             'featured' => $featured ? $this->card($featured) : null,
-            'items' => $list->map(fn (TeamNewsItem $i) => $this->card($i)),
+            'items' => Inertia::scroll($items),
             'categories' => $this->categories(),
             'activeCat' => $cat,
         ]);

@@ -29,11 +29,13 @@ class EnrichNewsCommand extends Command
         });
 
         $this->table(
-            ['Обработени', 'Успешни', 'Провалени', 'Input tokens', 'Output tokens'],
+            ['Обработени', 'Успешни', 'Дубликати', 'Провалени', 'Без статия', 'Input tokens', 'Output tokens'],
             [[
                 $stats['processed'],
                 $stats['success'],
+                $stats['duplicates'],
                 $stats['failed'],
+                $stats['articles_failed'],
                 $stats['input_tokens'],
                 $stats['output_tokens'],
             ]],

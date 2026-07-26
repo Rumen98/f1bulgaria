@@ -30,13 +30,15 @@ Schedule::command('f1:weekly-digest')
 // броя нови елементи, не от честотата — по-честият цикъл не струва повече.
 Schedule::command('news:fetch')
     ->cron('0,30 * * * *')
-    ->withoutOverlapping()
+    ->withoutOverlapping(25)
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
+// Lock-ът изтича след 40 мин: при runInBackground убит процес (OOM, deploy,
+// reboot) не освобождава mutex-а и default-ните 24h биха спрели цикъла за ден.
 Schedule::command('news:enrich --limit=25')
     ->cron('5,35 * * * *')
-    ->withoutOverlapping()
+    ->withoutOverlapping(40)
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
@@ -44,7 +46,7 @@ Schedule::command('news:enrich --limit=25')
 // грешка при featured_image) се публикуват тук, вместо да висят pending.
 Schedule::command('news:publish-pending')
     ->hourlyAt(20)
-    ->withoutOverlapping()
+    ->withoutOverlapping(10)
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
 // F2 синхрон от Wikipedia (текущите сезони) — дневно, преди sitemap-а,
@@ -62,11 +64,11 @@ Schedule::command('sitemap:generate')
     ->hourlyAt(45)
     ->withoutOverlapping();
 
-// Пълни български статии за публикуваните новини — най-новите първо.
-// Лимитът е per-run таван; реалният обем се определя от новите публикации.
+// Дописва пълни статии там, където inline генерацията в news:enrich се е
+// провалила, плюс наваксване на стария backlog — най-новите първо.
 Schedule::command('news:generate-articles --limit=10')
     ->hourlyAt(25)
-    ->withoutOverlapping()
+    ->withoutOverlapping(50)
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 

@@ -15,9 +15,9 @@ use Throwable;
  * Обогатява pending новините чрез LLM класификатора: попълва title_bg,
  * summary_bg, classification, constructor_id и importance_score.
  *
- * Успешно обогатените се публикуват автоматично (auto_published) — модерацията
- * е постфактум през Filament (Reject). Грешка в един елемент се логва и не
- * спира batch-а.
+ * Успешно обогатените се публикуват автоматично (auto_published) и веднага
+ * получават пълна статия (writeFullArticle) — модерацията е постфактум през
+ * Filament (Reject). Грешка в един елемент се логва и не спира batch-а.
  */
 class NewsEnricher
 {
@@ -30,7 +30,7 @@ class NewsEnricher
     /**
      * @param  Closure(TeamNewsItem, string, int, int, ?string): void|null  $onItem  Прогрес след всеки
      *                                                                               елемент: (елемент, изход published|duplicate|failed, пореден, общо, грешка).
-     * @return array{processed:int, success:int, failed:int, duplicates:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
+     * @return array{processed:int, success:int, failed:int, duplicates:int, articles_failed:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
      */
     public function enrichPending(int $limit = 50, ?Closure $onItem = null): array
     {
@@ -48,6 +48,7 @@ class NewsEnricher
             'success' => 0,
             'failed' => 0,
             'duplicates' => 0,
+            'articles_failed' => 0,
             'input_tokens' => 0,
             'output_tokens' => 0,
             'errors' => [],
@@ -97,6 +98,19 @@ class NewsEnricher
 
                     $stats['success']++;
                     $outcome = 'published';
+
+                    // Пълната статия се пише веднага след публикацията. Грешка
+                    // тук не проваля елемента (той вече е публикуван) — часовият
+                    // news:generate-articles pass ще я допише.
+                    try {
+                        $articleUsage = $this->writeFullArticle($item);
+                        $stats['input_tokens'] += $articleUsage['input_tokens'];
+                        $stats['output_tokens'] += $articleUsage['output_tokens'];
+                    } catch (Throwable $e) {
+                        $stats['articles_failed']++;
+                        $stats['errors'][] = "item #{$item->id} (статия): {$e->getMessage()}";
+                        Log::warning("Full article generation failed for item [{$item->id}]: {$e->getMessage()}");
+                    }
                 }
 
                 $stats['input_tokens'] += $result->tokenUsage['input_tokens'];
@@ -133,6 +147,9 @@ class NewsEnricher
             ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
             ->whereNull('full_article_bg')
             ->whereNotNull('title_bg')
+            // Прясно публикуваните може още да са в inline генерация от паралелен
+            // news:enrich — изчакваме ги, за да не плащаме заявката два пъти.
+            ->where('updated_at', '<', now()->subMinutes(10))
             ->orderByDesc('published_at')
             ->limit($limit)
             ->get();
@@ -155,20 +172,12 @@ class NewsEnricher
             $error = null;
 
             try {
-                // Пълният текст на оригинала дава реалните факти/резултати;
-                // при блокиран източник генерираме само от RSS откъса.
-                $content = $this->classifier->generateFullArticle($item, $this->sourceFetcher->fetch($item));
-
-                $item->update([
-                    'full_article_bg' => $content->fullArticleBg,
-                    'our_analysis_bg' => $content->analysisBg,
-                    'key_facts' => $content->keyFacts,
-                ]);
+                $usage = $this->writeFullArticle($item);
 
                 $stats['success']++;
                 $outcome = 'generated';
-                $stats['input_tokens'] += $content->tokenUsage['input_tokens'];
-                $stats['output_tokens'] += $content->tokenUsage['output_tokens'];
+                $stats['input_tokens'] += $usage['input_tokens'];
+                $stats['output_tokens'] += $usage['output_tokens'];
             } catch (Throwable $e) {
                 $stats['failed']++;
                 $error = $e->getMessage();
@@ -184,5 +193,26 @@ class NewsEnricher
         }
 
         return $stats;
+    }
+
+    /**
+     * Тегли пълния текст на оригинала (реални факти/резултати; при блокиран
+     * източник — само RSS откъса) и генерира пълната българска статия.
+     *
+     * @return array{input_tokens:int, output_tokens:int}
+     *
+     * @throws Throwable
+     */
+    private function writeFullArticle(TeamNewsItem $item): array
+    {
+        $content = $this->classifier->generateFullArticle($item, $this->sourceFetcher->fetch($item));
+
+        $item->update([
+            'full_article_bg' => $content->fullArticleBg,
+            'our_analysis_bg' => $content->analysisBg,
+            'key_facts' => $content->keyFacts,
+        ]);
+
+        return $content->tokenUsage;
     }
 }

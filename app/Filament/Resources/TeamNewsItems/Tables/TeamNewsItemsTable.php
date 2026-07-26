@@ -108,13 +108,18 @@ class TeamNewsItemsTable
                     ->label('Re-enrich')
                     ->icon('heroicon-o-arrow-path')
                     ->requiresConfirmation()
-                    ->modalDescription('Нулира българските полета и връща статус "Чакаща", за да я хване следващото news:enrich.')
+                    ->modalDescription('Нулира ВСИЧКИ български полета (включително пълната статия и анализа) и връща статус "Чакаща". Следващият news:enrich цикъл ще ги генерира наново.')
                     ->action(fn (TeamNewsItem $record) => $record->update([
                         'title_bg' => null,
                         'summary_bg' => null,
                         'classification' => null,
                         'constructor_id' => null,
                         'importance_score' => null,
+                        // Enrich пише статията наново — нулираме ги, за да е
+                        // явно, че ръчните редакции тук се губят.
+                        'full_article_bg' => null,
+                        'our_analysis_bg' => null,
+                        'key_facts' => null,
                         'status' => NewsStatus::Pending->value,
                     ])),
                 Action::make('viewOriginal')
