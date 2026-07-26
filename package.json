@@ -2,8 +2,8 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
-        "build:ssr": "php artisan ziggy:generate && vite build && vite build --ssr",
+        "build": "php artisan ziggy:generate && vite build && vite build --ssr",
+        "build:client": "vite build",
         "dev": "vite"
     },
     "devDependencies": {
