@@ -23,4 +23,5 @@ return [
     'f2' => env('FEATURE_F2', false),
     'live_timing' => env('FEATURE_LIVE_TIMING', false),
     'this_day' => env('FEATURE_THIS_DAY', false),
+    'quiz' => env('FEATURE_QUIZ', false),
 ];

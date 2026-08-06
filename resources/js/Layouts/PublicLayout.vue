@@ -31,6 +31,7 @@ const secondaryNav = [
     { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'История', route: 'history', feature: 'history' },
     { label: 'Речник', route: 'terminology' },
+    { label: 'Куиз', route: 'quiz', feature: 'quiz' },
 ];
 
 const mobileOpen = ref(false);

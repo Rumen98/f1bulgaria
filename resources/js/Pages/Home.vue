@@ -27,6 +27,7 @@ const allLinks = [
     { label: 'Сравни пилоти', desc: 'Двама пилоти един до друг', route: 'compare.index', feature: 'compare' },
     { label: 'Съперничества', desc: 'Великите дуели в историята', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'Prediction League', desc: 'Познай и събирай точки', route: 'leaderboard' },
+    { label: 'Куиз', desc: 'Провери познанията си за Формула 1.', route: 'quiz', feature: 'quiz' },
 ];
 
 const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.feature || features.value[l.feature])));
