@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Services\News\Llm\LlmException;
 use App\Services\News\Llm\MistralClient;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 
 const MISTRAL_URL = 'https://api.mistral.ai/*';
 const MISTRAL_TEST_KEY = 'mistral-test-SECRET-DO-NOT-LEAK';
@@ -45,13 +47,15 @@ it('праща системния промпт като system съобщени�
     Http::assertSent(function (Request $request) {
         $messages = $request->data()['messages'];
 
-        return $messages[0] === ['role' => 'system', 'content' => 'система']
+        return $request->url() === 'https://api.mistral.ai/v1/chat/completions'
+            && $messages[0] === ['role' => 'system', 'content' => 'система']
             && $messages[1] === ['role' => 'user', 'content' => 'въпрос']
             && $request->data()['model'] === 'mistral-small-latest';
     });
 });
 
 it('повтаря при 500 и успява на втория опит', function () {
+    Sleep::fake();
     Http::fake([
         MISTRAL_URL => Http::sequence()
             ->push('', 500)
@@ -65,6 +69,7 @@ it('повтаря при 500 и успява на втория опит', funct
 });
 
 it('хвърля LlmException след 3 неуспешни опита (5xx)', function () {
+    Sleep::fake();
     Http::fake([MISTRAL_URL => Http::response('', 500)]);
 
     expect(fn () => app(MistralClient::class)->complete('s', 'u'))
@@ -74,6 +79,7 @@ it('хвърля LlmException след 3 неуспешни опита (5xx)', f
 });
 
 it('повтаря при 429 (rate limit)', function () {
+    Sleep::fake();
     Http::fake([
         MISTRAL_URL => Http::sequence()
             ->push('', 429)
@@ -84,6 +90,56 @@ it('повтаря при 429 (rate limit)', function () {
 
     expect($result['content'])->toBe('ок');
     Http::assertSentCount(2);
+});
+
+it('хвърля LlmException след 3 поредни 429 (изчерпан rate limit)', function () {
+    Sleep::fake();
+    Http::fake([MISTRAL_URL => Http::response('', 429)]);
+
+    expect(fn () => app(MistralClient::class)->complete('s', 'u'))
+        ->toThrow(LlmException::class);
+
+    Http::assertSentCount(3);
+});
+
+it('повтаря при мрежова грешка и успява на втория опит', function () {
+    Sleep::fake();
+    $attempts = 0;
+    Http::fake(function () use (&$attempts) {
+        if (++$attempts === 1) {
+            throw new ConnectionException('cURL error 28: timeout');
+        }
+
+        return Http::response(mistralBody('ок'), 200);
+    });
+
+    $result = app(MistralClient::class)->complete('s', 'u');
+
+    expect($result['content'])->toBe('ок')
+        ->and($attempts)->toBe(2);
+});
+
+it('хвърля LlmException при постоянна мрежова грешка', function () {
+    Sleep::fake();
+    Http::fake(fn () => throw new ConnectionException('cURL error 6: could not resolve host'));
+
+    expect(fn () => app(MistralClient::class)->complete('s', 'u'))
+        ->toThrow(LlmException::class);
+});
+
+it('връща 0 токена при успешен отговор без usage поле', function () {
+    Http::fake([MISTRAL_URL => Http::response([
+        'choices' => [[
+            'message' => ['role' => 'assistant', 'content' => 'ок'],
+            'finish_reason' => 'stop',
+        ]],
+    ], 200)]);
+
+    $result = app(MistralClient::class)->complete('s', 'u');
+
+    expect($result['content'])->toBe('ок')
+        ->and($result['input_tokens'])->toBe(0)
+        ->and($result['output_tokens'])->toBe(0);
 });
 
 it('не повтаря при 401 (auth грешка) и хвърля веднага', function () {
@@ -158,6 +214,39 @@ it('completeWithTool праща strict json_schema с нормализирана
             && $schema['additionalProperties'] === false
             // type: ['integer', 'null'] е нормализиран до anyOf.
             && $schema['properties']['constructor_id'] === ['anyOf' => [['type' => 'integer'], ['type' => 'null']]];
+    });
+});
+
+it('нормализира nullable object: клонът получава additionalProperties и рекурсия', function () {
+    Http::fake([MISTRAL_URL => Http::response(mistralBody('{}'), 200)]);
+
+    app(MistralClient::class)->completeWithTool('s', 'u', 't', [
+        'type' => 'object',
+        'properties' => [
+            'meta' => [
+                'type' => ['object', 'null'],
+                'description' => 'вложен обект',
+                'properties' => [
+                    'note' => ['type' => ['string', 'null'], 'maxLength' => 400],
+                ],
+                'required' => ['note'],
+            ],
+        ],
+        'required' => ['meta'],
+    ]);
+
+    Http::assertSent(function (Request $request) {
+        $meta = data_get($request->data(), 'response_format.json_schema.schema.properties.meta');
+
+        $objectBranch = collect($meta['anyOf'] ?? [])->firstWhere('type', 'object');
+        // Сиблинг ограничението (maxLength) е пренесено ВЪТРЕ в string клона.
+        $noteStringBranch = collect($objectBranch['properties']['note']['anyOf'] ?? [])->firstWhere('type', 'string');
+
+        return ($meta['description'] ?? null) === 'вложен обект'
+            && ! isset($meta['type'])
+            && ($objectBranch['additionalProperties'] ?? null) === false
+            && ($noteStringBranch['maxLength'] ?? null) === 400
+            && collect($meta['anyOf'])->contains(['type' => 'null']);
     });
 });
 

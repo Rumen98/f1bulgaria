@@ -11,7 +11,6 @@ use App\Models\Driver;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
 use Illuminate\Support\Facades\Log;
-use JsonException;
 
 /**
  * Класифицира и превежда една новина чрез LLM: заглавие/резюме на български,
@@ -220,65 +219,6 @@ class NewsClassifier
                 'output_tokens' => $response['output_tokens'],
             ],
         );
-    }
-
-    /**
-     * Декодира JSON от отговора. Толерира преамбюл/епилог и ```json``` обвивка.
-     * При неуспех логва суровия отговор за диагностика и хвърля LlmException.
-     *
-     * @return array<string, mixed>
-     *
-     * @throws LlmException
-     */
-    private function decode(string $content, TeamNewsItem $item): array
-    {
-        $json = $this->extractJson($content);
-
-        try {
-            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException $e) {
-            $this->logParseFailure($item, $content, $e->getMessage());
-
-            throw new LlmException('LLM не върна валиден JSON.', previous: $e);
-        }
-
-        if (! is_array($decoded)) {
-            $this->logParseFailure($item, $content, 'Декодираната стойност не е JSON обект.');
-
-            throw new LlmException('LLM не върна валиден JSON.');
-        }
-
-        return $decoded;
-    }
-
-    /**
-     * Изважда JSON обекта от суров LLM отговор. Първо опитва най-агресивно —
-     * substring-а между първото "{" и последното "}" (така отпадат преамбюл,
-     * епилог и ```json``` огради). Ако няма скоби — пада до изчистване на огради.
-     */
-    private function extractJson(string $content): string
-    {
-        $start = strpos($content, '{');
-        $end = strrpos($content, '}');
-
-        if ($start !== false && $end !== false && $end >= $start) {
-            return substr($content, $start, $end - $start + 1);
-        }
-
-        // Fallback: изчистване на code fences.
-        $raw = trim($content);
-        $raw = preg_replace('/^```(?:json)?\s*/i', '', $raw);
-
-        return (string) preg_replace('/\s*```$/', '', (string) $raw);
-    }
-
-    private function logParseFailure(TeamNewsItem $item, string $rawResponse, string $parseError): void
-    {
-        Log::warning('LLM parse failure', [
-            'item_id' => $item->id,
-            'raw_response' => $rawResponse,
-            'parse_error' => $parseError,
-        ]);
     }
 
     /**

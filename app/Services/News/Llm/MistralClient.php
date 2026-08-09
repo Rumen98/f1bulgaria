@@ -120,13 +120,33 @@ class MistralClient implements LlmClient
     /**
      * Привежда JSON Schema към формата, който Mistral strict режимът очаква:
      * additionalProperties: false на всеки object и anyOf вместо type-масиви
-     * с "null" (формата, която Pydantic/Zod генерират — гарантирано поддържана).
+     * с "null" (формата, която Pydantic/Zod генерират).
      *
      * @param  array<string, mixed>  $schema
      * @return array<string, mixed>
      */
     private function normalizeSchema(array $schema): array
     {
+        // type масивът се разгъва ПРЪВ, за да мине всеки клон (вкл. nullable
+        // object) през пълната нормализация. Сиблинг ограниченията отиват във
+        // всеки не-null клон — JSON Schema игнорира неприложимите за типа.
+        if (is_array($schema['type'] ?? null)) {
+            $types = $schema['type'];
+            unset($schema['type']);
+
+            $annotations = array_intersect_key($schema, ['title' => true, 'description' => true]);
+            $constraints = array_diff_key($schema, $annotations);
+
+            $annotations['anyOf'] = array_map(
+                fn (string $type) => $type === 'null'
+                    ? ['type' => 'null']
+                    : $this->normalizeSchema([...$constraints, 'type' => $type]),
+                $types,
+            );
+
+            return $annotations;
+        }
+
         if (($schema['type'] ?? null) === 'object') {
             $schema['additionalProperties'] = false;
 
@@ -139,12 +159,6 @@ class MistralClient implements LlmClient
 
         if (isset($schema['items']) && is_array($schema['items'])) {
             $schema['items'] = $this->normalizeSchema($schema['items']);
-        }
-
-        // ['integer', 'null'] → anyOf: [{type: integer}, {type: 'null'}]
-        if (is_array($schema['type'] ?? null)) {
-            $schema['anyOf'] = array_map(fn (string $type) => ['type' => $type], $schema['type']);
-            unset($schema['type']);
         }
 
         return $schema;

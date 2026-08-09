@@ -39,6 +39,8 @@
              Http::fake удрят реалния Anthropic/OpenF1 → 120s hang + харчат пари). -->
         <env name="ANTHROPIC_API_KEY" value=""/>
         <env name="MISTRAL_API_KEY" value=""/>
+        <!-- Тестовете да не зависят от NEWS_LLM_DRIVER в локалния .env. -->
+        <env name="NEWS_LLM_DRIVER" value="anthropic"/>
         <env name="OPENF1_USERNAME" value=""/>
         <env name="OPENF1_PASSWORD" value=""/>
         <!-- V2 feature flags ON in tests, за да се тества кодът зад тях. -->

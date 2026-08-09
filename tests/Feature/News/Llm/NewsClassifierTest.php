@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 use App\Enums\NewsClassification;
 use App\Models\Constructor;
+use App\Models\Driver;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
 use App\Services\News\Llm\LlmClient;
 use App\Services\News\Llm\LlmException;
 use App\Services\News\Llm\NewsClassifier;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     $this->season = Season::factory()->current()->create();
@@ -151,4 +154,101 @@ it('хвърля LlmException при празна разширена стати�
 
     expect(fn () => app(NewsClassifier::class)->generateFullArticle($this->item))
         ->toThrow(LlmException::class);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Contract тестове през реалния Mistral драйвер
+|--------------------------------------------------------------------------
+| Реалните схеми на класификатора минават през MistralClient::normalizeSchema
+| — тук се заковава какво реално тръгва по жицата, за да не може регресия в
+| нормализацията или в схемите да мине незабелязано (Http::fake не валидира).
+*/
+
+function useMistralDriver(): void
+{
+    config()->set('news.llm_driver', 'mistral');
+    config()->set('services.mistral.key', 'test-key');
+    config()->set('services.mistral.model', 'mistral-large-latest');
+    config()->set('services.mistral.base_url', 'https://api.mistral.ai/v1');
+}
+
+/**
+ * @param  array<string, mixed>  $input
+ */
+function fakeMistralToolResponse(array $input): void
+{
+    Http::fake(['https://api.mistral.ai/*' => Http::response([
+        'choices' => [[
+            'message' => [
+                'role' => 'assistant',
+                'content' => json_encode($input, JSON_UNESCAPED_UNICODE),
+            ],
+            'finish_reason' => 'stop',
+        ]],
+        'usage' => ['prompt_tokens' => 100, 'completion_tokens' => 200],
+    ], 200)]);
+}
+
+it('праща реалната схема за класификация нормализирана през Mistral драйвера', function () {
+    useMistralDriver();
+
+    $driver = Driver::factory()->create([
+        'season_id' => $this->season->id,
+        'constructor_id' => $this->constructor->id,
+    ]);
+
+    fakeMistralToolResponse([
+        'title_bg' => 'Верстапен триумфира',
+        'summary_bg' => 'Макс Верстапен спечели. Победата е важна.',
+        'classification' => 'race',
+        'constructor_id' => null,
+        'importance_score' => 3,
+        'duplicate_of_id' => null,
+    ]);
+
+    $result = app(NewsClassifier::class)->classify($this->item);
+
+    expect($result->classification)->toBe(NewsClassification::Race);
+
+    Http::assertSent(function (Request $request) use ($driver) {
+        $format = data_get($request->data(), 'response_format');
+        $schema = $format['json_schema']['schema'];
+
+        return $request->url() === 'https://api.mistral.ai/v1/chat/completions'
+            && $format['json_schema']['name'] === 'classify_f1_news'
+            && $format['json_schema']['strict'] === true
+            && $schema['additionalProperties'] === false
+            // Union полетата (['integer','null']) са разгънати до anyOf.
+            && isset($schema['properties']['constructor_id']['anyOf'])
+            && isset($schema['properties']['duplicate_of_id']['anyOf'])
+            && ! isset($schema['properties']['constructor_id']['type'])
+            && $schema['properties']['classification']['enum'] === ['race', 'driver', 'technical', 'rumor', 'business', 'other']
+            // Анти-халюцинация защитата: списъкът пилот→отбор е в промпта.
+            && str_contains((string) data_get($request->data(), 'messages.1.content'), $driver->fullName());
+    });
+});
+
+it('праща реалната схема за статия през Mistral с непокътната items рекурсия', function () {
+    useMistralDriver();
+
+    fakeMistralToolResponse([
+        'full_article_bg' => "Първи параграф.\n\nВтори параграф.",
+        'key_facts' => ['Факт 1', 'Факт 2', 'Факт 3'],
+        'our_analysis_bg' => 'Анализ.',
+    ]);
+
+    $content = app(NewsClassifier::class)->generateFullArticle($this->item);
+
+    expect($content->keyFacts)->toBe(['Факт 1', 'Факт 2', 'Факт 3']);
+
+    Http::assertSent(function (Request $request) {
+        $format = data_get($request->data(), 'response_format');
+        $schema = $format['json_schema']['schema'];
+
+        return $format['json_schema']['name'] === 'write_f1_article'
+            && $format['json_schema']['strict'] === true
+            && $schema['additionalProperties'] === false
+            && $schema['properties']['key_facts']['items']['type'] === 'string';
+    });
 });

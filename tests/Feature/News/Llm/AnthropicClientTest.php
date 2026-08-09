@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Services\News\Llm\AnthropicClient;
 use App\Services\News\Llm\LlmException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/*';
 const TEST_API_KEY = 'sk-ant-test-SECRET-DO-NOT-LEAK';
@@ -34,6 +35,7 @@ it('връща съдържание и брой токени при успеше
 });
 
 it('повтаря при 500 и успява на втория опит', function () {
+    Sleep::fake();
     Http::fake([
         ANTHROPIC_URL => Http::sequence()
             ->push('', 500)
@@ -47,6 +49,7 @@ it('повтаря при 500 и успява на втория опит', funct
 });
 
 it('хвърля LlmException след 3 неуспешни опита (5xx)', function () {
+    Sleep::fake();
     Http::fake([ANTHROPIC_URL => Http::response('', 500)]);
 
     expect(fn () => app(AnthropicClient::class)->complete('s', 'u'))
@@ -56,6 +59,7 @@ it('хвърля LlmException след 3 неуспешни опита (5xx)', f
 });
 
 it('повтаря при 429 (rate limit)', function () {
+    Sleep::fake();
     Http::fake([
         ANTHROPIC_URL => Http::sequence()
             ->push('', 429)
