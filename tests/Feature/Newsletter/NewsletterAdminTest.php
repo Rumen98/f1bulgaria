@@ -13,7 +13,7 @@ beforeEach(function () {
 
 it('отваря списъка с абонати', function () {
     $subs = collect([
-        NewsletterSubscriber::create(['email' => 'a@x.bg', 'confirmed_at' => now()]),
+        NewsletterSubscriber::create(['email' => 'a@x.bg']),
         NewsletterSubscriber::create(['email' => 'b@x.bg']),
     ]);
 
@@ -22,22 +22,18 @@ it('отваря списъка с абонати', function () {
         ->assertCanSeeTableRecords($subs);
 });
 
-it('филтрите по потвърждение работят без грешка и показват правилния запис', function () {
-    $confirmed = NewsletterSubscriber::create(['email' => 'aa@x.bg', 'confirmed_at' => now()]);
-    $pending = NewsletterSubscriber::create(['email' => 'bb@x.bg']);
+it('филтърът по отписани работи без грешка и показва правилния запис', function () {
+    NewsletterSubscriber::create(['email' => 'aa@x.bg']);
+    $unsubscribed = NewsletterSubscriber::create(['email' => 'bb@x.bg', 'unsubscribed_at' => now()]);
 
     Livewire::test(ListNewsletterSubscribers::class)
-        ->filterTable('confirmed')
-        ->assertCanSeeTableRecords([$confirmed]);
-
-    Livewire::test(ListNewsletterSubscribers::class)
-        ->filterTable('unconfirmed')
-        ->assertCanSeeTableRecords([$pending]);
+        ->filterTable('unsubscribed')
+        ->assertCanSeeTableRecords([$unsubscribed]);
 });
 
 it('експортира избраните като CSV', function () {
     $subs = collect([
-        NewsletterSubscriber::create(['email' => 'a@x.bg', 'source' => 'footer', 'confirmed_at' => now()]),
+        NewsletterSubscriber::create(['email' => 'a@x.bg', 'source' => 'footer']),
         NewsletterSubscriber::create(['email' => 'b@x.bg', 'source' => 'homepage']),
     ]);
 

@@ -197,7 +197,7 @@ for u in / /standings /teams /drivers/lewis-hamilton; do curl -s -o /dev/null "$
 php artisan queue:work --tries=3 --max-time=3600
 ```
 
-Поща (newsletter double opt-in, верификация) минава през опашката.
+Поща (седмичен дайджест, имейл верификация) минава през опашката.
 
 ## 8. DNS / HTTPS
 

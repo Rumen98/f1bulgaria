@@ -19,15 +19,14 @@ beforeEach(function () {
     Result::factory()->create(['race_id' => $this->race->id, 'position' => 1]);
 });
 
-it('праща дайджеста на потребители И на потвърдени бюлетинни абонати', function () {
+it('праща дайджеста на потребители И на бюлетинни абонати', function () {
     Mail::fake();
 
     User::factory()->create(['email' => 'igrach@example.bg']);
     NewsletterSubscriber::create([
         'email' => 'abonat@example.bg',
-        'confirmation_token' => 'tok-abonat',
+        'unsubscribe_token' => 'tok-abonat',
         'subscribed_at' => now(),
-        'confirmed_at' => now(),
     ]);
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
@@ -44,9 +43,8 @@ it('не дублира имейл, който е и потребител, и а
     User::factory()->create(['email' => 'dvojnik@example.bg']);
     NewsletterSubscriber::create([
         'email' => 'dvojnik@example.bg',
-        'confirmation_token' => 'tok-dvojnik',
+        'unsubscribe_token' => 'tok-dvojnik',
         'subscribed_at' => now(),
-        'confirmed_at' => now(),
     ]);
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
@@ -54,11 +52,10 @@ it('не дублира имейл, който е и потребител, и а
     Mail::assertQueuedCount(1);
 });
 
-it('пропуска непотвърдените и отписаните абонати', function () {
+it('пропуска отписаните абонати', function () {
     Mail::fake();
 
-    NewsletterSubscriber::create(['email' => 'nepotvurden@example.bg', 'confirmation_token' => 't1', 'subscribed_at' => now()]);
-    NewsletterSubscriber::create(['email' => 'otpisan@example.bg', 'confirmation_token' => 't2', 'subscribed_at' => now(), 'confirmed_at' => now(), 'unsubscribed_at' => now()]);
+    NewsletterSubscriber::create(['email' => 'otpisan@example.bg', 'unsubscribe_token' => 't2', 'subscribed_at' => now(), 'unsubscribed_at' => now()]);
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 

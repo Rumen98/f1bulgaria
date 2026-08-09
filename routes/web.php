@@ -117,6 +117,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
     ->middleware('throttle:5,1')
     ->name('newsletter.subscribe');
+// Legacy: линкове от стари потвърждаващи имейли (double opt-in е премахнат).
 Route::get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm'])->name('newsletter.confirm');
 Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');

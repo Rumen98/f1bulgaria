@@ -24,7 +24,6 @@ class NewsletterSubscribersTable
             ->columns([
                 TextColumn::make('email')->label('Имейл')->searchable()->sortable(),
                 TextColumn::make('source')->label('Източник')->badge(),
-                IconColumn::make('confirmed_at')->label('Потвърден')->boolean(),
                 IconColumn::make('unsubscribed_at')
                     ->label('Отписан')
                     ->boolean()
@@ -38,10 +37,6 @@ class NewsletterSubscribersTable
                     'footer' => 'footer',
                     'profile' => 'profile',
                 ]),
-                Filter::make('confirmed')->label('Потвърдени')
-                    ->query(fn (Builder $q) => $q->whereNotNull('confirmed_at')),
-                Filter::make('unconfirmed')->label('Непотвърдени')
-                    ->query(fn (Builder $q) => $q->whereNull('confirmed_at')),
                 Filter::make('unsubscribed')->label('Отписани')
                     ->query(fn (Builder $q) => $q->whereNotNull('unsubscribed_at')),
             ])
@@ -59,14 +54,13 @@ class NewsletterSubscribersTable
     {
         return response()->streamDownload(function () use ($records) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['email', 'source', 'subscribed_at', 'confirmed_at', 'unsubscribed_at']);
+            fputcsv($out, ['email', 'source', 'subscribed_at', 'unsubscribed_at']);
 
             foreach ($records as $r) {
                 fputcsv($out, [
                     $r->email,
                     $r->source,
                     $r->subscribed_at?->toDateTimeString(),
-                    $r->confirmed_at?->toDateTimeString(),
                     $r->unsubscribed_at?->toDateTimeString(),
                 ]);
             }

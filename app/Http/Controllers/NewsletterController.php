@@ -4,19 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Mail\ConfirmSubscriptionMail;
 use App\Models\NewsletterSubscriber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class NewsletterController extends Controller
 {
     /**
-     * Записва имейл за бюлетина (double opt-in): съхраняваме като непотвърден
-     * и пращаме потвърждаващ имейл с токена. При повторно записване на
-     * непотвърден имейл пращаме писмото отново (изгубено/спам).
+     * Записва имейл за бюлетина — директно активен, без потвърждаващ имейл.
+     * Повторното записване е идемпотентно; отписан имейл се активира наново.
      */
     public function subscribe(Request $request): RedirectResponse
     {
@@ -31,7 +28,7 @@ class NewsletterController extends Controller
         if (! $subscriber->exists) {
             $subscriber->fill([
                 'source' => $data['source'] ?? 'footer',
-                'confirmation_token' => Str::random(48),
+                'unsubscribe_token' => Str::random(48),
                 'subscribed_at' => now(),
             ])->save();
         } elseif ($subscriber->unsubscribed_at !== null) {
@@ -39,27 +36,29 @@ class NewsletterController extends Controller
             $subscriber->update(['unsubscribed_at' => null, 'subscribed_at' => now()]);
         }
 
-        if ($subscriber->confirmed_at === null) {
-            Mail::to($subscriber->email)->queue(new ConfirmSubscriptionMail($subscriber));
-        }
-
-        return back()->with('success', 'Благодарим! Провери пощата си, за да потвърдиш абонамента.');
+        return back()->with('success', 'Благодарим! Записахме те за бюлетина.');
     }
 
+    /**
+     * Legacy: обслужва линкове от вече изпратени потвърждаващи имейли
+     * (double opt-in е премахнат). Може да се махне след няколко месеца.
+     */
     public function confirm(string $token): RedirectResponse
     {
-        $subscriber = NewsletterSubscriber::query()->where('confirmation_token', $token)->firstOrFail();
+        $subscriber = NewsletterSubscriber::query()->where('unsubscribe_token', $token)->firstOrFail();
 
-        if ($subscriber->confirmed_at === null) {
-            $subscriber->update(['confirmed_at' => now()]);
+        // Кликът е изричен opt-in (токенът доказва достъп до пощата) —
+        // активира наново дори отписан абонат.
+        if ($subscriber->unsubscribed_at !== null) {
+            $subscriber->update(['unsubscribed_at' => null, 'subscribed_at' => now()]);
         }
 
-        return redirect()->route('home')->with('success', 'Абонаментът ти за бюлетина е потвърден!');
+        return redirect()->route('home')->with('success', 'Абонаментът ти за бюлетина е активен!');
     }
 
     public function unsubscribe(string $token): RedirectResponse
     {
-        $subscriber = NewsletterSubscriber::query()->where('confirmation_token', $token)->firstOrFail();
+        $subscriber = NewsletterSubscriber::query()->where('unsubscribe_token', $token)->firstOrFail();
 
         $subscriber->update(['unsubscribed_at' => now()]);
 

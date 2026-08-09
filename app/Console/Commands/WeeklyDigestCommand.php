@@ -49,7 +49,7 @@ class WeeklyDigestCommand extends Command
             Mail::to($user)->queue(new WeeklyDigestMail($race, $recap, $board, $stats));
         }
 
-        // Потвърдените бюлетинни абонати без акаунт получават общата версия
+        // Бюлетинните абонати без акаунт получават общата версия
         // (без лична статистика) с линк за отписване. Дедупликация по имейл.
         $userEmails = $recipients->pluck('email')->map(fn (string $email) => mb_strtolower($email))->all();
 
@@ -63,7 +63,7 @@ class WeeklyDigestCommand extends Command
                 $recap,
                 $board,
                 userStats: null,
-                unsubscribeToken: $subscriber->confirmation_token,
+                unsubscribeToken: $subscriber->unsubscribe_token,
             ));
         }
 
