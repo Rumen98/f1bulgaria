@@ -11,41 +11,37 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class WeeklyDigestMail extends Mailable
+class RaceWeekendPreviewMail extends Mailable
 {
     use Queueable, SerializesModels;
 
     /**
-     * @param  array<int, array<string, mixed>>  $recap  подиум + ключови факти
-     * @param  array<int, array<string, mixed>>  $leaderboard  топ от класирането
-     * @param  array<string, mixed>|null  $userStats  статистика на получателя (null за бюлетинен абонат без акаунт)
+     * @param  array<int, array{label:string, when:string}>  $program  програма на уикенда в софийско време
+     * @param  string|null  $stake  едноредов залог в класирането
+     * @param  string|null  $deadline  краен срок за прогнози (софийско време)
      * @param  string|null  $unsubscribeToken  токен за отписване (само за бюлетинни абонати)
-     * @param  array<string, mixed>|null  $f2  Ф2 уикендът на Цолов (null скрива секцията)
-     * @param  array<int, array{title:string, url:string}>  $news  топ новини от седмицата
      * @param  string|null  $userUnsubscribeUrl  signed линк за спиране на имейлите (само за потребители с акаунт)
      */
     public function __construct(
         public Race $race,
-        public array $recap,
-        public array $leaderboard,
-        public ?array $userStats = null,
+        public array $program,
+        public ?string $stake = null,
+        public ?string $deadline = null,
         public ?string $unsubscribeToken = null,
-        public ?array $f2 = null,
-        public array $news = [],
         public ?string $userUnsubscribeUrl = null,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "Падок — рекап: {$this->race->name_bg}",
+            subject: "Падок — този уикенд: {$this->race->name_bg}",
         );
     }
 
     public function content(): Content
     {
         return new Content(
-            markdown: 'mail.weekly-digest',
+            markdown: 'mail.race-preview',
         );
     }
 }

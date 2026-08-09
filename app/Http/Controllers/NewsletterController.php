@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\NewsletterSubscriber;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -63,5 +64,17 @@ class NewsletterController extends Controller
         $subscriber->update(['unsubscribed_at' => now()]);
 
         return redirect()->route('home')->with('success', 'Отписан си от бюлетина.');
+    }
+
+    /**
+     * Спира имейлите от Падок за потребител с акаунт. Линкът е signed URL
+     * от футъра на всяко писмо — валидността се гарантира от 'signed'
+     * middleware-а, без нужда от вход.
+     */
+    public function userUnsubscribe(User $user): RedirectResponse
+    {
+        $user->forceFill(['email_opt_out_at' => now()])->save();
+
+        return redirect()->route('home')->with('success', 'Спряхме имейлите от Падок към този адрес.');
     }
 }

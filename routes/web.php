@@ -120,6 +120,10 @@ Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
 // Legacy: линкове от стари потвърждаващи имейли (double opt-in е премахнат).
 Route::get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm'])->name('newsletter.confirm');
 Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
+// Опт-аут за потребители с акаунт (дайджест/preview/пулс) — signed линк от писмата.
+Route::get('/newsletter/email-stop/{user}', [NewsletterController::class, 'userUnsubscribe'])
+    ->middleware('signed')
+    ->name('newsletter.user-unsubscribe');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');
 
 Route::get('/dashboard', [CalendarController::class, 'index'])

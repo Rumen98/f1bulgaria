@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\NewsletterSubscriber;
+use App\Models\User;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 
 it('записва имейл за бюлетина като директно активен', function () {
     $this->post('/newsletter/subscribe', ['email' => 'fan@example.bg', 'source' => 'footer'])
@@ -104,6 +106,23 @@ it('отписва чрез токен', function () {
 
 it('връща 404 за невалиден токен', function () {
     $this->get('/newsletter/unsubscribe/nonexistent')->assertNotFound();
+});
+
+it('спира имейлите на потребител чрез signed линк', function () {
+    $user = User::factory()->create();
+    $url = URL::signedRoute('newsletter.user-unsubscribe', ['user' => $user->id]);
+
+    $this->get($url)->assertRedirect(route('home'));
+
+    expect($user->fresh()->email_opt_out_at)->not->toBeNull();
+});
+
+it('отхвърля неподписан линк за спиране на имейлите', function () {
+    $user = User::factory()->create();
+
+    $this->get('/newsletter/email-stop/'.$user->id)->assertForbidden();
+
+    expect($user->fresh()->email_opt_out_at)->toBeNull();
 });
 
 it('scope active връща всички неотписани', function () {

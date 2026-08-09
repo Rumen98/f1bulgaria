@@ -54,6 +54,7 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'banned_at' => 'datetime',
+            'email_opt_out_at' => 'datetime',
         ];
     }
 

@@ -36,11 +36,36 @@ Schedule::command('f1:sync-sessions')
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
 // Неделен вечерен дайджест в 20:00 софийско време.
-// withoutOverlapping е задължително тук: изпраща имейли до всички абонати,
-// а дублиран cron (напр. и на root, и на www-data) би го пуснал два пъти.
+//
+// onOneServer пази от дублиран cron (напр. и на root, и на www-data):
+// withoutOverlapping пуска mutex-а веднага щом командата приключи (секунди),
+// а onOneServer държи lock за целия график-минутен слот. Освен това
+// `newsletter_sends` маркира състезанието преди пращане — твърда
+// идемпотентност дори при повторен ръчен пуск.
 Schedule::command('f1:weekly-digest')
     ->weeklyOn(0, '20:00')
     ->timezone('Europe/Sofia')
+    ->onOneServer()
+    ->withoutOverlapping(120);
+
+// Петъчен preview на състезателния уикенд в 09:00 софийско време.
+// Вътрешният guard праща само ако до 7 дни напред има кръг.
+Schedule::command('f1:race-preview')
+    ->weeklyOn(5, '09:00')
+    ->timezone('Europe/Sofia')
+    ->onOneServer()
+    ->withoutOverlapping(120);
+
+// „Пулс" през паузите — проверка всяка сряда 18:00 софийско време.
+// Седмично, а не месечно: закачен за 1-во число пулсът геометрично не може
+// да улучи лятната пауза (1 август/септември винаги опират в guard-овете).
+// Вътрешните guard-ове (14 дни тишина назад, 10 дни буфер напред, 21 дни
+// между два пулса чрез `newsletter_sends`) го пускат ефективно веднъж на
+// 3-4 седмици и само в дълги паузи.
+Schedule::command('f1:offseason-pulse')
+    ->weeklyOn(3, '18:00')
+    ->timezone('Europe/Sofia')
+    ->onOneServer()
     ->withoutOverlapping(120);
 
 // News pipeline — новини през целия ден: вземане на всеки 30 мин, LLM
