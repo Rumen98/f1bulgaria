@@ -9,6 +9,14 @@ beforeEach(function () {
     config(['features.quiz' => true]);
 });
 
+it('връща 404 когато флагът е изключен', function () {
+    config(['features.quiz' => false]);
+
+    $this->post(route('quiz.score'), [
+        'answers' => [['id' => 1, 'choice' => 1]],
+    ])->assertNotFound();
+});
+
 it('оценява отговорите сървърно', function () {
     $q1 = QuizQuestion::factory()->correct(1)->create();
     $q2 = QuizQuestion::factory()->correct(2)->create();
@@ -61,6 +69,47 @@ it('игнорира непознат/деактивиран въпрос', func
         ->where('result.total', 1)
         ->has('result.review', 1)
     );
+});
+
+it('брои пропуснат въпрос като грешен', function () {
+    $q = QuizQuestion::factory()->correct(2)->create();
+
+    $this->post(route('quiz.score'), [
+        'answers' => [['id' => $q->id, 'choice' => null]],
+    ])->assertInertia(fn (Assert $page) => $page
+        ->where('result.score', 0)
+        ->where('result.review.0.chosen_option', null)
+        ->where('result.review.0.is_correct', false)
+    );
+});
+
+it('пренасочва към куиза когато всички id-та са непознати', function () {
+    $this->post(route('quiz.score'), [
+        'answers' => [['id' => 999999, 'choice' => 1]],
+    ])->assertRedirect(route('quiz'));
+});
+
+it('отхвърля дублирани id-та', function () {
+    $q = QuizQuestion::factory()->correct(1)->create();
+
+    $this->from(route('quiz'))
+        ->post(route('quiz.score'), [
+            'answers' => [
+                ['id' => $q->id, 'choice' => 1],
+                ['id' => $q->id, 'choice' => 2],
+            ],
+        ])
+        ->assertSessionHasErrors(['answers.0.id', 'answers.1.id']);
+});
+
+it('отхвърля повече от 50 отговора', function () {
+    $answers = collect(range(1, 51))
+        ->map(fn (int $i) => ['id' => $i, 'choice' => 1])
+        ->all();
+
+    $this->from(route('quiz'))
+        ->post(route('quiz.score'), ['answers' => $answers])
+        ->assertSessionHasErrors('answers');
 });
 
 it('изисква поне един отговор', function () {

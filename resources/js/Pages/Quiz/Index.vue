@@ -5,11 +5,10 @@ import Trophy from '@/Components/UI/Trophy.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
 import { router } from '@inertiajs/vue3';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 const props = defineProps({
     questions: { type: Array, default: () => [] },
-    total: { type: Number, default: 0 },
     result: { type: Object, default: null }, // != null => режим резултат/ревю
 });
 
@@ -28,10 +27,22 @@ const submit = () => {
 const restart = () => router.visit(route('quiz'));
 
 // ── Режим резултат: превръщаме резултата в „класация от Гран При" ───────────
-// Позиция P1..P20 по процент верни (100% → P1, 0% → P20). Точки по F1 схемата.
+// Позиция P1..P20 по процент верни. Прагове вместо линейна формула: линейната
+// правеше P3 недостижим при 10 въпроса. Точки по F1 схемата.
 const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 const pct = computed(() => (props.result && props.result.total ? props.result.score / props.result.total : 0));
-const position = computed(() => Math.max(1, Math.ceil((1 - pct.value) * 20)));
+const position = computed(() => {
+    if (pct.value === 1) {
+        return 1;
+    }
+    if (pct.value >= 0.9) {
+        return 2;
+    }
+    if (pct.value >= 0.8) {
+        return 3;
+    }
+    return Math.min(20, 4 + Math.round(((0.8 - pct.value) / 0.8) * 16));
+});
 const points = computed(() => F1_POINTS[position.value - 1] ?? 0);
 const isPerfect = computed(() => props.result && props.result.total > 0 && props.result.score === props.result.total);
 const wrongCount = computed(() => (props.result ? props.result.total - props.result.score : 0));
@@ -57,15 +68,41 @@ const podiumSteps = [
     { pos: 3, h: 'h-14', color: 'bg-orange-600/25 border-orange-500/50' },
 ];
 
-// Анимации + count-up на точките.
+// Анимации + count-up на точките. Наблюдаваме result вместо onMounted:
+// router.post към същата страница преизползва компонента и onMounted не се
+// вика повторно — точките оставаха 0 завинаги.
 const revealed = ref(false);
 const displayPoints = ref(0);
-onMounted(() => {
-    requestAnimationFrame(() => (revealed.value = true));
-    if (props.result) {
+let countUpToken = 0; // прекъсва застоял rAF цикъл при нов резултат
+
+watch(
+    () => props.result,
+    (result) => {
+        if (typeof window === 'undefined') {
+            return; // SSR: няма rAF/matchMedia; клиентът стартира анимацията сам
+        }
+        const token = ++countUpToken;
+        revealed.value = false;
+        displayPoints.value = 0;
+        requestAnimationFrame(() => (revealed.value = true));
+        if (!result) {
+            return;
+        }
         const target = points.value;
-        const start = performance.now();
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            displayPoints.value = target;
+            return;
+        }
+        // Стартът е timestamp-ът на първия кадър, не performance.now():
+        // скрит таб отлага rAF и иначе анимацията се прескача изцяло.
+        let start = null;
         const step = (t) => {
+            if (token !== countUpToken) {
+                return;
+            }
+            if (start === null) {
+                start = t;
+            }
             const k = Math.min(1, (t - start) / 900);
             displayPoints.value = Math.round(target * (1 - Math.pow(1 - k, 3)));
             if (k < 1) {
@@ -73,20 +110,21 @@ onMounted(() => {
             }
         };
         requestAnimationFrame(step);
-    }
-});
+    },
+    { immediate: true },
+);
 </script>
 
 <template>
     <PublicLayout>
         <!-- ═══════════════ РЕЗУЛТАТ = ФИНАЛНА КЛАСАЦИЯ ═══════════════ -->
         <template v-if="result">
-            <h1 class="sr-only">Формула 1 куиз — резултат</h1>
+            <h1 class="sr-only">Куизът на Падок — резултат</h1>
 
             <!-- Hero: шахматно знаме + позиция + точки -->
             <section
                 class="relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-b to-black p-6 text-center transition-all duration-700 sm:p-8"
-                :class="[tier.glow, revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3']"
+                :class="[tier.glow, revealed ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-95']"
             >
                 <div class="flag pointer-events-none absolute inset-x-0 top-0 h-2" />
                 <p class="text-xs font-black uppercase tracking-[0.3em] text-zinc-500">Финална класация</p>
@@ -107,7 +145,7 @@ onMounted(() => {
                 <!-- Метрики като табло -->
                 <div class="mx-auto mt-6 grid max-w-md grid-cols-3 gap-3">
                     <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
-                        <div class="font-display text-2xl font-black tabular-nums text-white">{{ result.score }}<span class="text-base text-zinc-600">/{{ result.total }}</span></div>
+                        <div class="font-display text-2xl font-black tabular-nums text-white">{{ result.score }}<span class="text-base text-zinc-500">/{{ result.total }}</span></div>
                         <div class="mt-0.5 text-[11px] uppercase tracking-wide text-zinc-500">Верни</div>
                     </div>
                     <div class="rounded-xl border border-red-900/50 bg-red-950/20 p-3">
@@ -132,7 +170,7 @@ onMounted(() => {
                 :class="revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'"
             >
                 <div v-for="step in podiumSteps" :key="step.pos" class="flex w-20 flex-col items-center sm:w-24">
-                    <Trophy :place="step.pos" class="mb-1 h-10 w-10 sm:h-12 sm:w-12" :class="step.pos === position ? 'animate-bounce' : 'opacity-60'" />
+                    <Trophy :place="step.pos" class="mb-1 h-10 w-10 sm:h-12 sm:w-12" :class="step.pos === position ? 'motion-safe:animate-bounce' : 'opacity-60'" />
                     <div class="flex w-full items-start justify-center rounded-t-lg border-t border-x pt-2 font-display text-xl font-black tabular-nums" :class="[step.h, step.color, podiumClass(step.pos)]">
                         {{ step.pos }}
                     </div>
@@ -142,7 +180,7 @@ onMounted(() => {
 
             <!-- Класация (всеки въпрос = ред, като резултати от състезание) -->
             <h2 class="mb-3 mt-8 font-display text-lg font-black uppercase tracking-wide text-white">Класация по въпроси</h2>
-            <TableShell :scroll="true">
+            <TableShell>
                 <table class="w-full text-sm">
                     <thead class="bg-zinc-900/80 text-xs uppercase tracking-wide text-zinc-500">
                         <tr>
@@ -191,14 +229,14 @@ onMounted(() => {
         <template v-else>
             <div class="mb-6 flex items-center gap-2.5">
                 <span class="flag-chip h-6 w-6 rounded" />
-                <h1 class="font-display text-2xl font-black sm:text-3xl">Формула 1 <span class="text-red-600">Куиз</span></h1>
+                <h1 class="font-display text-2xl font-black sm:text-3xl">Куизът на Падок<span class="text-red-600">.</span></h1>
             </div>
 
             <EmptyState v-if="questions.length === 0">Все още няма въпроси. Върни се скоро!</EmptyState>
 
             <template v-else>
                 <!-- Прогрес (стартова решетка) -->
-                <div class="sticky top-2 z-10 mb-5 rounded-xl border border-zinc-800 bg-black/80 p-3 backdrop-blur">
+                <div class="sticky top-16 z-10 mb-5 rounded-xl border border-zinc-800 bg-black/80 p-3 backdrop-blur">
                     <div class="mb-1.5 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-zinc-400">
                         <span>Отговорени</span>
                         <span class="tabular-nums" :class="allAnswered ? 'text-emerald-400' : 'text-zinc-300'">{{ answeredCount }}/{{ questions.length }}</span>
@@ -209,12 +247,20 @@ onMounted(() => {
                 </div>
 
                 <div class="space-y-4">
-                    <div v-for="(q, i) in questions" :key="q.id" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 transition hover:border-zinc-700">
+                    <div
+                        v-for="(q, i) in questions"
+                        :key="q.id"
+                        class="rounded-xl border bg-zinc-900/60 p-4 transition"
+                        :class="selected[q.id] ? 'border-red-900/60' : 'border-zinc-800 hover:border-zinc-700'"
+                    >
                         <div class="mb-3 flex items-start gap-3">
-                            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-zinc-800 font-display text-sm font-black tabular-nums text-zinc-400">{{ i + 1 }}</span>
-                            <p class="pt-0.5 font-semibold text-white">{{ q.question }}</p>
+                            <span
+                                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-display text-sm font-black tabular-nums transition-colors"
+                                :class="selected[q.id] ? 'bg-red-600 text-white' : 'bg-zinc-800 text-zinc-400'"
+                            >{{ i + 1 }}</span>
+                            <p :id="`quiz-q-${q.id}`" class="pt-0.5 font-semibold text-white">{{ q.question }}</p>
                         </div>
-                        <div class="grid gap-2 sm:grid-cols-2">
+                        <div class="grid gap-2 sm:grid-cols-2" role="group" :aria-labelledby="`quiz-q-${q.id}`">
                             <button
                                 v-for="(opt, idx) in q.options"
                                 :key="idx"
@@ -223,6 +269,7 @@ onMounted(() => {
                                 :class="selected[q.id] === idx + 1
                                     ? 'border-red-600 bg-red-600/20 text-white ring-1 ring-red-600/40'
                                     : 'border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800/40'"
+                                :aria-pressed="selected[q.id] === idx + 1"
                                 @click="choose(q.id, idx + 1)"
                             >
                                 <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-black" :class="selected[q.id] === idx + 1 ? 'border-red-500 bg-red-600 text-white' : 'border-zinc-600 text-zinc-500'">

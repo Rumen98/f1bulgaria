@@ -16,6 +16,7 @@ class QuizQuestionFactory extends Factory
     public function definition(): array
     {
         return [
+            'code' => $this->faker->unique()->slug(3),
             'question' => $this->faker->sentence().'?',
             'option_1' => $this->faker->word(),
             'option_2' => $this->faker->word(),

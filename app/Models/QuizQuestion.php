@@ -8,6 +8,7 @@ use Database\Factories\QuizQuestionFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class QuizQuestion extends Model
 {
@@ -16,6 +17,7 @@ class QuizQuestion extends Model
 
     /** @var array<int, string> */
     protected $fillable = [
+        'code',
         'question',
         'option_1',
         'option_2',
@@ -24,6 +26,40 @@ class QuizQuestion extends Model
         'correct_option',
         'is_active',
     ];
+
+    /**
+     * Defense-in-depth: верният отговор никога не бива да изтича към клиента
+     * при случайно сериализиране на целия модел (Inertia/JSON).
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'correct_option',
+    ];
+
+    protected static function booted(): void
+    {
+        // Авто-генериран код при ръчно създаване (Filament) — seeder-ът винаги подава свой.
+        static::creating(function (QuizQuestion $question): void {
+            if (blank($question->code)) {
+                $question->code = static::uniqueCode((string) $question->question);
+            }
+        });
+    }
+
+    public static function uniqueCode(string $question): string
+    {
+        $base = Str::limit(Str::slug($question), 48, '') ?: 'vapros';
+        $code = $base;
+        $n = 2;
+
+        while (static::query()->where('code', $code)->exists()) {
+            $code = "{$base}-{$n}";
+            $n++;
+        }
+
+        return $code;
+    }
 
     /** @return array<string, string> */
     protected function casts(): array

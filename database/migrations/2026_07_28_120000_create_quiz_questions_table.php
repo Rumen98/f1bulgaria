@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('quiz_questions', function (Blueprint $table) {
             $table->id();
+            $table->string('code')->unique();               // стабилен идентификатор за seed-а
             $table->text('question');                       // въпросът (BG)
             $table->string('option_1');
             $table->string('option_2');

@@ -1,6 +1,8 @@
 <script setup>
 // Класическа купа (чаша с дръжки) за подиум — злато/сребро/бронз според мястото.
 // Inline SVG: остра на всякакъв размер, без външни картинки, в тъмната тема.
+import { useId } from 'vue';
+
 const props = defineProps({
     place: { type: Number, default: 1 }, // 1 | 2 | 3
 });
@@ -12,7 +14,8 @@ const META = {
 };
 const m = META[props.place] ?? META[1];
 // Уникален id на градиента — три купи на един екран не се застъпват.
-const gid = 'tg-' + props.place + '-' + Math.random().toString(36).slice(2, 8);
+// useId() вместо Math.random(): стабилен между SSR и клиента (без mismatch).
+const gid = useId();
 </script>
 
 <template>

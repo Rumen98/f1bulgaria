@@ -1,8 +1,10 @@
 <?php
 
-namespace App\Filament\Resources\QuizQuestionResource\Pages;
+declare(strict_types=1);
 
-use App\Filament\Resources\QuizQuestionResource;
+namespace App\Filament\Resources\QuizQuestions\Pages;
+
+use App\Filament\Resources\QuizQuestions\QuizQuestionResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 

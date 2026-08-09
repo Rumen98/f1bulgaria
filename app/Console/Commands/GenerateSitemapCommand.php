@@ -98,6 +98,7 @@ class GenerateSitemapCommand extends Command
             'history' => ['history', 'history.world', 'history.bulgaria'],
             'f2' => ['f2'],
             'live_timing' => ['live'],
+            'quiz' => ['quiz'],
         ];
         foreach ($featureStatic as $flag => $routes) {
             if (config("features.{$flag}")) {

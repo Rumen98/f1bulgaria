@@ -106,7 +106,9 @@ Route::middleware('feature:rivalries')->group(function () {
 
 Route::middleware('feature:quiz')->group(function () {
     Route::get('/quiz', [QuizController::class, 'index'])->name('quiz');
-    Route::post('/quiz', [QuizController::class, 'score'])->name('quiz.score');
+    Route::post('/quiz', [QuizController::class, 'score'])
+        ->middleware('throttle:10,1')
+        ->name('quiz.score');
 });
 
 // RSS за агрегатори и Telegram ботове — безплатен дистрибуционен канал.

@@ -9,8 +9,10 @@ const page = usePage();
 const user = computed(() => page.props.auth?.user);
 const flashSuccess = computed(() => page.props.flash?.success);
 
-// Основна навигация (винаги видима на десктоп) + второстепенна (под „Повече ▾").
+// Основна навигация (винаги видима на десктоп) + справочна (под „Енциклопедия ▾").
 // Елементите с `feature` се показват само ако флагът е включен (config/features.php).
+// Принцип на разделяне: „живото" (следиш сезона, играеш) е отпред; справочното
+// съдържание без времева стойност живее в „Енциклопедия".
 const primaryNav = [
     { label: 'На живо', route: 'live', live: true, feature: 'live_timing' },
     { label: 'Новини', route: 'news.index' },
@@ -18,20 +20,19 @@ const primaryNav = [
     { label: 'Класиране', route: 'standings' },
     // Prediction league-ът е ядро на общността — стои в основната лента.
     { label: 'Прогнози', route: 'leaderboard' },
-    { label: 'Отбори', route: 'teams.index' },
-    { label: 'Пилоти', route: 'drivers.index' },
-    // Ф2 до Цолов — двете вървят заедно. „Писти" отива в „Повече ▾":
-    // 10 елемента не се събират на lg (1024px) без пренасяне.
+    { label: 'Куиз', route: 'quiz', feature: 'quiz' },
+    // Ф2 до Цолов — двете вървят заедно.
     { label: 'Формула 2', route: 'f2', feature: 'f2' },
     // tricolor: easter egg — името светва в бг трибагреника на hover.
     { label: 'Цолов', route: 'tsolov', feature: 'tsolov', flag: 'bg', tricolor: true },
 ];
 const secondaryNav = [
+    { label: 'Отбори', route: 'teams.index' },
+    { label: 'Пилоти', route: 'drivers.index' },
     { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
     { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'История', route: 'history', feature: 'history' },
     { label: 'Речник', route: 'terminology' },
-    { label: 'Куиз', route: 'quiz', feature: 'quiz' },
 ];
 
 const mobileOpen = ref(false);
@@ -88,7 +89,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                             :aria-expanded="moreOpen"
                             @click="moreOpen = !moreOpen"
                         >
-                            Повече ▾
+                            Енциклопедия ▾
                         </button>
                         <div v-if="moreOpen" class="absolute right-0 z-40 mt-2 w-44 rounded-xl border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl">
                             <Link
@@ -107,7 +108,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
 
                 <div class="flex items-center gap-3 text-sm">
                     <template v-if="user">
-                        <!-- xl: на lg лентата с 9 линка + „Повече" не побира и този — има го и в /leaderboard. -->
+                        <!-- xl: на lg лентата с 8 линка + „Енциклопедия" не побира и този — има го и в /leaderboard. -->
                         <Link :href="route('predictions.index')" class="hidden text-zinc-400 transition hover:text-white xl:block">
                             Моите прогнози
                         </Link>

@@ -17,8 +17,8 @@ class StoreQuizRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'answers' => ['required', 'array', 'min:1'],
-            'answers.*.id' => ['required', 'integer'],
+            'answers' => ['required', 'array', 'min:1', 'max:50'],
+            'answers.*.id' => ['required', 'integer', 'distinct'],
             'answers.*.choice' => ['nullable', 'integer', 'between:1,4'],
         ];
     }
