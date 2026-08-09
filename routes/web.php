@@ -22,6 +22,7 @@ use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicProfileController;
+use App\Http\Controllers\QuizController;
 use App\Http\Controllers\RaceController;
 use App\Http\Controllers\RivalriesController;
 use App\Http\Controllers\StandingsController;
@@ -101,6 +102,13 @@ Route::middleware('feature:rivalries')->group(function () {
         Route::post('/rivalries', [RivalriesController::class, 'store'])->name('rivalries.store');
     });
     Route::get('/rivalries/{slug}', [RivalriesController::class, 'show'])->name('rivalries.show');
+});
+
+Route::middleware('feature:quiz')->group(function () {
+    Route::get('/quiz', [QuizController::class, 'index'])->name('quiz');
+    Route::post('/quiz', [QuizController::class, 'score'])
+        ->middleware('throttle:10,1')
+        ->name('quiz.score');
 });
 
 // RSS за агрегатори и Telegram ботове — безплатен дистрибуционен канал.
