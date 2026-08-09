@@ -6,7 +6,7 @@ use App\Enums\NewsClassification;
 use App\Models\Constructor;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
-use App\Services\News\Llm\AnthropicClient;
+use App\Services\News\Llm\LlmClient;
 use App\Services\News\Llm\LlmException;
 use App\Services\News\Llm\NewsClassifier;
 
@@ -20,14 +20,14 @@ beforeEach(function () {
 });
 
 /**
- * Връзва mock AnthropicClient, който връща подадения tool input (както при
+ * Връзва mock LlmClient, който връща подадения tool input (както при
  * forced tool use — вече структуриран, без JSON parsing).
  *
  * @param  array<string, mixed>  $input
  */
 function mockTool(array $input): void
 {
-    test()->mock(AnthropicClient::class, function ($mock) use ($input) {
+    test()->mock(LlmClient::class, function ($mock) use ($input) {
         $mock->shouldReceive('completeWithTool')
             ->once()
             ->andReturn(['input' => $input, 'input_tokens' => 15, 'output_tokens' => 40]);
@@ -120,7 +120,7 @@ it('хвърля LlmException при празно заглавие или рез
 });
 
 it('генерира разширена статия от tool input', function () {
-    test()->mock(AnthropicClient::class, function ($mock) {
+    test()->mock(LlmClient::class, function ($mock) {
         $mock->shouldReceive('completeWithTool')->once()->andReturn([
             'input' => [
                 'full_article_bg' => "Първи параграф на статията.\n\nВтори параграф с детайли.",
@@ -141,7 +141,7 @@ it('генерира разширена статия от tool input', function 
 });
 
 it('хвърля LlmException при празна разширена статия', function () {
-    test()->mock(AnthropicClient::class, function ($mock) {
+    test()->mock(LlmClient::class, function ($mock) {
         $mock->shouldReceive('completeWithTool')->once()->andReturn([
             'input' => ['full_article_bg' => '   ', 'key_facts' => [], 'our_analysis_bg' => ''],
             'input_tokens' => 10,

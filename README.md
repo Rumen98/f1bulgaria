@@ -38,7 +38,7 @@ npm run dev   # или npm run build
 | `f1:lock-predictions` | Заключва прогнозите 5 мин преди квалификацията | всяка минута |
 | `f1:weekly-digest` | Неделен рекап + leaderboard по имейл | неделя 20:00 (Sofia) |
 | `news:fetch {--source=}` | Взема RSS/Atom feed-овете и записва нови елементи | дневно 06:00 |
-| `news:enrich {--limit=50}` | LLM класификация + превод на български (Claude) | дневно 06:30 |
+| `news:enrich {--limit=50}` | LLM класификация + превод на български (Claude или Mistral, виж `NEWS_LLM_DRIVER`) | дневно 06:30 |
 
 Разписанието е в [routes/console.php](routes/console.php). На сървъра е нужен
 само един cron ред:

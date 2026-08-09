@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 use JsonException;
 
 /**
- * Класифицира и превежда една новина чрез Claude: заглавие/резюме на български,
+ * Класифицира и превежда една новина чрез LLM: заглавие/резюме на български,
  * категория, обвързан отбор и оценка за важност. Валидира отговора стриктно.
  */
 class NewsClassifier
@@ -23,7 +23,7 @@ class NewsClassifier
 
     private const ARTICLE_TOOL_NAME = 'write_f1_article';
 
-    public function __construct(private readonly AnthropicClient $client) {}
+    public function __construct(private readonly LlmClient $client) {}
 
     /**
      * Генерира НАША оригинална българска статия по фактите от новината

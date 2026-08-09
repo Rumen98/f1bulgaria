@@ -12,7 +12,7 @@ class GenerateNewsArticlesCommand extends Command
 {
     protected $signature = 'news:generate-articles {--limit=10 : Максимален брой статии за генериране}';
 
-    protected $description = 'Генерира разширени оригинални български статии (+анализ) за одобрените новини чрез Claude.';
+    protected $description = 'Генерира разширени оригинални български статии (+анализ) за одобрените новини чрез LLM.';
 
     public function handle(NewsEnricher $enricher): int
     {

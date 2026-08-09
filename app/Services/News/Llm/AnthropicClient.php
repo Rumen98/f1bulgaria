@@ -20,7 +20,7 @@ use Throwable;
  * @see https://docs.anthropic.com/en/api/messages
  * @see https://docs.anthropic.com/en/docs/build-with-claude/tool-use
  */
-class AnthropicClient
+class AnthropicClient implements LlmClient
 {
     private const DEFAULT_TIMEOUT_SECONDS = 120;
 

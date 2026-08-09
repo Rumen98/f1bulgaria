@@ -12,7 +12,7 @@ class EnrichNewsCommand extends Command
 {
     protected $signature = 'news:enrich {--limit=50 : Максимален брой новини за обработка}';
 
-    protected $description = 'Класифицира и превежда pending новините на български чрез Claude (LLM).';
+    protected $description = 'Класифицира и превежда pending новините на български чрез LLM.';
 
     public function handle(NewsEnricher $enricher): int
     {

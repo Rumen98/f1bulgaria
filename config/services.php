@@ -51,6 +51,13 @@ return [
         'timeout' => (int) env('ANTHROPIC_TIMEOUT', 120),
     ],
 
+    'mistral' => [
+        'key' => env('MISTRAL_API_KEY'),
+        'model' => env('MISTRAL_MODEL', 'mistral-large-latest'),
+        'base_url' => env('MISTRAL_BASE_URL', 'https://api.mistral.ai/v1'),
+        'timeout' => (int) env('MISTRAL_TIMEOUT', 120),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
