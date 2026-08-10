@@ -15,10 +15,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        /** @var array<string, int> $titles */
-        $titles = config('team-championships', []);
-
-        foreach ($titles as $slug => $count) {
+        foreach ($this->titles() as $slug => $count) {
             DB::table('constructors_canonical')
                 ->where('slug', $slug)
                 ->where('championships_count', 0)
@@ -29,7 +26,21 @@ return new class extends Migration
     public function down(): void
     {
         DB::table('constructors_canonical')
-            ->whereIn('slug', array_keys((array) config('team-championships', [])))
+            ->whereIn('slug', array_keys($this->titles()))
             ->update(['championships_count' => 0]);
+    }
+
+    /**
+     * Файлът се чете директно, а НЕ през config(): deploy.sh пуска `migrate`
+     * преди `optimize:clear`, така че в този момент е активен конфиг кешът от
+     * предишния деплой и новият ключ още не съществува в него.
+     *
+     * @return array<string, int>
+     */
+    private function titles(): array
+    {
+        $path = config_path('team-championships.php');
+
+        return file_exists($path) ? (array) require $path : [];
     }
 };
