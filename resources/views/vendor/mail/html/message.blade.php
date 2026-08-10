@@ -21,6 +21,8 @@
 {{-- Footer --}}
 <x-slot:footer>
 <x-mail::footer>
+Коментираме уикендите на живо в [Telegram канала](https://t.me/padokbg).
+
 © {{ date('Y') }} Падок — [padok.bg]({{ config('app.url') }})
 
 Независим фен проект, несвързан с Formula One Group или FIA.
