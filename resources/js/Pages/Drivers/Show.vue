@@ -5,6 +5,7 @@ import DriverRecentResults from '@/Components/Driver/DriverRecentResults.vue';
 import DriverStatsGrid from '@/Components/Driver/DriverStatsGrid.vue';
 import HeadToHeadBars from '@/Components/Driver/HeadToHeadBars.vue';
 import FlagIcon from '@/Components/FlagIcon.vue';
+import SeasonSelect from '@/Components/UI/SeasonSelect.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
@@ -40,15 +41,7 @@ watch(() => props.driver.photo, () => (photoFailed.value = false));
     <PublicLayout>
         <div class="flex items-center justify-between gap-3">
             <Link :href="route('drivers.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Всички пилоти</Link>
-            <select
-                v-if="seasons.length > 1"
-                :value="selectedSeason"
-                aria-label="Сезон"
-                class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
-                @change="goToSeason"
-            >
-                <option v-for="y in seasons" :key="y" :value="y">Сезон {{ y }}</option>
-            </select>
+            <SeasonSelect v-if="seasons.length > 1" :seasons="seasons" :selected="selectedSeason" prefix="Сезон " @change="goToSeason" />
         </div>
 
         <!-- Hero -->

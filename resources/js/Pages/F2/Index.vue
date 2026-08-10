@@ -1,5 +1,6 @@
 <script setup>
 import FlagIcon from '@/Components/FlagIcon.vue';
+import SeasonSelect from '@/Components/UI/SeasonSelect.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
@@ -27,15 +28,7 @@ const goToSeason = (e) => {
                 <h1 class="font-display text-2xl font-black sm:text-3xl">Формула 2 <span class="text-red-600">{{ season }}</span></h1>
                 <p class="mt-1 text-sm text-zinc-500">Стъпалото преди Формула 1. Данните се поддържат ръчно.</p>
             </div>
-            <select
-                v-if="seasons.length"
-                :value="season"
-                aria-label="Сезон"
-                class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
-                @change="goToSeason"
-            >
-                <option v-for="y in seasons" :key="y" :value="y">{{ y }}</option>
-            </select>
+            <SeasonSelect v-if="seasons.length" :seasons="seasons" :selected="season" @change="goToSeason" />
         </div>
 
         <!-- F2 под-навигация -->
