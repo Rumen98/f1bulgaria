@@ -13,6 +13,7 @@ use App\Http\Controllers\F2DriversController;
 use App\Http\Controllers\F2RaceController;
 use App\Http\Controllers\F2TeamsController;
 use App\Http\Controllers\FeedController;
+use App\Http\Controllers\GameController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
@@ -102,6 +103,10 @@ Route::middleware('feature:rivalries')->group(function () {
         Route::post('/rivalries', [RivalriesController::class, 'store'])->name('rivalries.store');
     });
     Route::get('/rivalries/{slug}', [RivalriesController::class, 'show'])->name('rivalries.show');
+});
+
+Route::middleware('feature:game')->group(function () {
+    Route::get('/game', [GameController::class, 'index'])->name('game');
 });
 
 Route::middleware('feature:quiz')->group(function () {

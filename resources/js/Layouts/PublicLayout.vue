@@ -21,6 +21,7 @@ const primaryNav = [
     // Prediction league-ът е ядро на общността — стои в основната лента.
     { label: 'Прогнози', route: 'leaderboard' },
     { label: 'Куиз', route: 'quiz', feature: 'quiz' },
+    { label: 'Хронометър', route: 'game', feature: 'game' },
     // Ф2 до Цолов — двете вървят заедно.
     { label: 'Формула 2', route: 'f2', feature: 'f2' },
     // tricolor: easter egg — името светва в бг трибагреника на hover.
