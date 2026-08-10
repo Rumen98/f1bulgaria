@@ -96,43 +96,46 @@ const countdownText = computed(() => {
                     v-for="race in visibleRaces"
                     :key="race.id"
                     :href="route('races.show', race.id)"
-                    class="group flex items-center justify-between rounded-xl border p-4 transition duration-200 hover:bg-zinc-900"
+                    class="group flex items-start gap-3 rounded-xl border p-4 transition duration-200 hover:bg-zinc-900 sm:items-center sm:gap-4"
                     :class="isNext(race)
                         ? 'border-red-600/60 bg-zinc-900 shadow-[0_0_25px_rgba(225,6,0,0.12)] hover:border-red-500'
                         : 'border-zinc-800 bg-zinc-900/60 hover:border-red-600/50'"
                 >
-                    <div class="flex items-center gap-4">
-                        <span
-                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums transition"
-                            :class="isNext(race)
-                                ? 'bg-red-600 text-white'
-                                : 'bg-zinc-800 text-zinc-300 group-hover:bg-red-600 group-hover:text-white'"
-                        >
-                            {{ race.round }}
-                        </span>
-                        <div>
-                            <div class="font-semibold text-white">
-                                <span v-if="isNext(race)" class="mr-2 rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+                    <span
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums transition"
+                        :class="isNext(race)
+                            ? 'bg-red-600 text-white'
+                            : 'bg-zinc-800 text-zinc-300 group-hover:bg-red-600 group-hover:text-white'"
+                    >
+                        {{ race.round }}
+                    </span>
+                    <!-- На телефон часът минава ПОД името: две колони в 360px
+                         чупят и заглавието, и датата на срички. От sm нагоре
+                         се връща класическият двуколонен ред. -->
+                    <div class="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span v-if="isNext(race)" class="rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
                                     Следващо
                                 </span>
-                                {{ race.name_bg ?? race.name }}
-                                <span v-if="race.has_sprint" class="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-400">
+                                <span class="font-semibold text-white">{{ race.name_bg ?? race.name }}</span>
+                                <span v-if="race.has_sprint" class="rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-400">
                                     Спринт
                                 </span>
                             </div>
-                            <div class="text-sm text-zinc-500">{{ race.circuit }}, {{ race.country }}</div>
+                            <div class="mt-0.5 truncate text-sm text-zinc-500">{{ race.circuit }}, {{ race.country }}</div>
                         </div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-sm font-medium tabular-nums text-zinc-200">{{ race.race_at_sofia ?? 'TBC' }}</div>
-                        <div v-if="isNext(race) && countdownText" class="font-display text-xs font-bold tabular-nums text-red-500">
-                            {{ countdownText }}
+                        <div class="mt-2 flex flex-wrap items-baseline gap-x-2 sm:mt-0 sm:block sm:shrink-0 sm:text-right">
+                            <div class="whitespace-nowrap text-sm font-medium tabular-nums text-zinc-200">{{ race.race_at_sofia ?? 'TBC' }}</div>
+                            <div v-if="isNext(race) && countdownText" class="whitespace-nowrap font-display text-xs font-bold tabular-nums text-red-500">
+                                {{ countdownText }}
+                            </div>
+                            <div v-else-if="race.finished" class="whitespace-nowrap text-xs font-medium text-emerald-400">Завършено</div>
+                            <!-- Изкарано, но източникът още не е публикувал класацията.
+                                 Без този надпис изглежда като че данните липсват. -->
+                            <div v-else-if="race.held" class="whitespace-nowrap text-xs text-amber-400">Чакаме резултатите</div>
+                            <div v-else class="whitespace-nowrap text-xs text-zinc-500">Предстои</div>
                         </div>
-                        <div v-else-if="race.finished" class="text-xs font-medium text-emerald-400">Завършено</div>
-                        <!-- Изкарано, но източникът още не е публикувал класацията.
-                             Без този надпис изглежда като че данните липсват. -->
-                        <div v-else-if="race.held" class="text-xs text-amber-400">Чакаме резултатите</div>
-                        <div v-else class="text-xs text-zinc-500">Предстои</div>
                     </div>
                 </Link>
             </div>

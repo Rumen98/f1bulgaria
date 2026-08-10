@@ -139,6 +139,9 @@ class TeamsController extends Controller
             ->limit(5)
             ->get()
             ->map(fn (TeamNewsItem $n) => [
+                // slug-ът води към нашата статия; external_url е само резерва
+                // за стари записи без slug.
+                'slug' => $n->slug,
                 'title' => $n->title_bg ?? $n->title_original,
                 'summary' => $n->summary_bg,
                 'classification' => $n->classification?->label(),

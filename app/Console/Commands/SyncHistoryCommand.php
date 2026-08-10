@@ -82,6 +82,10 @@ class SyncHistoryCommand extends Command
         $this->call('constructors:backfill-canonical');
         $this->call('drivers:backfill-canonical');
 
+        // Титлите не идват от източника — пълнят се от конфига, иначе всеки
+        // нов каноничен запис тръгва с 0 титли.
+        $this->call('constructors:backfill-championships');
+
         return self::SUCCESS;
     }
 

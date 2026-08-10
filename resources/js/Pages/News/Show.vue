@@ -113,9 +113,13 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                         :href="article.external_url"
                         target="_blank"
                         rel="noopener nofollow"
-                        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-500"
+                        class="mt-4 inline-block rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-500"
                     >
-                        Прочетете оригинала<span v-if="article.source"> на {{ article.source }}</span> →
+                        <!-- Без flex: всеки текстов възел ставаше отделен flex item
+                             и на телефон се чупеше по средата на израза
+                             („Прочетете / оригинала" до „на The / Race"). -->
+                        Прочетете оригинала<span v-if="article.source" class="whitespace-nowrap"> на {{ article.source }}</span><span aria-hidden="true">&nbsp;→</span>
+                        <span class="sr-only">(отваря се в нов раздел)</span>
                     </a>
                 </div>
 

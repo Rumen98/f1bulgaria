@@ -7,6 +7,7 @@ use App\Models\Driver;
 use App\Models\Race;
 use App\Models\Result;
 use App\Models\Season;
+use App\Models\TeamNewsItem;
 use App\Services\Teams\CanonicalConstructorBackfiller;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -93,4 +94,20 @@ it('?season избира конкретен сезон на отбора', funct
     $this->get('/teams/mclaren?season=1850')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('selectedSeason', $this->season->year));
+});
+
+it('дава slug на новините на отбора, за да водят към нашата статия', function () {
+    $team = Constructor::factory()->create(['season_id' => $this->season->id, 'name' => 'Ferrari', 'slug' => 'ferrari']);
+    $item = TeamNewsItem::factory()->approved()->create(['constructor_id' => $team->id]);
+    backfillTeamCanonical();
+
+    $this->get('/teams/ferrari')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('news', 1)
+            // Без slug картата пада към external_url и праща читателя навън.
+            ->where('news.0.slug', $item->slug));
+
+    // Слугът наистина резолва към нашата article страница.
+    $this->get("/news/{$item->slug}")->assertOk();
 });
