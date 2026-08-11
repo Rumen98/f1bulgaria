@@ -27,7 +27,7 @@ class GenerateTrackDataCommand extends Command
 {
     protected $signature = 'game:generate-tracks
         {--source= : Път до geojson (по подразбиране storage/app/bacinger-circuits.geojson)}
-        {--output= : Изходна директория (по подразбиране public/game/tracks)}
+        {--output= : Изходна директория (по подразбиране public/game-tracks)}
         {--only= : Само тази писта (slug)}
         {--spacing=4.0 : Разстояние между точките след ресемплиране, в метри}
         {--flat : Игнорира надморската височина, дори когато е кеширана}';
@@ -54,7 +54,7 @@ class GenerateTrackDataCommand extends Command
 
     public function handle(): int
     {
-        $output = $this->option('output') ?: public_path('game/tracks');
+        $output = $this->option('output') ?: public_path('game-tracks');
         $spacing = max(1.0, (float) $this->option('spacing'));
 
         if (! is_dir($output)) {

@@ -14,6 +14,7 @@ use App\Http\Controllers\F2RaceController;
 use App\Http\Controllers\F2TeamsController;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\GameController;
+use App\Http\Controllers\GameLeaderboardController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
@@ -107,6 +108,13 @@ Route::middleware('feature:rivalries')->group(function () {
 
 Route::middleware('feature:game')->group(function () {
     Route::get('/game', [GameController::class, 'index'])->name('game');
+
+    // Класация: публична за четене (лилави рекорди за всички), запис само с вход.
+    Route::get('/game/leaderboard/{track}', [GameLeaderboardController::class, 'show'])
+        ->name('game.leaderboard');
+    Route::post('/game/lap', [GameLeaderboardController::class, 'store'])
+        ->middleware(['auth', 'throttle:30,1'])
+        ->name('game.lap.store');
 });
 
 Route::middleware('feature:quiz')->group(function () {

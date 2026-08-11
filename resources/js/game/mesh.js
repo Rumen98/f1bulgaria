@@ -43,8 +43,13 @@ const KERB_WIDTH = 1.1;
 /** Дължина на едно червено/бяло блокче на керба, метри. */
 const KERB_BLOCK = 2.0;
 
-/** Колко навън се простира тревата от ръба на трасето, метри. */
-const RUNOFF_WIDTH = 60;
+/**
+ * Колко навън се простира тревната лента от ръба на трасето, метри. Смъкнато
+ * от 60: при компактни писти с денивелация (Монако — 55 m, Casino над
+ * пристанището) широкият apron от по-високия сегмент увисваше над по-ниския и
+ * скриваше пистата. Далечната трева я поема ground plane-ът (същия зелен цвят).
+ */
+const RUNOFF_WIDTH = 8;
 
 /**
  * Спад на тревата на метър навън. Без него run-off зоната е плосък диск около
@@ -99,6 +104,8 @@ export function buildTrackMeshes(track) {
         group.add(mesh);
     }
 
+    group.add(buildStartGrandstands(track));
+
     return group;
 }
 
@@ -131,9 +138,11 @@ function buildLandmarks(track) {
         out.push(grandstands);
     }
 
+    // Изхвърляме сградите, които попадат върху/до трасето — в град като Монако
+    // OSM има footprint-и точно на пистата (бежевите блокове през асфалта).
     const buildings = extrudeRings(
         track,
-        landmarks.buildings ?? [],
+        (landmarks.buildings ?? []).filter((ring) => !overlapsTrack(track, ring, track.width / 2 + 3)),
         LANDMARK_HEIGHT.building,
         COLORS.building
     );
@@ -147,6 +156,121 @@ function buildLandmarks(track) {
     }
 
     return out;
+}
+
+/**
+ * Дали контур (сграда) попада на по-малко от `clearance` метра от осевата линия
+ * — т.е. върху/до трасето. Проверката е по върхове през всяка 2-ра осева точка;
+ * еднократна е (при билд на mesh-а), не в кадъра.
+ *
+ * @param {import('./track.js').Track} track
+ * @param {Array<[number, number]>} ring
+ * @param {number} clearance
+ * @returns {boolean}
+ */
+function overlapsTrack(track, ring, clearance) {
+    const { xs, zs, count } = track;
+    const c2 = clearance * clearance;
+    const n = ring.length;
+
+    // Проверяваме РЪБОВЕТЕ, не само върховете: дълга стена (напр. по средата на
+    // Монако) има върхове далеч от трасето, но ръбът ѝ го пресича — само по
+    // върхове минаваше през филтъра и оставаше „сляпа" бежева стена на пистата.
+    for (let j = 0; j < n; j++) {
+        const [ax, az] = ring[j];
+        const [bx, bz] = ring[(j + 1) % n];
+
+        for (let i = 0; i < count; i += 2) {
+            if (distToSegmentSq(xs[i], zs[i], ax, az, bx, bz) < c2) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/** Квадрат на разстоянието от точка (px,pz) до отсечка (ax,az)-(bx,bz). */
+function distToSegmentSq(px, pz, ax, az, bx, bz) {
+    const dx = bx - ax;
+    const dz = bz - az;
+    const lenSq = dx * dx + dz * dz;
+
+    let t = lenSq > 0 ? ((px - ax) * dx + (pz - az) * dz) / lenSq : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+
+    const ex = px - (ax + t * dx);
+    const ez = pz - (az + t * dz);
+
+    return ex * ex + ez * ez;
+}
+
+/**
+ * Процедурни трибуни покрай стартовата права. Реалните OSM ориентири са малко
+ * (по няколко на писта), а всяка писта има главна трибуна на старт/финала. Това
+ * добавя разпознаваема „стадион" атмосфера, без да зависи от пълнотата на OSM.
+ *
+ * Кутиите пазят frustum culling (за разлика от лентите) — изнасят се от кадъра
+ * зад гърба на колата.
+ *
+ * @param {import('./track.js').Track} track
+ * @returns {THREE.Group}
+ */
+function buildStartGrandstands(track) {
+    const { xs, ys, zs, nx, nz, tx, tz, count, spacing, width } = track;
+    const group = new THREE.Group();
+    const half = width / 2;
+
+    const GAP = 7; // отстъп навън от ръба на асфалта, m
+    const DEPTH = 18; // дълбочина навън, m
+    const HEIGHT = 12; // височина, m
+    const SECTION = 26; // дължина на секция по трасето, m
+    const SPAN = 165; // колко от правата да покрием, m
+
+    const sections = Math.max(3, Math.round(SPAN / SECTION));
+    const step = Math.max(1, Math.round(SECTION / spacing));
+    const startBack = Math.round(20 / spacing); // започва ~20 m преди старта
+
+    const bodyMat = new THREE.MeshStandardMaterial({ color: COLORS.grandstand, metalness: 0.1, roughness: 0.75 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: COLORS.grandstandRoof, metalness: 0.45, roughness: 0.5 });
+
+    // Наклонена седяща банка вместо блокче: свалям горния ръб откъм трасето, за
+    // да се вдига навън, както истинска трибуна. (+X сочи към трасето след
+    // rotation.y; ако ракът излезе обърнат, се сменя знакът на `front`.)
+    const bodyGeo = new THREE.BoxGeometry(DEPTH, HEIGHT, SECTION * 0.9);
+    {
+        const p = bodyGeo.attributes.position;
+        for (let v = 0; v < p.count; v++) {
+            if (p.getY(v) > 0) {
+                const front = (p.getX(v) + DEPTH / 2) / DEPTH; // 1 откъм трасето, 0 отзад
+                p.setY(v, p.getY(v) - HEIGHT * 0.6 * front);
+            }
+        }
+        bodyGeo.computeVertexNormals();
+    }
+
+    const roofGeo = new THREE.BoxGeometry(DEPTH * 0.92, 0.4, SECTION * 0.96);
+
+    for (const sign of [1, -1]) {
+        for (let s = 0; s < sections; s++) {
+            const i = (((s * step - startBack) % count) + count) % count;
+            const angle = Math.atan2(tx[i], tz[i]);
+            const off = sign * (half + GAP + DEPTH / 2);
+
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.set(xs[i] + nx[i] * off, ys[i] + HEIGHT / 2, zs[i] + nz[i] * off);
+            body.rotation.y = angle;
+            group.add(body);
+
+            // Покрив над задната (високата) част, надвиснал над седалките.
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.position.set(xs[i] + nx[i] * off, ys[i] + HEIGHT + 0.4, zs[i] + nz[i] * off);
+            roof.rotation.y = angle;
+            group.add(roof);
+        }
+    }
+
+    return group;
 }
 
 /**
@@ -221,7 +345,7 @@ function extrudeRings(track, rings, baseHeight, color) {
 
     merged.computeVertexNormals();
 
-    const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ color }));
+    const mesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ color, metalness: 0.1, roughness: 0.75 }));
     mesh.frustumCulled = false;
 
     return mesh;
@@ -259,7 +383,7 @@ function buildTrees(track, trees) {
 
     const mesh = new THREE.InstancedMesh(
         geometry,
-        new THREE.MeshLambertMaterial({ vertexColors: true }),
+        new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 }),
         trees.length
     );
 
@@ -369,7 +493,7 @@ function groundHeightNear(track, x, z) {
  * @returns {THREE.Mesh}
  */
 function ribbonMesh(track, fromOffset, toOffset, y, options) {
-    const { xs, ys, zs, nx, nz, count, spacing } = track;
+    const { xs, ys, zs, nx, nz, count, spacing, curvature } = track;
 
     // +1 ред върхове: последният дублира първия, за да се затвори цикълът с
     // коректни UV координати (иначе последният сегмент опъва текстурата назад).
@@ -387,8 +511,21 @@ function ribbonMesh(track, fromOffset, toOffset, y, options) {
         const i = r % count;
         const v = (r * spacing) / 8;
 
+        // Радиусът на завоя е 1/κ. Лента, по-широка от радиуса, се сгъва навътре
+        // отвъд центъра на кривината и прави каша (Монако Fairmont ~8 м, тесните
+        // завои на Спа). Ограничаваме отместването до 80% от радиуса, само от
+        // ВЪТРЕШНАТА (вдлъбната) страна — външната не се сгъва.
+        const k = curvature[i];
+        const innerLimit = k !== 0 ? (0.5 / k) : 0;
+
         for (let side = 0; side < 2; side++) {
-            const offset = side === 0 ? fromOffset : toOffset;
+            let offset = side === 0 ? fromOffset : toOffset;
+            if (k > 0) {
+                offset = Math.min(offset, innerLimit);
+            } else if (k < 0) {
+                offset = Math.max(offset, innerLimit);
+            }
+
             const vi = (r * 2 + side) * 3;
 
             positions[vi] = xs[i] + nx[i] * offset;
@@ -434,7 +571,7 @@ function ribbonMesh(track, fromOffset, toOffset, y, options) {
 
     const mesh = new THREE.Mesh(
         geometry,
-        new THREE.MeshLambertMaterial({ vertexColors: true })
+        new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 })
     );
     mesh.frustumCulled = false;
 
@@ -515,7 +652,7 @@ function buildKerbs(track) {
 
     const mesh = new THREE.Mesh(
         geometry,
-        new THREE.MeshLambertMaterial({ vertexColors: true })
+        new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 })
     );
     mesh.frustumCulled = false;
 
@@ -576,7 +713,7 @@ function buildDistanceMarkers(track) {
     const capacity = Math.floor(count / every) * 2;
 
     const geometry = new THREE.BoxGeometry(0.25, 1.1, 0.25);
-    const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const material = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 });
     const mesh = new THREE.InstancedMesh(geometry, material, capacity);
 
     const matrix = new THREE.Matrix4();
@@ -642,7 +779,7 @@ function buildGround(track) {
 
     const mesh = new THREE.Mesh(
         geometry,
-        new THREE.MeshLambertMaterial({ color: COLORS.ground })
+        new THREE.MeshStandardMaterial({ color: COLORS.ground, metalness: 0, roughness: 1 })
     );
 
     // Под най-ниската точка на трасето и под спуснатия ръб на тревата.

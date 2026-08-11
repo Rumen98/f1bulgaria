@@ -1,10 +1,12 @@
 /**
- * Аркадна физика на болида, с фиксирана стъпка.
+ * Аркадно-симулационна физика на болида, с фиксирана стъпка.
  *
- * Съзнателно НЕ е Pacejka/пълен bicycle модел: на клавиатура пълният модел е
- * непредвидим и неприятен. Този е прост и настройваем, но пази двете неща,
- * които правят усещането „формула" — сцепление, растящо със скоростта
- * (downforce), и брутално спиране.
+ * Опростен двуосев (bicycle) модел: предната и задната ос имат отделни странични
+ * сили с таван по хватката си. Когато задната се насити — на входа на завой
+ * (прехвърляне на тегло към предницата при спиране) или от газта на изход —
+ * колата ротира от задницата, контролируем oversteer като в реалния F1.
+ * Настроен за клавиатура: ротацията е умерена, не аркаден дрифт. Пази усещането
+ * „формула" — сцепление, растящо със скоростта (downforce), и брутално спиране.
  *
  * `step()` е чиста функция на (състояние, вход, dt) без достъп до времето или
  * случайност. Това е нарочно: същият код може да превърти записан вход на
@@ -43,29 +45,80 @@ export const CAR = {
     /** Съпротивление при търкаляне (линейно по скоростта). */
     rollingResistance: 0.02,
 
-    /** Странично сцепление при нулева скорост, m/s² (≈ 1.5 g). */
-    baseGrip: 15,
+    /** Странично сцепление при нулева скорост, m/s². Вдигнато (22→25): с
+     *  клавиатура играчите излитаха често; повече хватка държи линията по-лесно. */
+    baseGrip: 25,
 
-    /** Прираст на сцеплението от притискащата сила: grip += coef * v². */
-    downforceCoef: 0.0063,
+    /** Прираст на сцеплението от притискащата сила: grip += coef * v².
+     *  Вдигнат (0.0082→0.0095) за повече хватка на висока скорост. */
+    downforceCoef: 0.0095,
 
-    /** Максимален ъгъл на предните колела, радиани. */
-    maxSteerAngle: 0.52,
+    /** Максимален ъгъл на предните колела, радиани. Вдигнат от 0.52 —
+     *  предницата „хапе" повече, колата не е дървена в бавните завои. */
+    maxSteerAngle: 0.58,
 
     /**
      * Колко бързо пада ъгълът на завиване със скоростта. Без това на 300 km/h
-     * едно докосване на стрелката завърта колата на 90°.
+     * едно докосване на стрелката завърта колата на 90°. Вдигнато (0.045→0.055):
+     * на клавиатура пълното натискане на скорост даваше твърде голям ъгъл и
+     * колата излиташе; сега воланът е по-мек на скорост.
      */
     steerSpeedFalloff: 0.055,
 
-    /** Скорост на завъртане на волана, единици/сек. */
-    steerRate: 3.4,
+    /** Скорост на завъртане на волана, единици/сек. Смекчена (6.5→5.0): на
+     *  клавиатура твърде бързият волан прави входа рязък; 5.0 се модулира лесно. */
+    steerRate: 5.0,
 
     /** Скорост на връщане на волана в центъра, единици/сек. */
     steerReturnRate: 5.5,
 
     /** Разстояние между осите, метри. */
     wheelbase: 3.6,
+
+    // ── Двуосев модел (ротация на задницата) ─────────────────────────────
+
+    /** Дял от теглото върху предната ос в покой (F1 ~46/54). Равно на b/L. */
+    staticFrontLoad: 0.46,
+
+    /** Височина на центъра на тежестта, метри. Ниска при F1 → малко прехвърляне
+     *  на тегло, но достатъчно за ротация на входа на завоя. */
+    cgHeight: 0.3,
+
+    /** Таван на прехвърлянето на тегло (дял), за да не олекне ос напълно. */
+    maxLoadTransfer: 0.3,
+
+    /** Ъгъл на плъзгане (рад), при който оста достига тавана на хватката си.
+     *  Предната беше твърде остра (0.095) → колата твича на входа и е трудна за
+     *  браузърна игра. Върната по-прогресивна (0.14): малко стабилизиращо
+     *  недозавиване → входът е предвидим и опростителен. */
+    gripPeakSlipFront: 0.1,
+    gripPeakSlipRear: 0.15,
+
+    /** Мащаб на инерцията на въртене (Iz = m·a·b·factor). По-малко = по-остра
+     *  ротация. Леко вдигнат (1.25→1.5) за по-плавно, по-предвидимо завъртане —
+     *  подходящо за браузърна игра. */
+    yawInertiaFactor: 1.35,
+
+    /** Затихване на въртенето, 1/s. Средно: стабилно и лесно за „хващане" на
+     *  плъзгането, без да убива живостта или да добавя излишно недозавиване. */
+    yawDamping: 3.8,
+
+    /** Пиково аеро-затихване на въртенето (при максимална скорост), 1/s. Расте
+     *  кубично със скоростта, затова е почти нула в бавните/средните завои и
+     *  силно на права/висока скорост — лека корекция там не изхвърля задницата.
+     *  Вдигнато (8→11) за повече стабилност на скорост. */
+    yawDampingAero: 11.0,
+
+    /** Таван на ъгловата скорост, rad/s. */
+    maxYawRate: 1.7,
+
+    /** Колко газта „изяжда" задната странична хватка → power-oversteer на изход.
+     *  Скалира се по скоростта (powerBite) — силно на изход от бавен завой,
+     *  нула на правата. Леко смекчено (0.55→0.5) за по-лесно каране. */
+    powerOversteer: 0.5,
+
+    /** Праг на скоростта (m/s), под който караме кинематично (без ротация). */
+    lowSpeedThreshold: 2.0,
 
     /** Коефициент на сцепление извън трасето. */
     offTrackGripFactor: 0.38,
@@ -85,8 +138,8 @@ const GRAVITY = 9.81;
  * @property {number} vForward     Надлъжна скорост, m/s
  * @property {number} vLateral     Странична скорост, m/s (+ = надясно)
  * @property {number} steer        Текущо положение на волана, [-1, 1]
- * @property {number} yawRate      rad/s, само за визуализация
- * @property {number} slip         0..1, колко плъзга — за ефекти
+ * @property {number} yawRate      Ъглова скорост, rad/s (динамично състояние)
+ * @property {number} slip         0..1, колко плъзга задницата — за ефекти
  */
 
 /**
@@ -172,6 +225,10 @@ export function step(state, input, dt, onTrack, gradient = 0) {
         accel -= GRAVITY * (gradient / Math.sqrt(1 + gradient * gradient));
     }
 
+    // Надлъжното ускорение движи прехвърлянето на тегло (спирачка → отпред,
+    // газта → отзад). Улавяме го преди клампването на скоростта.
+    const axBody = accel;
+
     state.vForward += accel * dt;
 
     // Спирачката не бива да тласка колата назад в рамките на една стъпка.
@@ -181,40 +238,87 @@ export function step(state, input, dt, onTrack, gradient = 0) {
 
     state.vForward = clamp(state.vForward, -CAR.maxReverseSpeed, CAR.maxSpeed);
 
-    // ── Сцепление и завиване ─────────────────────────────────────────────
-    const speed = Math.abs(state.vForward);
-    const maxLateralAccel =
-        (CAR.baseGrip + CAR.downforceCoef * speed * speed) * gripFactor;
+    // ── Странична динамика: двуосев модел ────────────────────────────────
+    // Отделни странични сили на предната и задната ос, всяка с таван по своята
+    // хватка. Когато задната се насити (олекнала на входа при спиране или
+    // „изядена" от газта на изход), колата ротира от задницата — контролируем
+    // oversteer като в F1.
+    const vx = state.vForward;
+    const absV = Math.abs(vx);
 
+    // Кормилен ъгъл на предните колела — с падане по скоростта, както преди.
     const steerAngle =
-        CAR.maxSteerAngle * state.steer / (1 + speed * CAR.steerSpeedFalloff);
+        (CAR.maxSteerAngle * state.steer) / (1 + absV * CAR.steerSpeedFalloff);
 
-    const desiredYawRate = (state.vForward * Math.tan(steerAngle)) / CAR.wheelbase;
-
-    // Центростремителното ускорение не може да надвиши сцеплението: при опит
-    // колата отива в подуправление вместо да завие.
-    const maxYawRate = maxLateralAccel / Math.max(speed, 1);
-    const yawRate = clamp(desiredYawRate, -maxYawRate, maxYawRate);
-
-    state.slip =
-        Math.abs(desiredYawRate) > 1e-4
-            ? clamp(1 - Math.abs(yawRate) / Math.abs(desiredYawRate), 0, 1)
-            : 0;
-
-    state.yawRate = yawRate;
-    state.heading += yawRate * dt;
-
-    // Частта от желаното завиване, която сцеплението не понесе, се превръща в
-    // странично плъзгане — оттам идва усещането за „изнасяне" в завоя.
-    const unservedYaw = desiredYawRate - yawRate;
-    state.vLateral += unservedYaw * speed * dt;
-
-    // Гумите гасят страничната скорост до лимита на сцеплението.
-    const lateralFriction = maxLateralAccel * dt;
-    if (Math.abs(state.vLateral) <= lateralFriction) {
-        state.vLateral = 0;
+    if (absV < CAR.lowSpeedThreshold || vx < 0) {
+        // Твърде бавно за смислени гуми-сили ИЛИ заден ход: караме кинематично.
+        // Двуосевият модел ползва напредово приближение на slip ъглите, което на
+        // заден ход обръща реакцията на волана — затова целият заден ход минава
+        // оттук (kinYaw е коректен и за vx < 0). Гасим и остатъчното плъзгане.
+        const kinYaw = (vx * Math.tan(steerAngle)) / CAR.wheelbase;
+        state.yawRate = kinYaw;
+        state.heading += kinYaw * dt;
+        state.vLateral -= state.vLateral * Math.min(1, 10 * dt);
+        state.slip = 0;
     } else {
-        state.vLateral -= Math.sign(state.vLateral) * lateralFriction;
+        const grip = (CAR.baseGrip + CAR.downforceCoef * absV * absV) * gripFactor;
+
+        // Геометрия: CG по-близо до задницата (staticFrontLoad = b/L).
+        const a = CAR.wheelbase * (1 - CAR.staticFrontLoad); // CG → предна ос
+        const b = CAR.wheelbase * CAR.staticFrontLoad; //        CG → задна ос
+
+        // Надлъжно прехвърляне на тегло: спирачка (axBody < 0) товари предницата
+        // и олекотява задницата → тя поддава на входа.
+        const shift = clamp(
+            (CAR.cgHeight / CAR.wheelbase) * (axBody / GRAVITY),
+            -CAR.maxLoadTransfer,
+            CAR.maxLoadTransfer
+        );
+        const loadF = clamp(CAR.staticFrontLoad - shift, 0.1, 0.9);
+        const loadR = 1 - loadF;
+
+        // Таван на страничното ускорение на всяка ос (сумата = grip при баланс).
+        const gripF = grip * loadF;
+        // Газта изяжда част от задната странична хватка (грип-кръг) → power-
+        // oversteer на изход. Но само когато реално има теглителна сила: близо
+        // до максималната скорост тягата е нищожна, затова НЕ бива да разхлабва
+        // задницата — иначе лека корекция на правата „изхвърля" колата.
+        const powerBite = Math.max(0, 1 - absV / CAR.maxSpeed);
+        const rearUse = CAR.powerOversteer * input.throttle * powerBite;
+        const gripR = grip * loadR * Math.max(0.25, 1 - rearUse * rearUse);
+
+        // Ъгли на плъзгане на всяка ос (завъртени са само предните колела).
+        const slipF = steerAngle - (state.vLateral + a * state.yawRate) / vx;
+        const slipR = -(state.vLateral - b * state.yawRate) / vx;
+
+        // Странични ускорения, наситени до тавана на всяка ос.
+        const ayF = gripF * clamp(slipF / CAR.gripPeakSlipFront, -1, 1);
+        const ayR = gripR * clamp(slipR / CAR.gripPeakSlipRear, -1, 1);
+
+        // Въртене: моментът от двете оси минус затихване. Iz = m·a·b·factor,
+        // затова масата се съкращава и работим в ускорения.
+        const izz = a * b * CAR.yawInertiaFactor;
+        // Затихването расте кубично със скоростта (аеро-стабилност) → правата е
+        // спокойна, а бавните/средните завои остават живи.
+        const speedRatio = absV / CAR.maxSpeed;
+        const damping = CAR.yawDamping + CAR.yawDampingAero * speedRatio * speedRatio * speedRatio;
+        const yawAccel = (a * ayF - b * ayR) / izz - damping * state.yawRate;
+        state.yawRate = clamp(
+            state.yawRate + yawAccel * dt,
+            -CAR.maxYawRate,
+            CAR.maxYawRate
+        );
+
+        // Странична скорост: сумата от осите минус центростремителната връзка.
+        const latAccel = ayF + ayR - state.yawRate * vx;
+        state.vLateral += latAccel * dt;
+        // Не оставяме плъзгането да избяга извън разумното.
+        state.vLateral = clamp(state.vLateral, -absV - 6, absV + 6);
+
+        state.heading += state.yawRate * dt;
+
+        // За визуализация: колко се плъзга задницата (0..1).
+        state.slip = clamp(Math.abs(state.vLateral) / Math.max(absV, 1), 0, 1);
     }
 
     // ── Интегриране на позицията ─────────────────────────────────────────

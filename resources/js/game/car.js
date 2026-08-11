@@ -33,13 +33,26 @@ const MAX_PITCH = 0.035;
  */
 export function buildCar() {
     const root = new THREE.Group();
+    // Пичът за наклона трябва да е около ЛОКАЛНАТА напречна ос на колата, не
+    // около световната X. При default ред 'XYZ' heading се прилага преди пича,
+    // та на склон + завой (heading ≠ 0) пичът частично става роул и предницата
+    // хлътва в асфалта. 'YXZ' прилага пича локално, после heading.
+    root.rotation.order = 'YXZ';
     const body = new THREE.Group();
     root.add(body);
 
-    const paint = new THREE.MeshLambertMaterial({ color: BODY_COLOR });
-    const dark = new THREE.MeshLambertMaterial({ color: DARK });
-    const accent = new THREE.MeshLambertMaterial({ color: ACCENT });
-    const rubber = new THREE.MeshLambertMaterial({ color: TYRE });
+    // PBR: боята е металик с clearcoat (заотразява небето от env map-а);
+    // гумите — матови; тъмните части — леко гланцирани.
+    const paint = new THREE.MeshPhysicalMaterial({
+        color: BODY_COLOR,
+        metalness: 0.55,
+        roughness: 0.32,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.12,
+    });
+    const dark = new THREE.MeshStandardMaterial({ color: DARK, metalness: 0.35, roughness: 0.5 });
+    const accent = new THREE.MeshStandardMaterial({ color: ACCENT, metalness: 0.2, roughness: 0.45 });
+    const rubber = new THREE.MeshStandardMaterial({ color: TYRE, metalness: 0.0, roughness: 0.88 });
 
     /**
      * @param {THREE.BufferGeometry} geometry
@@ -177,10 +190,13 @@ export function updateCarRig(rig, state, surface, dt) {
     rig.root.position.set(state.x, surface.height, state.z);
     rig.root.rotation.y = state.heading;
 
-    // Носът следва склона. Знакът е обратен на наклона: при изкачване
-    // (gradient > 0) предницата се вдига, а вдигането е отрицателна ротация
-    // около X при модел, гледащ по +Z.
-    rig.root.rotation.x = -Math.atan(surface.gradient);
+    // Носът следва склона, но ПЛАВНО: `gradient` е дискретна на всяка осева
+    // точка и без изглаждане пичът подскача при всяко прекосяване (тресене,
+    // което дразни окото). Знакът е обратен на наклона: при изкачване
+    // (gradient > 0) предницата се вдига (отрицателна ротация около X при модел
+    // по +Z).
+    const slopePitch = -Math.atan(surface.gradient);
+    rig.root.rotation.x += (slopePitch - rig.root.rotation.x) * (1 - Math.exp(-9 * dt));
 
     const speed = Math.abs(state.vForward);
 

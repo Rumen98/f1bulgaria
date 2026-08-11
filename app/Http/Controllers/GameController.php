@@ -30,7 +30,7 @@ class GameController extends Controller
     private function tracks(): array
     {
         return Cache::remember('game.tracks.index', now()->addHour(), function (): array {
-            $path = public_path('game/tracks/index.json');
+            $path = public_path('game-tracks/index.json');
 
             if (! file_exists($path)) {
                 return [];

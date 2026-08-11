@@ -49,7 +49,7 @@ it('подава само метаданни, не самите точки на 
 it('не гърми когато каталогът липсва', function () {
     // Пресен clone преди `php artisan game:generate-tracks` — страницата
     // трябва да се зареди празна, не да хвърли.
-    $index = public_path('game/tracks/index.json');
+    $index = public_path('game-tracks/index.json');
     $backup = file_exists($index) ? file_get_contents($index) : null;
 
     if ($backup !== null) {

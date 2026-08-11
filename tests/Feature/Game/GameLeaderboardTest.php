@@ -1,0 +1,204 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\GameLapRecord;
+use App\Models\User;
+
+beforeEach(function () {
+    config(['features.game' => true]);
+});
+
+it('връща 404 за класацията когато флагът е изключен', function () {
+    config(['features.game' => false]);
+
+    $this->getJson('/game/leaderboard/monza')->assertNotFound();
+});
+
+it('връща 404 за непозната писта', function () {
+    $this->getJson('/game/leaderboard/nonsense')->assertNotFound();
+});
+
+it('показва празни рекорди в началото', function () {
+    $this->getJson('/game/leaderboard/monza')
+        ->assertOk()
+        ->assertJson([
+            'bests' => ['lap_ms' => null, 'sectors_ms' => [null, null, null]],
+            'top' => [],
+            'authenticated' => false,
+        ]);
+});
+
+it('иска вход за запис на обиколка', function () {
+    $this->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 90000,
+        'sectors' => [30000, 30000, 30000],
+    ])->assertUnauthorized();
+});
+
+it('валидира че секторите съставят обиколката', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 90000,
+        'sectors' => [10000, 10000, 10000],
+    ])->assertJsonValidationErrors('sectors');
+});
+
+it('отхвърля непозната писта при запис', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'nope',
+        'lap_ms' => 90000,
+        'sectors' => [30000, 30000, 30000],
+    ])->assertJsonValidationErrors('track');
+});
+
+it('отхвърля сектори които не са списък (не гърми с 500)', function () {
+    $user = User::factory()->create();
+
+    // Асоциативен обект с 3 елемента минаваше `array|size:3`, после record()
+    // четеше индекси 0/1/2 → NULL в NOT NULL колони → 500.
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 90000,
+        'sectors' => ['a' => 30000, 'b' => 30000, 'c' => 30000],
+    ])->assertStatus(422);
+});
+
+it('отхвърля сектори с разбъркани ключове (без байпас на прага)', function () {
+    $user = User::factory()->create();
+
+    // {"2":..,"0":..,"1":..} минава rules() (ключове 0/1/2 налични), но е
+    // не-списък → трябва да се отхвърли, иначе прагът/сумата се байпасват и
+    // фабрикувана 10-секундна обиколка минава.
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 10000,
+        'sectors' => ['2' => 3000, '0' => 3000, '1' => 4000],
+    ])->assertJsonValidationErrors('sectors');
+
+    expect(GameLapRecord::query()->count())->toBe(0);
+});
+
+it('отхвърля неправдоподобно бързо време за пистата', function () {
+    $user = User::factory()->create();
+
+    // 11 s за Монца (5788 m) е под дължина/макс. скорост → физически невъзможно.
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 11000,
+        'sectors' => [3000, 4000, 4000],
+    ])->assertJsonValidationErrors('lap_ms');
+});
+
+it('записва първата обиколка като лилава на пистата и лична', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 90000,
+        'sectors' => [28000, 31000, 31000],
+    ])->assertOk();
+
+    $response->assertJson([
+        'purple_lap' => true,
+        'purple_sectors' => [true, true, true],
+        'personal_best' => true,
+        'rank' => 1,
+    ]);
+    $response->assertJsonPath('bests.lap_ms', 90000);
+
+    expect(GameLapRecord::query()->count())->toBe(1);
+});
+
+it('лилаво само за подобрените полета и пази идеалната обиколка', function () {
+    $user = User::factory()->create();
+
+    // Еталонна обиколка.
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 90000,
+        'sectors' => [30000, 30000, 30000],
+    ])->assertOk();
+
+    // По-бърз S1, по-бавен S3, по-добра обиколка общо.
+    $response = $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 89000,
+        'sectors' => [28000, 30000, 31000],
+    ])->assertOk();
+
+    $response->assertJson([
+        'purple_lap' => true,
+        'purple_sectors' => [true, false, false],
+        // Зелено = личен рекорд: S1 подобрен, S2 изравнен (≤), S3 по-бавен.
+        'green_sectors' => [true, true, false],
+        'personal_best' => true,
+    ]);
+
+    // Лилавият S3 остава от първата обиколка — секторните рекорди са независими.
+    $response->assertJsonPath('bests.sectors_ms', [28000, 30000, 30000]);
+    $response->assertJsonPath('bests.lap_ms', 89000);
+    // Личните рекорди по сектори (за зелено/жълто спрямо себе си).
+    $response->assertJsonPath('user_bests.sectors_ms', [28000, 30000, 30000]);
+});
+
+it('връща личните рекорди на влезлия през класацията', function () {
+    $user = User::factory()->create();
+    GameLapRecord::factory()->for($user)->create([
+        'lap_ms' => 91000,
+        'sector1_ms' => 30000,
+        'sector2_ms' => 30000,
+        'sector3_ms' => 31000,
+    ]);
+
+    $this->actingAs($user)
+        ->getJson('/game/leaderboard/monza')
+        ->assertOk()
+        ->assertJsonPath('user_bests.lap_ms', 91000)
+        ->assertJsonPath('user_bests.sectors_ms', [30000, 30000, 31000]);
+});
+
+it('по-бавна обиколка не е нито лилава, нито личен рекорд', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 88000,
+        'sectors' => [29000, 29000, 30000],
+    ])->assertOk();
+
+    $response = $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 95000,
+        'sectors' => [31000, 32000, 32000],
+    ])->assertOk();
+
+    $response->assertJson([
+        'purple_lap' => false,
+        'purple_sectors' => [false, false, false],
+        'personal_best' => false,
+    ]);
+});
+
+it('нарежда класацията и маркира твоя ред', function () {
+    $alice = User::factory()->create(['name' => 'Алиса']);
+    $bob = User::factory()->create(['name' => 'Боби']);
+
+    GameLapRecord::factory()->for($bob)->create(['lap_ms' => 95000]);
+    GameLapRecord::factory()->for($alice)->create(['lap_ms' => 92000]);
+
+    $this->actingAs($alice)
+        ->getJson('/game/leaderboard/monza')
+        ->assertOk()
+        ->assertJsonPath('top.0.name', 'Алиса')
+        ->assertJsonPath('top.0.lap_ms', 92000)
+        ->assertJsonPath('top.0.is_you', true)
+        ->assertJsonPath('top.1.name', 'Боби')
+        ->assertJsonPath('top.1.is_you', false)
+        ->assertJsonPath('authenticated', true);
+});
