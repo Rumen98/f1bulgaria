@@ -14,7 +14,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { buildCar, updateCarRig } from './car.js';
+import { buildCar, updateCarRig, attachCarModel } from './car.js';
 import { buildTrackMeshes, COLORS } from './mesh.js';
 import { CAR, FIXED_DT, createCarState, speedKmh, step } from './physics.js';
 import { prepareTrack, projectOnTrack } from './track.js';
@@ -92,6 +92,9 @@ export class Game {
 
         this.carRig = buildCar();
         this.scene.add(this.carRig.root);
+        // По избор: външен GLB болид (public/game-models/car.glb). Липсва ли —
+        // остава процедурният силует по-горе.
+        attachCarModel(this.carRig);
 
         // Сенки: всеки mesh хвърля и приема.
         this.scene.traverse((o) => {

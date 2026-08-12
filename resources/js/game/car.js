@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const BODY_COLOR = 0xd42a26;
 const DARK = 0x1b1b1f;
@@ -17,6 +18,21 @@ const MAX_ROLL = 0.055;
 
 /** Максимален визуален наклон напред/назад, радиани. */
 const MAX_PITCH = 0.035;
+
+/**
+ * Външен GLB болид — по избор. Пусни файл в public/game-models/car.glb и той
+ * заменя процедурния силует; ако липсва, тихо остава процедурният.
+ */
+const MODEL_URL = '/game-models/car.glb';
+
+/** Дължина по Z — колкото процедурния болид, за да пасне на физиката/пистата. */
+const MODEL_TARGET_LENGTH = 4.6;
+
+/** Ако моделът гледа назад спрямо движението (+Z), сложи Math.PI. */
+const MODEL_ROTATION_Y = 0;
+
+/** В тон с намаленото осветление — да не блести. */
+const MODEL_ENV_INTENSITY = 0.6;
 
 /**
  * @typedef {object} CarRig
@@ -138,6 +154,65 @@ export function buildCar() {
     }
 
     return { root, body, frontWheels, allWheels };
+}
+
+/**
+ * Опитва да зареди външен GLB болид и да замести процедурния силует. Тихо се
+ * отказва (остава процедурният), ако файлът липсва или не се зареди — така
+ * играта работи и без асета.
+ *
+ * Моделът се центрира хоризонтално, стъпва на земята и се мащабира към
+ * MODEL_TARGET_LENGTH. Наклоните/завоите продължават да важат, защото го
+ * закачаме в `rig.body`.
+ *
+ * @param {CarRig} rig
+ */
+export function attachCarModel(rig) {
+    new GLTFLoader().load(
+        MODEL_URL,
+        (gltf) => {
+            const model = gltf.scene;
+
+            // Мащаб към целевата дължина по Z.
+            const size = new THREE.Vector3();
+            new THREE.Box3().setFromObject(model).getSize(size);
+            model.scale.setScalar(MODEL_TARGET_LENGTH / (size.z || size.x || 1));
+            model.rotation.y = MODEL_ROTATION_Y;
+
+            // Центрирай по X/Z и стъпи на земята (min.y → 0) СЛЕД мащаба/ротацията.
+            const box = new THREE.Box3().setFromObject(model);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+            model.position.x -= center.x;
+            model.position.z -= center.z;
+            model.position.y -= box.min.y;
+
+            model.traverse((o) => {
+                if (!o.isMesh) {
+                    return;
+                }
+                o.castShadow = true;
+                o.receiveShadow = true;
+                const materials = Array.isArray(o.material) ? o.material : [o.material];
+                for (const material of materials) {
+                    if (material && 'envMapIntensity' in material) {
+                        material.envMapIntensity = MODEL_ENV_INTENSITY;
+                    }
+                }
+            });
+
+            // Скрий процедурните части — моделът ги замества визуално.
+            for (const child of rig.body.children) {
+                child.visible = false;
+            }
+            rig.body.add(model);
+            rig.model = model;
+        },
+        undefined,
+        () => {
+            // Няма външен модел — остава процедурният силует.
+        },
+    );
 }
 
 /**
