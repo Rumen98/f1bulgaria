@@ -83,10 +83,15 @@ export function updateDrivetrain(dt, vForward, throttle) {
 
     let rpm = rpmFor(speed, dt.gear);
 
-    if (rpm > UPSHIFT && dt.gear < 8) {
+    // Пълно догонване в едно извикване (while, не if): при връщането на пистата
+    // скоростта скача рязко (телепорт до release speed за една стъпка). Една
+    // смяна на кадър оставяше оборотите забити в червено, а предавката
+    // „проблясваше" 1→2→3… няколко кадъра, докато настигне.
+    while (rpm > UPSHIFT && dt.gear < 8) {
         dt.gear++;
         rpm = rpmFor(speed, dt.gear);
-    } else if (rpm < DOWNSHIFT && dt.gear > 1) {
+    }
+    while (rpm < DOWNSHIFT && dt.gear > 1) {
         dt.gear--;
         rpm = rpmFor(speed, dt.gear);
     }
