@@ -88,7 +88,8 @@ export class Game {
         this.camera = new THREE.PerspectiveCamera(CAMERA.fovIdle, 1, 0.5, 2200);
 
         const envReady = this.#setupEnvironment();
-        this.scene.add(buildTrackMeshes(this.track));
+        const trackReady = this.#loadTrackTextures();
+        this.scene.add(buildTrackMeshes(this.track, this.trackTextures));
 
         this.carRig = buildCar();
         this.scene.add(this.carRig.root);
@@ -99,7 +100,7 @@ export class Game {
         // HDRI-то и външният болид се зареждат асинхронно. Изчакваме ги ПРЕДИ
         // старта (виж Game/Index.vue), за да не подменят вида по средата на
         // играта. Никога не reject-ва — при липса остава процедурното.
-        this.ready = Promise.all([envReady, carReady]).then(() => undefined);
+        this.ready = Promise.all([envReady, carReady, trackReady]).then(() => undefined);
 
         // Сенки: всеки mesh хвърля и приема.
         this.scene.traverse((o) => {
@@ -221,10 +222,53 @@ export class Game {
         this.cubeRT?.dispose();
         this.envRT?.dispose();
         this.hdrBackground?.dispose();
+        for (const texture of Object.values(this.trackTextures?.asphalt ?? {})) {
+            texture?.dispose?.();
+        }
         this.renderer.dispose();
     }
 
     // ── Вътрешни ─────────────────────────────────────────────────────────
+
+    /**
+     * Зарежда tiling PBR текстурите на пистата (асфалт). Обектите се връщат
+     * веднага (пълнят се при decode), а промисът се резолвва при зареждане —
+     * добавя се към this.ready, за да са готови ПРЕДИ първия кадър (без pop).
+     *
+     * @returns {Promise<void>}
+     */
+    #loadTrackTextures() {
+        const loader = new THREE.TextureLoader();
+        const maxAniso = this.renderer.capabilities.getMaxAnisotropy?.() ?? 1;
+        const promises = [];
+
+        const make = (url, srgb) => {
+            let done;
+            promises.push(new Promise((resolve) => { done = resolve; }));
+            const texture = loader.load(url, () => done(), undefined, () => done());
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.anisotropy = maxAniso;
+            if (srgb) {
+                texture.colorSpace = THREE.SRGBColorSpace;
+            }
+            return texture;
+        };
+
+        this.trackTextures = {
+            asphalt: {
+                map: make('/game-textures/asphalt/diff.jpg', true),
+                normalMap: make('/game-textures/asphalt/nor.jpg', false),
+                roughnessMap: make('/game-textures/asphalt/rough.jpg', false),
+            },
+        };
+
+        // Бавна мрежа да не държи loading екрана безкрайно.
+        return Promise.race([
+            Promise.all(promises),
+            new Promise((resolve) => setTimeout(resolve, 6000)),
+        ]);
+    }
 
     #setupEnvironment() {
         // Посока на слънцето от азимут/елевация. Ниско слънце = дълги сенки.

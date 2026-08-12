@@ -40,6 +40,15 @@ const EDGE_LINE_WIDTH = 0.18;
 /** Ширина на кербовете, метри. */
 const KERB_WIDTH = 1.1;
 
+/** Височина на външния ръб на керба (вътрешният е на нивото на трасето) — 3D релеф. */
+const KERB_HEIGHT = 0.07;
+
+/** Асфалтова текстура: повторения напречно (по ширината на трасето). */
+const ASPHALT_REPEAT_U = 6;
+
+/** Асфалтова текстура: повторения по дължина на всеки 8 m (v-единицата на лентата). */
+const ASPHALT_REPEAT_V = 4;
+
 /** Дължина на едно червено/бяло блокче на керба, метри. */
 const KERB_BLOCK = 2.0;
 
@@ -72,7 +81,7 @@ const Y = {
  * @param {import('./track.js').Track} track
  * @returns {THREE.Group}
  */
-export function buildTrackMeshes(track) {
+export function buildTrackMeshes(track, assets = null) {
     const group = new THREE.Group();
     const half = track.width / 2;
 
@@ -88,6 +97,8 @@ export function buildTrackMeshes(track) {
         ribbonMesh(track, -half, half, Y.asphalt, {
             color: COLORS.asphalt,
             variation: 0.06,
+            maps: assets?.asphalt,
+            repeat: [ASPHALT_REPEAT_U, ASPHALT_REPEAT_V],
         })
     );
     group.add(
@@ -569,10 +580,29 @@ function ribbonMesh(track, fromOffset, toOffset, y, options) {
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
 
-    const mesh = new THREE.Mesh(
-        geometry,
-        new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 })
-    );
+    let material;
+    if (options.maps && options.maps.map) {
+        // Реална tiling PBR текстура (напр. асфалт). vertexColors се изключва —
+        // цветът идва от картата, не от плоския базов цвят.
+        const m = options.maps;
+        const [ru, rv] = options.repeat ?? [1, 1];
+        for (const texture of [m.map, m.normalMap, m.roughnessMap]) {
+            if (texture) {
+                texture.repeat.set(ru, rv);
+            }
+        }
+        material = new THREE.MeshStandardMaterial({
+            map: m.map,
+            normalMap: m.normalMap ?? null,
+            roughnessMap: m.roughnessMap ?? null,
+            metalness: 0,
+            roughness: 1,
+        });
+    } else {
+        material = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 });
+    }
+
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = false;
 
     return mesh;
@@ -613,15 +643,17 @@ function buildKerbs(track) {
             const colour = Math.floor((r - range.from) / blockSteps) % 2 === 0 ? red : white;
             const vertexBase = positions.length / 3;
 
-            for (const [idx, offset] of [
-                [i0, inner],
-                [i0, outer],
-                [i1, inner],
-                [i1, outer],
+            // Вътрешният ръб е на нивото на трасето, външният — издигнат: кербът
+            // става наклонена 3D лента (rumble strip), не плоско петно.
+            for (const [idx, offset, h] of [
+                [i0, inner, Y.kerb],
+                [i0, outer, KERB_HEIGHT],
+                [i1, inner, Y.kerb],
+                [i1, outer, KERB_HEIGHT],
             ]) {
                 positions.push(
                     xs[idx] + nx[idx] * offset,
-                    ys[idx] + Y.kerb,
+                    ys[idx] + h,
                     zs[idx] + nz[idx] * offset
                 );
                 colors.push(colour.r, colour.g, colour.b);
@@ -652,7 +684,8 @@ function buildKerbs(track) {
 
     const mesh = new THREE.Mesh(
         geometry,
-        new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 })
+        // По-гланцов от асфалта — боядисаните кербове ловят HDRI-то (мокър вид).
+        new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.1, roughness: 0.5 })
     );
     mesh.frustumCulled = false;
 
