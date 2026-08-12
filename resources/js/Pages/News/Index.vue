@@ -1,4 +1,5 @@
 <script setup>
+import FeaturedNewsCard from '@/Components/News/FeaturedNewsCard.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
@@ -40,10 +41,14 @@ defineProps({
             Все още няма новини в тази категория.
         </EmptyState>
 
-        <!-- Featured -->
-        <div v-if="featured" class="mb-6">
-            <NewsCard :item="featured" featured />
-        </div>
+        <!-- Топ новина -->
+        <FeaturedNewsCard v-if="featured" :item="featured" class="mb-8" />
+
+        <!-- Заглавието разделя водещата новина от потока — иначе решетката изглежда
+             като продължение на featured блока. -->
+        <h2 v-if="featured && items.data.length" class="mb-4 font-display text-lg font-black">
+            Още новини<span class="text-red-600">.</span>
+        </h2>
 
         <!-- Grid с безкраен скрол -->
         <InfiniteScroll data="items" items-element="#news-grid" class="block">
