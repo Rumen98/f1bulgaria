@@ -12,6 +12,7 @@ use App\Services\Hero\NextRaceResolver;
 use App\Services\Homepage\ThisDayInF1Service;
 use App\Services\LiveTiming\OpenF1Client;
 use App\Services\LiveTiming\OpenF1TokenManager;
+use App\Services\Predictions\PredictionLockService;
 use App\Services\Races\RaceNameLocalizer;
 use App\Support\DriverName;
 use Illuminate\Support\Carbon;
@@ -21,14 +22,60 @@ use Inertia\Response;
 
 class HomeController extends Controller
 {
-    public function index(NextRaceResolver $resolver, ThisDayInF1Service $thisDay, OpenF1Client $openF1, OpenF1TokenManager $tokens): Response
-    {
+    public function index(
+        NextRaceResolver $resolver,
+        ThisDayInF1Service $thisDay,
+        OpenF1Client $openF1,
+        OpenF1TokenManager $tokens,
+        PredictionLockService $locks,
+    ): Response {
+        $hero = $resolver->resolve();
+
         return Inertia::render('Home', [
-            'hero' => $this->heroProp($resolver->resolve()),
+            'hero' => $this->heroProp($hero),
             'liveSession' => $this->liveSession($openF1, $tokens),
             'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
             'topNews' => $this->topNews(),
+            'predictionCta' => $this->predictionCta($hero, $locks),
         ]);
+    }
+
+    /**
+     * Подсещане за неподадена прогноза. Показва се само на влезнал потребител
+     * без прогноза за предстоящия кръг, докато срокът още не е минал.
+     *
+     * Причината да съществува: деветимата, които се връщат редовно, попадаха на
+     * начална страница, която не ги канеше да играят — трябваше сами да се сетят
+     * за лигата и да я намерят в менюто (измерено 12.08.2026: 9 връщащи се, 4
+     * прогнозиращи).
+     *
+     * @return array{race:string, url:string, deadline:?string, days:?int}|null
+     */
+    private function predictionCta(HeroRaceContext $hero, PredictionLockService $locks): ?array
+    {
+        $user = request()->user();
+        $race = $hero->race;
+
+        if ($user === null || $race === null || $locks->isLocked($race)) {
+            return null;
+        }
+
+        $alreadyPredicted = $user->predictions()
+            ->where('race_id', $race->id)
+            ->exists();
+
+        if ($alreadyPredicted) {
+            return null;
+        }
+
+        $deadline = $locks->lockDeadline($race);
+
+        return [
+            'race' => $race->name_bg,
+            'url' => route('races.show', $race),
+            'deadline' => $deadline?->copy()->setTimezone('Europe/Sofia')->format('d.m, H:i'),
+            'days' => $deadline !== null ? (int) Carbon::now()->diffInDays($deadline, false) : null,
+        ];
     }
 
     /**

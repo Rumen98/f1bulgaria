@@ -84,16 +84,22 @@ class PredictionScoringService
             && $prediction->fastest_lap_driver_id === $actual['fastest_lap'])
             ? $rules['fastest_lap'] : 0;
 
-        // Брой DNF.
-        $dnfDiff = abs($prediction->dnf_count - $actual['dnf_count']);
-        $breakdown['dnf'] = match (true) {
-            $dnfDiff === 0 => $rules['dnf_exact'],
-            $dnfDiff === 1 => $rules['dnf_close'],
-            default => 0,
-        };
+        // Брой DNF. Неподаден отговор е null, не 0 — без тази проверка
+        // празното поле щеше да носи точки при състезание без отпаднали.
+        $breakdown['dnf'] = 0;
 
-        // Safety car — само ако реалният резултат е известен.
-        $breakdown['safety_car'] = ($actual['safety_car'] !== null
+        if ($prediction->dnf_count !== null) {
+            $dnfDiff = abs($prediction->dnf_count - $actual['dnf_count']);
+            $breakdown['dnf'] = match (true) {
+                $dnfDiff === 0 => $rules['dnf_exact'],
+                $dnfDiff === 1 => $rules['dnf_close'],
+                default => 0,
+            };
+        }
+
+        // Safety car — само ако и прогнозата, и реалният резултат са известни.
+        $breakdown['safety_car'] = ($prediction->safety_car !== null
+            && $actual['safety_car'] !== null
             && $prediction->safety_car === $actual['safety_car'])
             ? $rules['safety_car'] : 0;
 
