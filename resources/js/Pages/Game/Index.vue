@@ -234,6 +234,11 @@ const startGame = async (track) => {
             },
             onFinish
         );
+
+        // Изчакай средата (HDRI + болид) да е приложена ПРЕДИ първия кадър —
+        // иначе фонът/светлината се сменят по средата на играта. loading остава
+        // true дотук, тъй че играчът вижда loading екрана, не подмяната.
+        await game.value.ready?.catch(() => {});
         game.value.start();
 
         window.addEventListener('resize', handleResize);

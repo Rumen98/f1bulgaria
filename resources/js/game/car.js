@@ -168,51 +168,64 @@ export function buildCar() {
  * @param {CarRig} rig
  */
 export function attachCarModel(rig) {
-    new GLTFLoader().load(
-        MODEL_URL,
-        (gltf) => {
-            const model = gltf.scene;
-
-            // Мащаб към целевата дължина по Z.
-            const size = new THREE.Vector3();
-            new THREE.Box3().setFromObject(model).getSize(size);
-            model.scale.setScalar(MODEL_TARGET_LENGTH / (size.z || size.x || 1));
-            model.rotation.y = MODEL_ROTATION_Y;
-
-            // Центрирай по X/Z и стъпи на земята (min.y → 0) СЛЕД мащаба/ротацията.
-            const box = new THREE.Box3().setFromObject(model);
-            const center = new THREE.Vector3();
-            box.getCenter(center);
-            model.position.x -= center.x;
-            model.position.z -= center.z;
-            model.position.y -= box.min.y;
-
-            model.traverse((o) => {
-                if (!o.isMesh) {
-                    return;
-                }
-                o.castShadow = true;
-                o.receiveShadow = true;
-                const materials = Array.isArray(o.material) ? o.material : [o.material];
-                for (const material of materials) {
-                    if (material && 'envMapIntensity' in material) {
-                        material.envMapIntensity = MODEL_ENV_INTENSITY;
-                    }
-                }
-            });
-
-            // Скрий процедурните части — моделът ги замества визуално.
-            for (const child of rig.body.children) {
-                child.visible = false;
+    return new Promise((resolve) => {
+        let settled = false;
+        const done = () => {
+            if (settled) {
+                return;
             }
-            rig.body.add(model);
-            rig.model = model;
-        },
-        undefined,
-        () => {
-            // Няма външен модел — остава процедурният силует.
-        },
-    );
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+        };
+        // Тежък модел да не държи loading екрана безкрайно.
+        const timer = setTimeout(done, 15000);
+
+        new GLTFLoader().load(
+            MODEL_URL,
+            (gltf) => {
+                const model = gltf.scene;
+
+                // Мащаб към целевата дължина по Z.
+                const size = new THREE.Vector3();
+                new THREE.Box3().setFromObject(model).getSize(size);
+                model.scale.setScalar(MODEL_TARGET_LENGTH / (size.z || size.x || 1));
+                model.rotation.y = MODEL_ROTATION_Y;
+
+                // Центрирай по X/Z и стъпи на земята (min.y → 0) СЛЕД мащаба/ротацията.
+                const box = new THREE.Box3().setFromObject(model);
+                const center = new THREE.Vector3();
+                box.getCenter(center);
+                model.position.x -= center.x;
+                model.position.z -= center.z;
+                model.position.y -= box.min.y;
+
+                model.traverse((o) => {
+                    if (!o.isMesh) {
+                        return;
+                    }
+                    o.castShadow = true;
+                    o.receiveShadow = true;
+                    const materials = Array.isArray(o.material) ? o.material : [o.material];
+                    for (const material of materials) {
+                        if (material && 'envMapIntensity' in material) {
+                            material.envMapIntensity = MODEL_ENV_INTENSITY;
+                        }
+                    }
+                });
+
+                // Скрий процедурните части — моделът ги замества визуално.
+                for (const child of rig.body.children) {
+                    child.visible = false;
+                }
+                rig.body.add(model);
+                rig.model = model;
+                done();
+            },
+            undefined,
+            done,   // няма външен модел — остава процедурният силует
+        );
+    });
 }
 
 /**

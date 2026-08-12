@@ -87,14 +87,19 @@ export class Game {
 
         this.camera = new THREE.PerspectiveCamera(CAMERA.fovIdle, 1, 0.5, 2200);
 
-        this.#setupEnvironment();
+        const envReady = this.#setupEnvironment();
         this.scene.add(buildTrackMeshes(this.track));
 
         this.carRig = buildCar();
         this.scene.add(this.carRig.root);
         // По избор: външен GLB болид (public/game-models/car.glb). Липсва ли —
         // остава процедурният силует по-горе.
-        attachCarModel(this.carRig);
+        const carReady = attachCarModel(this.carRig);
+
+        // HDRI-то и външният болид се зареждат асинхронно. Изчакваме ги ПРЕДИ
+        // старта (виж Game/Index.vue), за да не подменят вида по средата на
+        // играта. Никога не reject-ва — при липса остава процедурното.
+        this.ready = Promise.all([envReady, carReady]).then(() => undefined);
 
         // Сенки: всеки mesh хвърля и приема.
         this.scene.traverse((o) => {
@@ -215,6 +220,7 @@ export class Game {
         this.composer?.dispose();
         this.cubeRT?.dispose();
         this.envRT?.dispose();
+        this.hdrBackground?.dispose();
         this.renderer.dispose();
     }
 
@@ -249,6 +255,9 @@ export class Game {
         const pmrem = new THREE.PMREMGenerator(this.renderer);
         this.envRT = pmrem.fromCubemap(cubeRT.texture);
         this.scene.environment = this.envRT.texture;
+        // Същата сила като при HDRI-то → няма скок в осветлението, ако HDRI-то
+        // се приложи по-късно или изобщо липсва.
+        this.scene.environmentIntensity = 0.6;
         this.cubeRT = cubeRT;
         pmrem.dispose();
         sky.geometry.dispose();
@@ -275,21 +284,44 @@ export class Game {
         // ── Фаза 2: истински HDRI за околната среда ──────────────────────────
         // Отраженията по clearcoat боята и по мокрия асфалт идват от снимано
         // небе (Poly Haven CC0), не от процедурното — оттам „реалният" вид.
-        // Зарежда се асинхронно с процедурното небе като fallback, за да не
-        // блокира старта; PMREM се смята веднъж → нулев per-frame разход.
-        new RGBELoader().load('/game-hdri/sky_2k.hdr', (hdr) => {
-            hdr.mapping = THREE.EquirectangularReflectionMapping;
-            const pmrem = new THREE.PMREMGenerator(this.renderer);
-            const envRT = pmrem.fromEquirectangular(hdr);
-            pmrem.dispose();
+        //
+        // Процедурното небе горе е само мигновен placeholder. HDRI-то се
+        // ЗАРЕЖДА ПРЕДИ старта (Game.start го чака през this.ready), за да не
+        // подменя фон/светлина по средата на играта („смяна на климата").
+        // PMREM се смята веднъж → нулев per-frame разход. Никога не reject-ва:
+        // при липсващ файл или бавна мрежа остава процедурното небе.
+        return new Promise((resolve) => {
+            let settled = false;
+            const done = () => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                clearTimeout(timer);
+                resolve();
+            };
+            // Бавна мрежа да не държи loading екрана безкрайно.
+            const timer = setTimeout(done, 6000);
 
-            this.envRT?.dispose?.();       // старият env (от процедурното небе)
-            this.envRT = envRT;
-            this.scene.environment = envRT.texture;
-            // Осветлението/отраженията от HDRI-то са с намалена сила (чистото небе
-            // е ярко), но фонът остава пълно ярък — небето изглежда добре.
-            this.scene.environmentIntensity = 0.6;
-            this.scene.background = hdr;   // видимото небе = HDRI → отраженията съвпадат с гледката
+            new RGBELoader().load(
+                '/game-hdri/sky_2k.hdr',
+                (hdr) => {
+                    hdr.mapping = THREE.EquirectangularReflectionMapping;
+                    const pmrem = new THREE.PMREMGenerator(this.renderer);
+                    const envRT = pmrem.fromEquirectangular(hdr);
+                    pmrem.dispose();
+
+                    this.envRT?.dispose?.();       // старият env (от процедурното небе)
+                    this.envRT = envRT;
+                    this.scene.environment = envRT.texture;
+                    this.scene.environmentIntensity = 0.6;
+                    this.scene.background = hdr;    // видимото небе = HDRI → отраженията съвпадат с гледката
+                    this.hdrBackground = hdr;       // пазим за dispose при teardown
+                    done();
+                },
+                undefined,
+                done,   // няма HDRI → остава процедурното небе
+            );
         });
     }
 
