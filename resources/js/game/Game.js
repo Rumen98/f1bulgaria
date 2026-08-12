@@ -7,11 +7,13 @@
  */
 
 import * as THREE from 'three';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { buildCar, updateCarRig } from './car.js';
 import { buildTrackMeshes, COLORS } from './mesh.js';
 import { CAR, FIXED_DT, createCarState, speedKmh, step } from './physics.js';
@@ -265,6 +267,23 @@ export class Game {
 
         this.sun = sun;
         this.sunDir = sunDir;
+
+        // ── Фаза 2: истински HDRI за околната среда ──────────────────────────
+        // Отраженията по clearcoat боята и по мокрия асфалт идват от снимано
+        // небе (Poly Haven CC0), не от процедурното — оттам „реалният" вид.
+        // Зарежда се асинхронно с процедурното небе като fallback, за да не
+        // блокира старта; PMREM се смята веднъж → нулев per-frame разход.
+        new RGBELoader().load('/game-hdri/sky_2k.hdr', (hdr) => {
+            hdr.mapping = THREE.EquirectangularReflectionMapping;
+            const pmrem = new THREE.PMREMGenerator(this.renderer);
+            const envRT = pmrem.fromEquirectangular(hdr);
+            pmrem.dispose();
+
+            this.envRT?.dispose?.();       // старият env (от процедурното небе)
+            this.envRT = envRT;
+            this.scene.environment = envRT.texture;
+            this.scene.background = hdr;   // видимото небе = HDRI → отраженията съвпадат с гледката
+        });
     }
 
     #setupComposer() {
@@ -274,11 +293,12 @@ export class Game {
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-        // GTAO (ground-truth ambient occlusion) е изключено нарочно: на full-res
-        // сваляше кадрите и играта накъсваше/дърпаше. Оставяме евтините passes;
-        // при нужда се връща олекотено (half-res) зад настройка за качество.
-        void w;
-        void h;
+        // Bloom (Фаза 2) — само ярките акценти греят: слънчеви отблясъци по
+        // clearcoat боята и яркото HDRI небе. Висок threshold + умерена сила =
+        // кинематографичен блясък без „млечен" екран. Евтин на тази резолюция.
+        this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.45, 0.5, 0.85));
+
+        // GTAO остава изключено нарочно: на full-res сваляше кадрите (вкл. телефон).
 
         // SMAA — чист антиалиасинг върху вече композираната картина.
         this.composer.addPass(new SMAAPass());
