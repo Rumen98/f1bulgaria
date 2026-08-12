@@ -77,7 +77,7 @@ export class Game {
 
         // Филмов tone mapping + сенки (Фаза 1 реализъм).
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.35;
+        this.renderer.toneMappingExposure = 1.1;
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -252,7 +252,8 @@ export class Game {
         sky.material.dispose();
 
         // Мека околна светлина + ключова слънчева със сенки.
-        this.scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x33402f, 1.1));
+        // Намалена — HDRI-то вече дава небесен fill, затова аналитичната е по-слаба.
+        this.scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x33402f, 0.75));
 
         const sun = new THREE.DirectionalLight(0xfff2d8, 2.6);
         sun.castShadow = true;
@@ -282,6 +283,9 @@ export class Game {
             this.envRT?.dispose?.();       // старият env (от процедурното небе)
             this.envRT = envRT;
             this.scene.environment = envRT.texture;
+            // Осветлението/отраженията от HDRI-то са с намалена сила (чистото небе
+            // е ярко), но фонът остава пълно ярък — небето изглежда добре.
+            this.scene.environmentIntensity = 0.8;
             this.scene.background = hdr;   // видимото небе = HDRI → отраженията съвпадат с гледката
         });
     }
@@ -296,7 +300,7 @@ export class Game {
         // Bloom (Фаза 2) — само ярките акценти греят: слънчеви отблясъци по
         // clearcoat боята и яркото HDRI небе. Висок threshold + умерена сила =
         // кинематографичен блясък без „млечен" екран. Евтин на тази резолюция.
-        this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.45, 0.5, 0.85));
+        this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.22, 0.5, 0.9));
 
         // GTAO остава изключено нарочно: на full-res сваляше кадрите (вкл. телефон).
 
