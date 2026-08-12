@@ -32,13 +32,19 @@ it('подсеща влезнал потребител без прогноза �
         ->assertInertia(fn (Assert $page) => $page
             ->has('predictionCta')
             ->where('predictionCta.race', $this->race->name_bg)
-            ->where('predictionCta.url', route('races.show', $this->race)));
+            ->where('predictionCta.url', route('races.show', $this->race))
+            ->where('predictionCta.guest', false));
 });
 
-it('мълчи пред гост', function () {
+it('кани госта към регистрация, не към формата за прогноза', function () {
+    // Формата и без това изисква вход — линк към нея би дал login redirect
+    // вместо обяснение защо си струва.
     $this->get('/')
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('predictionCta', null));
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('predictionCta.race', $this->race->name_bg)
+            ->where('predictionCta.url', route('register'))
+            ->where('predictionCta.guest', true));
 });
 
 it('мълчи, когато човекът вече е прогнозирал', function () {
@@ -63,5 +69,15 @@ it('мълчи, когато прогнозите вече са заключен
 
     $this->actingAs(User::factory()->create())
         ->get('/')
+        ->assertInertia(fn (Assert $page) => $page->where('predictionCta', null));
+});
+
+it('мълчи пред госта също, когато кръгът е заключен', function () {
+    $this->race->update([
+        'qualifying_datetime_utc' => now()->subHour(),
+        'race_datetime_utc' => now()->addHours(20),
+    ]);
+
+    $this->get('/')
         ->assertInertia(fn (Assert $page) => $page->where('predictionCta', null));
 });

@@ -51,26 +51,33 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
             class="group mb-6 flex flex-col gap-3 rounded-2xl border border-red-600/40 bg-gradient-to-r from-red-600/15 to-transparent p-5 transition duration-200 hover:border-red-600/70 sm:flex-row sm:items-center sm:justify-between"
         >
             <div>
+                <!-- Пулсиращата точка е за подсещане (има срок, който тече).
+                     На гост нищо не му изтича — за него е покана, не аларма. -->
                 <div class="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-red-500">
-                    <span aria-hidden="true" class="relative flex h-1.5 w-1.5">
+                    <span v-if="!predictionCta.guest" aria-hidden="true" class="relative flex h-1.5 w-1.5">
                         <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
                         <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
                     </span>
-                    Не си прогнозирал
+                    {{ predictionCta.guest ? 'Prediction League' : 'Не си прогнозирал' }}
                 </div>
                 <p class="mt-1.5 font-display text-lg font-black text-white sm:text-xl">
                     {{ predictionCta.race }}
                 </p>
                 <p class="mt-0.5 text-sm text-zinc-400">
-                    <template v-if="predictionCta.deadline">
-                        Заключва се {{ predictionCta.deadline }}<template v-if="predictionCta.days > 0"> — остават {{ predictionCta.days }} дни</template>.
+                    <template v-if="predictionCta.guest">
+                        Познай подиума и събирай точки срещу останалите в Падок. Стигат три имена.
                     </template>
-                    Стигат ти три имена за подиума.
+                    <template v-else>
+                        <template v-if="predictionCta.deadline">
+                            Заключва се {{ predictionCta.deadline }}<template v-if="predictionCta.days > 0"> — остават {{ predictionCta.days }} дни</template>.
+                        </template>
+                        Стигат ти три имена за подиума.
+                    </template>
                 </p>
             </div>
 
             <span class="shrink-0 rounded-lg bg-red-600 px-5 py-2.5 text-center font-semibold text-white transition group-hover:bg-red-500">
-                Дай прогноза
+                {{ predictionCta.guest ? 'Регистрирай се и играй' : 'Дай прогноза' }}
             </span>
         </Link>
 

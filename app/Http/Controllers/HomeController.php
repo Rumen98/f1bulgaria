@@ -41,30 +41,32 @@ class HomeController extends Controller
     }
 
     /**
-     * Подсещане за неподадена прогноза. Показва се само на влезнал потребител
-     * без прогноза за предстоящия кръг, докато срокът още не е минал.
+     * Покана към прогноза за предстоящия кръг.
      *
      * Причината да съществува: деветимата, които се връщат редовно, попадаха на
-     * начална страница, която не ги канеше да играят — трябваше сами да се сетят
-     * за лигата и да я намерят в менюто (измерено 12.08.2026: 9 връщащи се, 4
+     * начална страница, която не ги канеше никъде — трябваше сами да се сетят за
+     * лигата и да я намерят в менюто (измерено 12.08.2026: 9 връщащи се, 4
      * прогнозиращи).
      *
-     * @return array{race:string, url:string, deadline:?string, days:?int}|null
+     * Гостът също го вижда, но с друг текст и към регистрация: човек, който се
+     * записва ЗАРАДИ лигата, идва с намерение да играе — точно това липсва на
+     * сегашните регистрации.
+     *
+     * @return array{race:string, url:string, deadline:?string, days:?int, guest:bool}|null
      */
     private function predictionCta(HeroRaceContext $hero, PredictionLockService $locks): ?array
     {
-        $user = request()->user();
         $race = $hero->race;
 
-        if ($user === null || $race === null || $locks->isLocked($race)) {
+        // Заключен кръг би водил към форма, която не приема — по-лошо от нищо.
+        if ($race === null || $locks->isLocked($race)) {
             return null;
         }
 
-        $alreadyPredicted = $user->predictions()
-            ->where('race_id', $race->id)
-            ->exists();
+        $user = request()->user();
 
-        if ($alreadyPredicted) {
+        // Подсещане за нещо вече свършено обучава хората да игнорират банера.
+        if ($user !== null && $user->predictions()->where('race_id', $race->id)->exists()) {
             return null;
         }
 
@@ -72,9 +74,10 @@ class HomeController extends Controller
 
         return [
             'race' => $race->name_bg,
-            'url' => route('races.show', $race),
+            'url' => $user !== null ? route('races.show', $race) : route('register'),
             'deadline' => $deadline?->copy()->setTimezone('Europe/Sofia')->format('d.m, H:i'),
             'days' => $deadline !== null ? (int) Carbon::now()->diffInDays($deadline, false) : null,
+            'guest' => $user === null,
         ];
     }
 
