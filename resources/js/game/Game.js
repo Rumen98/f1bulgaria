@@ -77,7 +77,7 @@ export class Game {
 
         // Филмов tone mapping + сенки (Фаза 1 реализъм).
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.1;
+        this.renderer.toneMappingExposure = 0.95;
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -285,7 +285,7 @@ export class Game {
             this.scene.environment = envRT.texture;
             // Осветлението/отраженията от HDRI-то са с намалена сила (чистото небе
             // е ярко), но фонът остава пълно ярък — небето изглежда добре.
-            this.scene.environmentIntensity = 0.8;
+            this.scene.environmentIntensity = 0.6;
             this.scene.background = hdr;   // видимото небе = HDRI → отраженията съвпадат с гледката
         });
     }
@@ -300,7 +300,7 @@ export class Game {
         // Bloom (Фаза 2) — само ярките акценти греят: слънчеви отблясъци по
         // clearcoat боята и яркото HDRI небе. Висок threshold + умерена сила =
         // кинематографичен блясък без „млечен" екран. Евтин на тази резолюция.
-        this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.22, 0.5, 0.9));
+        this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.1, 0.5, 1.0));
 
         // GTAO остава изключено нарочно: на full-res сваляше кадрите (вкл. телефон).
 

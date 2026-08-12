@@ -46,9 +46,9 @@ export function buildCar() {
     const paint = new THREE.MeshPhysicalMaterial({
         color: BODY_COLOR,
         metalness: 0.55,
-        roughness: 0.32,
+        roughness: 0.4,
         clearcoat: 1.0,
-        clearcoatRoughness: 0.12,
+        clearcoatRoughness: 0.22,
     });
     const dark = new THREE.MeshStandardMaterial({ color: DARK, metalness: 0.35, roughness: 0.5 });
     const accent = new THREE.MeshStandardMaterial({ color: ACCENT, metalness: 0.2, roughness: 0.45 });
