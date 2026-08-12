@@ -30,6 +30,8 @@
 @endcomponent
 @endif
 
+@include('mail.partials.community')
+
 Успешен уикенд!<br>
 Екипът на Падок
 

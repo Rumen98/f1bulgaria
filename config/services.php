@@ -123,6 +123,12 @@ return [
         'chat_id' => env('TELEGRAM_CHAT_ID'),
         'base_url' => env('TELEGRAM_BASE_URL', 'https://api.telegram.org'),
         'timeout' => (int) env('TELEGRAM_TIMEOUT', 15),
+        /*
+        | Линк към МЯСТОТО ЗА РАЗГОВОР, не към канала. В канал хората не могат
+        | да пишат — покана натам не създава общност, а показва празна стая.
+        | Празно означава, че блокът не се показва в писмата.
+        */
+        'community_url' => env('TELEGRAM_COMMUNITY_URL'),
     ],
 
     /*

@@ -16,7 +16,12 @@
 @endforeach
 @endcomponent
 
-@if ($userStats)
+{{--
+    Човек без нито една прогноза не бива да получава таблица от нули —
+    „точки 0, прогнози 0, най-добър резултат 0" е демотивиращо и заема
+    мястото на единственото полезно нещо за него: поканата да започне.
+--}}
+@if ($userStats && $userStats['predictions'] > 0)
 ## Твоята статистика този сезон
 @if (!empty($userStats['rank']))
 - Позиция в лигата: **#{{ $userStats['rank'] }}** от {{ $userStats['players'] }} играчи
@@ -28,6 +33,9 @@
 @if (!empty($userStats['new_badges']))
 - Нови значки тази седмица: **{{ implode(', ', $userStats['new_badges']) }}** 🏅
 @endif
+@elseif ($userStats)
+## Още не си играл този сезон
+Класирането отдолу е на хора, които просто са познали три имена преди старта. Отнема по-малко от минута: топ 3, пол позиция, най-бърза обиколка.
 @endif
 
 ## Класиране (топ 10)
@@ -61,15 +69,33 @@
 @endforeach
 @endif
 
-@if ($userStats)
-@component('mail::button', ['url' => url('/leaderboard')])
-Виж пълното класиране
-@endcomponent
-@else
+@if ($nextRace)
+## Следващ кръг: {{ $nextRace['name'] }}
+@if ($nextRace['deadline'])
+Прогнозите се заключват **{{ $nextRace['deadline'] }}** — 5 минути преди квалификацията.
+@endif
+@endif
+
+{{--
+    Приоритетът на бутона следва това, което липсва на получателя: непознат
+    има нужда от акаунт, играч без прогноза за следващия кръг — от прогноза,
+    и чак редовният играч печели от класирането.
+--}}
+@if (! $userStats)
 @component('mail::button', ['url' => url('/register')])
 Включи се в prediction league
 @endcomponent
+@elseif ($nextRace)
+@component('mail::button', ['url' => $nextRace['url']])
+Дай прогноза за {{ $nextRace['name'] }}
+@endcomponent
+@else
+@component('mail::button', ['url' => url('/leaderboard')])
+Виж пълното класиране
+@endcomponent
 @endif
+
+@include('mail.partials.community')
 
 До следващото състезание! 🏁<br>
 Екипът на Падок
