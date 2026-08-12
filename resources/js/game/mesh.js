@@ -49,6 +49,10 @@ const ASPHALT_REPEAT_U = 6;
 /** Асфалтова текстура: повторения по дължина на всеки 8 m (v-единицата на лентата). */
 const ASPHALT_REPEAT_V = 4;
 
+/** Тревна текстура: повторения напречно и по дължина (виж асфалта). */
+const GRASS_REPEAT_U = 8;
+const GRASS_REPEAT_V = 3;
+
 /** Дължина на едно червено/бяло блокче на керба, метри. */
 const KERB_BLOCK = 2.0;
 
@@ -91,6 +95,8 @@ export function buildTrackMeshes(track, assets = null) {
             color: COLORS.grass,
             variation: 0.1,
             drop: RUNOFF_DROP,
+            maps: assets?.grass,
+            repeat: [GRASS_REPEAT_U, GRASS_REPEAT_V],
         })
     );
     group.add(
@@ -242,8 +248,18 @@ function buildStartGrandstands(track) {
     const step = Math.max(1, Math.round(SECTION / spacing));
     const startBack = Math.round(20 / spacing); // започва ~20 m преди старта
 
-    const bodyMat = new THREE.MeshStandardMaterial({ color: COLORS.grandstand, metalness: 0.1, roughness: 0.75 });
+    // Процедурна „публика" — хиляди цветни точки върху тъмни седалки → пълни
+    // трибуни без external asset. Строи се веднъж, споделя се от всички секции.
+    const crowd = makeCrowdTexture();
+    crowd.repeat.set(6, 3);
+    const bodyMat = new THREE.MeshStandardMaterial({ map: crowd, color: 0xffffff, metalness: 0.0, roughness: 0.9 });
     const roofMat = new THREE.MeshStandardMaterial({ color: COLORS.grandstandRoof, metalness: 0.45, roughness: 0.5 });
+
+    // Рекламни бордове пред трибуните — iconic за F1, носят и цвят на сцената.
+    const hoarding = makeHoardingTexture();
+    hoarding.repeat.set(3, 1);
+    const hoardMat = new THREE.MeshStandardMaterial({ map: hoarding, metalness: 0.1, roughness: 0.6 });
+    const hoardGeo = new THREE.BoxGeometry(0.3, 1.3, SECTION * 0.95);
 
     // Наклонена седяща банка вместо блокче: свалям горния ръб откъм трасето, за
     // да се вдига навън, както истинска трибуна. (+X сочи към трасето след
@@ -278,6 +294,13 @@ function buildStartGrandstands(track) {
             roof.position.set(xs[i] + nx[i] * off, ys[i] + HEIGHT + 0.4, zs[i] + nz[i] * off);
             roof.rotation.y = angle;
             group.add(roof);
+
+            // Рекламен борд пред трибуната, на нивото на пистата.
+            const hoardOff = sign * (half + GAP * 0.4);
+            const hoard = new THREE.Mesh(hoardGeo, hoardMat);
+            hoard.position.set(xs[i] + nx[i] * hoardOff, ys[i] + 0.65, zs[i] + nz[i] * hoardOff);
+            hoard.rotation.y = angle;
+            group.add(hoard);
         }
     }
 
@@ -823,6 +846,73 @@ function buildGround(track) {
     );
 
     return mesh;
+}
+
+/**
+ * Процедурна текстура на публика: тъмни седалки + хиляди дребни цветни точки
+ * (зрители). Детерминирана (hashNoise, не Math.random) — без мъждукане при
+ * презареждане. Строи се веднъж и се tiling-ва по трибуните.
+ *
+ * @returns {THREE.CanvasTexture}
+ */
+function makeCrowdTexture() {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#23272e';
+    ctx.fillRect(0, 0, size, size);
+
+    const colors = ['#d94f4f', '#e6e6e6', '#4f7fd9', '#e0c24f', '#5ad07a', '#c94fd9', '#d98a4f', '#ffffff', '#4a4f57', '#f0f0f0'];
+    for (let i = 0; i < 4600; i++) {
+        ctx.fillStyle = colors[Math.floor(hashNoise(i * 1.37) * colors.length)];
+        ctx.fillRect(hashNoise(i * 2.11) * size, hashNoise(i * 3.71) * size, 2, 2);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    return texture;
+}
+
+/**
+ * Процедурна текстура на рекламни бордове: цветни блокчета с бяла рамка (без
+ * реални лога — генерично, IP-чисто).
+ *
+ * @returns {THREE.CanvasTexture}
+ */
+function makeHoardingTexture() {
+    const w = 512;
+    const h = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    const colors = ['#c0392b', '#2c3e50', '#16a085', '#e67e22', '#2980b9', '#8e44ad', '#f1c40f', '#ecf0f1'];
+    let x = 0;
+    let k = 0;
+    while (x < w) {
+        const bw = 44 + hashNoise(k * 5.3) * 44;
+        ctx.fillStyle = colors[Math.floor(hashNoise(k * 1.7) * colors.length)];
+        ctx.fillRect(x, 0, bw, h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 6, 12, bw - 12, h - 24);
+        x += bw;
+        k++;
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    return texture;
 }
 
 /**

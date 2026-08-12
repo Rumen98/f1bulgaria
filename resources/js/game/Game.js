@@ -213,6 +213,12 @@ export class Game {
                     : [object.material];
 
                 for (const material of materials) {
+                    // material.dispose() НЕ чисти картите — освобождаваме ги ръчно,
+                    // иначе canvas текстурите (публика/бордове) и текстурите на
+                    // GLB болида текат GPU памет при всеки quit/restart.
+                    for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) {
+                        material[key]?.dispose?.();
+                    }
                     material.dispose();
                 }
             }
@@ -222,8 +228,10 @@ export class Game {
         this.cubeRT?.dispose();
         this.envRT?.dispose();
         this.hdrBackground?.dispose();
-        for (const texture of Object.values(this.trackTextures?.asphalt ?? {})) {
-            texture?.dispose?.();
+        for (const group of Object.values(this.trackTextures ?? {})) {
+            for (const texture of Object.values(group)) {
+                texture?.dispose?.();
+            }
         }
         this.renderer.dispose();
     }
@@ -260,6 +268,11 @@ export class Game {
                 map: make('/game-textures/asphalt/diff.jpg', true),
                 normalMap: make('/game-textures/asphalt/nor.jpg', false),
                 roughnessMap: make('/game-textures/asphalt/rough.jpg', false),
+            },
+            grass: {
+                map: make('/game-textures/grass/diff.jpg', true),
+                normalMap: make('/game-textures/grass/nor.jpg', false),
+                roughnessMap: make('/game-textures/grass/rough.jpg', false),
             },
         };
 
