@@ -43,16 +43,6 @@ const KERB_WIDTH = 1.1;
 /** Височина на външния ръб на керба (вътрешният е на нивото на трасето) — 3D релеф. */
 const KERB_HEIGHT = 0.07;
 
-/** Асфалтова текстура: повторения напречно (по ширината на трасето). */
-const ASPHALT_REPEAT_U = 6;
-
-/** Асфалтова текстура: повторения по дължина на всеки 8 m (v-единицата на лентата). */
-const ASPHALT_REPEAT_V = 4;
-
-/** Тревна текстура: повторения напречно и по дължина (виж асфалта). */
-const GRASS_REPEAT_U = 8;
-const GRASS_REPEAT_V = 3;
-
 /** Дължина на едно червено/бяло блокче на керба, метри. */
 const KERB_BLOCK = 2.0;
 
@@ -85,28 +75,28 @@ const Y = {
  * @param {import('./track.js').Track} track
  * @returns {THREE.Group}
  */
-export function buildTrackMeshes(track, assets = null) {
+export function buildTrackMeshes(track) {
     const group = new THREE.Group();
     const half = track.width / 2;
 
     group.add(buildGround(track));
-    group.add(
-        ribbonMesh(track, -(half + RUNOFF_WIDTH), half + RUNOFF_WIDTH, Y.grass, {
-            color: COLORS.grass,
-            variation: 0.1,
-            drop: RUNOFF_DROP,
-            maps: assets?.grass,
-            repeat: [GRASS_REPEAT_U, GRASS_REPEAT_V],
-        })
-    );
-    group.add(
-        ribbonMesh(track, -half, half, Y.asphalt, {
-            color: COLORS.asphalt,
-            variation: 0.06,
-            maps: assets?.asphalt,
-            repeat: [ASPHALT_REPEAT_U, ASPHALT_REPEAT_V],
-        })
-    );
+
+    // Асфалтът и тревата тръгват с процедурен (vertex-color) материал. Ако
+    // техните PBR текстури се заредят успешно ПРЕДИ старта, Game.js ги подменя
+    // (виж #loadTrackTextures); при неуспех остава процедурният цвят — никога
+    // черно. Пазим материалите за тази подмяна в userData.
+    const grass = ribbonMesh(track, -(half + RUNOFF_WIDTH), half + RUNOFF_WIDTH, Y.grass, {
+        color: COLORS.grass,
+        variation: 0.1,
+        drop: RUNOFF_DROP,
+    });
+    const asphalt = ribbonMesh(track, -half, half, Y.asphalt, {
+        color: COLORS.asphalt,
+        variation: 0.06,
+    });
+    group.add(grass);
+    group.add(asphalt);
+    group.userData.surfaces = { asphalt: asphalt.material, grass: grass.material };
     group.add(
         ribbonMesh(track, half - EDGE_LINE_WIDTH, half, Y.edgeLine, { color: COLORS.edgeLine })
     );
@@ -603,29 +593,10 @@ function ribbonMesh(track, fromOffset, toOffset, y, options) {
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
 
-    let material;
-    if (options.maps && options.maps.map) {
-        // Реална tiling PBR текстура (напр. асфалт). vertexColors се изключва —
-        // цветът идва от картата, не от плоския базов цвят.
-        const m = options.maps;
-        const [ru, rv] = options.repeat ?? [1, 1];
-        for (const texture of [m.map, m.normalMap, m.roughnessMap]) {
-            if (texture) {
-                texture.repeat.set(ru, rv);
-            }
-        }
-        material = new THREE.MeshStandardMaterial({
-            map: m.map,
-            normalMap: m.normalMap ?? null,
-            roughnessMap: m.roughnessMap ?? null,
-            metalness: 0,
-            roughness: 1,
-        });
-    } else {
-        material = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 });
-    }
-
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 })
+    );
     mesh.frustumCulled = false;
 
     return mesh;

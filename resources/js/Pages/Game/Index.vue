@@ -235,11 +235,16 @@ const startGame = async (track) => {
             onFinish
         );
 
-        // Изчакай средата (HDRI + болид) да е приложена ПРЕДИ първия кадър —
-        // иначе фонът/светлината се сменят по средата на играта. loading остава
-        // true дотук, тъй че играчът вижда loading екрана, не подмяната.
-        await game.value.ready?.catch(() => {});
-        game.value.start();
+        // Изчакай средата (HDRI + болид + текстури) ПРЕДИ първия кадър — иначе
+        // видът се сменя по средата. loading остава true дотук. Ако играчът
+        // напусне през това време (game.value става null или друга инстанция),
+        // не стартирай мъртвата инстанция.
+        const instance = game.value;
+        await instance.ready?.catch(() => {});
+        if (game.value !== instance) {
+            return;
+        }
+        instance.start();
 
         window.addEventListener('resize', handleResize);
     } catch (e) {

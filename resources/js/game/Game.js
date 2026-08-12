@@ -88,14 +88,16 @@ export class Game {
         this.camera = new THREE.PerspectiveCamera(CAMERA.fovIdle, 1, 0.5, 2200);
 
         const envReady = this.#setupEnvironment();
+        const trackGroup = buildTrackMeshes(this.track);
+        this.scene.add(trackGroup);
+        this.surfaceMaterials = trackGroup.userData.surfaces;
         const trackReady = this.#loadTrackTextures();
-        this.scene.add(buildTrackMeshes(this.track, this.trackTextures));
 
         this.carRig = buildCar();
         this.scene.add(this.carRig.root);
         // По избор: външен GLB болид (public/game-models/car.glb). Липсва ли —
         // остава процедурният силует по-горе.
-        const carReady = attachCarModel(this.carRig);
+        const carReady = attachCarModel(this.carRig, () => this.disposed || this.started);
 
         // HDRI-то и външният болид се зареждат асинхронно. Изчакваме ги ПРЕДИ
         // старта (виж Game/Index.vue), за да не подменят вида по средата на
@@ -123,6 +125,10 @@ export class Game {
         this.lastFrame = 0;
         this.running = false;
         this.rafId = null;
+        // Пазят инвариантите на асинхронните loader-и: не подменяй вида СЛЕД
+        // старта (късен pop) и не пипай renderer-а СЛЕД освобождаване.
+        this.started = false;
+        this.disposed = false;
 
         this.#resetLapState();
         this.bestLapTicks = null;
@@ -142,6 +148,7 @@ export class Game {
         }
 
         this.running = true;
+        this.started = true;
         this.lastFrame = performance.now();
         this.rafId = requestAnimationFrame(this.#frame);
     }
@@ -199,6 +206,7 @@ export class Game {
 
     /** Освобождава WebGL ресурсите. Задължително при unmount. */
     dispose() {
+        this.disposed = true;
         this.stop();
         this.#unbindEvents();
 
@@ -224,15 +232,15 @@ export class Game {
             }
         });
 
+        // EffectComposer.dispose() не чисти passes-ите — Bloom/SMAA/Output си
+        // държат собствени render targets, които иначе текат при всеки quit.
+        for (const pass of this.composer?.passes ?? []) {
+            pass.dispose?.();
+        }
         this.composer?.dispose();
         this.cubeRT?.dispose();
         this.envRT?.dispose();
         this.hdrBackground?.dispose();
-        for (const group of Object.values(this.trackTextures ?? {})) {
-            for (const texture of Object.values(group)) {
-                texture?.dispose?.();
-            }
-        }
         this.renderer.dispose();
     }
 
@@ -248,37 +256,48 @@ export class Game {
     #loadTrackTextures() {
         const loader = new THREE.TextureLoader();
         const maxAniso = this.renderer.capabilities.getMaxAnisotropy?.() ?? 1;
-        const promises = [];
 
-        const make = (url, srgb) => {
-            let done;
-            promises.push(new Promise((resolve) => { done = resolve; }));
-            const texture = loader.load(url, () => done(), undefined, () => done());
+        // Зарежда една карта; резолвва с текстурата при успех или с null при
+        // грешка (никога reject).
+        const load = (url, srgb, repeat) => new Promise((resolve) => {
+            const texture = loader.load(url, () => resolve(texture), undefined, () => resolve(null));
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.RepeatWrapping;
             texture.anisotropy = maxAniso;
+            texture.repeat.set(repeat[0], repeat[1]);
             if (srgb) {
                 texture.colorSpace = THREE.SRGBColorSpace;
             }
             return texture;
-        };
+        });
 
-        this.trackTextures = {
-            asphalt: {
-                map: make('/game-textures/asphalt/diff.jpg', true),
-                normalMap: make('/game-textures/asphalt/nor.jpg', false),
-                roughnessMap: make('/game-textures/asphalt/rough.jpg', false),
-            },
-            grass: {
-                map: make('/game-textures/grass/diff.jpg', true),
-                normalMap: make('/game-textures/grass/nor.jpg', false),
-                roughnessMap: make('/game-textures/grass/rough.jpg', false),
-            },
-        };
+        // Подменя процедурния материал на повърхността САМО при успешен diffuse
+        // и само ако играта още не е тръгнала/освободена — иначе остава
+        // процедурният цвят (без черно, без късен pop). repeat: u напречно (по
+        // ширината), v по дължина на всеки 8 m (виж UV-то в ribbonMesh).
+        const applyTo = (name, dir, repeat) => Promise.all([
+            load(`/game-textures/${dir}/diff.jpg`, true, repeat),
+            load(`/game-textures/${dir}/nor.jpg`, false, repeat),
+            load(`/game-textures/${dir}/rough.jpg`, false, repeat),
+        ]).then(([map, normalMap, roughnessMap]) => {
+            const material = this.surfaceMaterials?.[name];
+            if (!map || this.started || this.disposed || !material) {
+                for (const texture of [map, normalMap, roughnessMap]) {
+                    texture?.dispose?.();
+                }
+                return;
+            }
+            material.map = map;
+            material.normalMap = normalMap;
+            material.roughnessMap = roughnessMap;
+            material.vertexColors = false;
+            material.color.set(0xffffff);
+            material.needsUpdate = true;
+        });
 
         // Бавна мрежа да не държи loading екрана безкрайно.
         return Promise.race([
-            Promise.all(promises),
+            Promise.all([applyTo('asphalt', 'asphalt', [6, 4]), applyTo('grass', 'grass', [8, 3])]),
             new Promise((resolve) => setTimeout(resolve, 6000)),
         ]);
     }
@@ -363,6 +382,13 @@ export class Game {
             new RGBELoader().load(
                 '/game-hdri/sky_2k.hdr',
                 (hdr) => {
+                    // Късно (след timeout/старт) или след освобождаване — не
+                    // подменяй фона (би било pop) и не пускай PMREM на мъртъв renderer.
+                    if (this.started || this.disposed) {
+                        hdr.dispose?.();
+                        done();
+                        return;
+                    }
                     hdr.mapping = THREE.EquirectangularReflectionMapping;
                     const pmrem = new THREE.PMREMGenerator(this.renderer);
                     const envRT = pmrem.fromEquirectangular(hdr);

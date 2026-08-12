@@ -167,7 +167,7 @@ export function buildCar() {
  *
  * @param {CarRig} rig
  */
-export function attachCarModel(rig) {
+export function attachCarModel(rig, isStale) {
     return new Promise((resolve) => {
         let settled = false;
         const done = () => {
@@ -185,6 +185,26 @@ export function attachCarModel(rig) {
             MODEL_URL,
             (gltf) => {
                 const model = gltf.scene;
+
+                // Късно (след старт) или след освобождаване — не показвай болида
+                // (би бил pop); освободи заредените ресурси, за да не текат.
+                if (isStale?.()) {
+                    model.traverse((object) => {
+                        if (!object.isMesh) {
+                            return;
+                        }
+                        object.geometry?.dispose?.();
+                        const materials = Array.isArray(object.material) ? object.material : [object.material];
+                        for (const material of materials) {
+                            material?.map?.dispose?.();
+                            material?.normalMap?.dispose?.();
+                            material?.roughnessMap?.dispose?.();
+                            material?.dispose?.();
+                        }
+                    });
+                    done();
+                    return;
+                }
 
                 // Мащаб към целевата дължина по Z.
                 const size = new THREE.Vector3();
