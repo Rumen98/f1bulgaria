@@ -164,7 +164,7 @@ function smoothCyclic(values) {
  *          distance: изминато разстояние по обиколката в метри
  *          height: височина на асфалта под тази позиция
  */
-export function projectOnTrack(track, x, z, hint = null) {
+export function projectOnTrack(track, x, z, hint = null, out = {}) {
     const { xs, zs, count } = track;
 
     let bestIndex = 0;
@@ -201,13 +201,15 @@ export function projectOnTrack(track, x, z, hint = null) {
     // без която таймерът на сектор би скачал на стъпки от `spacing`.
     const along = dx * track.tx[bestIndex] + dz * track.tz[bestIndex];
 
-    return {
-        index: bestIndex,
-        lateral,
-        distance: bestIndex * track.spacing + along,
-        height: heightAt(track, bestIndex, along),
-        gradient: track.gradient[bestIndex],
-    };
+    // Мутираме подадения обект (по подразбиране нов) — извикваме на всяка
+    // физична стъпка, затова caller-ът подава постоянен обект без алокация/кадър.
+    out.index = bestIndex;
+    out.lateral = lateral;
+    out.distance = bestIndex * track.spacing + along;
+    out.height = heightAt(track, bestIndex, along);
+    out.gradient = track.gradient[bestIndex];
+
+    return out;
 }
 
 /**

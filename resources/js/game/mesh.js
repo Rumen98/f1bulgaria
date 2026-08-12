@@ -113,6 +113,12 @@ export function buildTrackMeshes(track) {
 
     group.add(buildStartGrandstands(track));
 
+    // Маршал с кариран флаг до старт/финала — flagPivot се вее от Game.#frame
+    // на летящата (финална) обиколка.
+    const marshal = buildMarshal(track);
+    group.add(marshal.group);
+    group.userData.marshalFlag = marshal.flagPivot;
+
     return group;
 }
 
@@ -217,8 +223,7 @@ function distToSegmentSq(px, pz, ax, az, bx, bz) {
  * (по няколко на писта), а всяка писта има главна трибуна на старт/финала. Това
  * добавя разпознаваема „стадион" атмосфера, без да зависи от пълнотата на OSM.
  *
- * Кутиите пазят frustum culling (за разлика от лентите) — изнасят се от кадъра
- * зад гърба на колата.
+ * Инстанцирани (3 draw call-а за всички секции) и без сянка — леко за телефон.
  *
  * @param {import('./track.js').Track} track
  * @returns {THREE.Group}
@@ -268,30 +273,48 @@ function buildStartGrandstands(track) {
 
     const roofGeo = new THREE.BoxGeometry(DEPTH * 0.92, 0.4, SECTION * 0.96);
 
+    // Инстанцирани: 3 draw call-а (тяло/покрив/борд) вместо ~36 отделни меша —
+    // и толкова по-малко в сенчестия pass. Не хвърлят сянка (виж Game: само
+    // колата хвърля) и не се cull-ват (3 евтини рисувания, винаги налични).
+    const capacity = sections * 2;
+    const bodies = new THREE.InstancedMesh(bodyGeo, bodyMat, capacity);
+    const roofs = new THREE.InstancedMesh(roofGeo, roofMat, capacity);
+    const hoards = new THREE.InstancedMesh(hoardGeo, hoardMat, capacity);
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3(1, 1, 1);
+    let n = 0;
+
     for (const sign of [1, -1]) {
         for (let s = 0; s < sections; s++) {
             const i = (((s * step - startBack) % count) + count) % count;
-            const angle = Math.atan2(tx[i], tz[i]);
+            quaternion.setFromAxisAngle(UP, Math.atan2(tx[i], tz[i]));
             const off = sign * (half + GAP + DEPTH / 2);
 
-            const body = new THREE.Mesh(bodyGeo, bodyMat);
-            body.position.set(xs[i] + nx[i] * off, ys[i] + HEIGHT / 2, zs[i] + nz[i] * off);
-            body.rotation.y = angle;
-            group.add(body);
+            position.set(xs[i] + nx[i] * off, ys[i] + HEIGHT / 2, zs[i] + nz[i] * off);
+            bodies.setMatrixAt(n, matrix.compose(position, quaternion, scale));
 
             // Покрив над задната (високата) част, надвиснал над седалките.
-            const roof = new THREE.Mesh(roofGeo, roofMat);
-            roof.position.set(xs[i] + nx[i] * off, ys[i] + HEIGHT + 0.4, zs[i] + nz[i] * off);
-            roof.rotation.y = angle;
-            group.add(roof);
+            position.set(xs[i] + nx[i] * off, ys[i] + HEIGHT + 0.4, zs[i] + nz[i] * off);
+            roofs.setMatrixAt(n, matrix.compose(position, quaternion, scale));
 
             // Рекламен борд пред трибуната, на нивото на пистата.
             const hoardOff = sign * (half + GAP * 0.4);
-            const hoard = new THREE.Mesh(hoardGeo, hoardMat);
-            hoard.position.set(xs[i] + nx[i] * hoardOff, ys[i] + 0.65, zs[i] + nz[i] * hoardOff);
-            hoard.rotation.y = angle;
-            group.add(hoard);
+            position.set(xs[i] + nx[i] * hoardOff, ys[i] + 0.65, zs[i] + nz[i] * hoardOff);
+            hoards.setMatrixAt(n, matrix.compose(position, quaternion, scale));
+
+            n++;
         }
+    }
+
+    for (const mesh of [bodies, roofs, hoards]) {
+        mesh.count = n;
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.castShadow = false;
+        mesh.frustumCulled = false;
+        group.add(mesh);
     }
 
     return group;
@@ -817,6 +840,101 @@ function buildGround(track) {
     );
 
     return mesh;
+}
+
+/**
+ * Маршал на банкета до стартовата линия. Вее кариран флаг на финалната
+ * (летящата) обиколка — анимира се от Game.#frame чрез върнатия `flagPivot`.
+ *
+ * Процедурен, low-poly (като дърветата) — без външен модел. Един е, затова
+ * няколкото меша са без значение (локален, frustum-culled).
+ *
+ * @param {import('./track.js').Track} track
+ * @returns {{group: THREE.Group, flagPivot: THREE.Group}}
+ */
+function buildMarshal(track) {
+    const group = new THREE.Group();
+
+    const hiVis = new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: 0.6 }); // оранжев елек
+    const skin = new THREE.MeshStandardMaterial({ color: 0xe0a884, roughness: 0.75 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x24272c, roughness: 0.8 });
+
+    const legs = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.8, 0.26), dark);
+    legs.position.y = 0.4;
+    group.add(legs);
+
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.6, 0.28), hiVis);
+    torso.position.y = 1.05;
+    group.add(torso);
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), skin);
+    head.position.y = 1.5;
+    group.add(head);
+
+    // Вдигната ръка към флага.
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.52, 0.12), hiVis);
+    arm.position.set(0.32, 1.28, 0);
+    arm.rotation.z = -0.7;
+    group.add(arm);
+
+    // ── Флаг на прът — pivot при дланта, върти се за „веене" ──
+    const flagPivot = new THREE.Group();
+    flagPivot.position.set(0.52, 1.5, 0);
+
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.9, 6), dark);
+    pole.position.y = 0.35;
+    flagPivot.add(pole);
+
+    const flagGeo = new THREE.PlaneGeometry(0.7, 0.45);
+    flagGeo.translate(0.35, 0, 0); // виси от пръта надясно
+    const flag = new THREE.Mesh(
+        flagGeo,
+        new THREE.MeshStandardMaterial({ map: makeCheckeredTexture(), side: THREE.DoubleSide, roughness: 0.9 })
+    );
+    flag.position.y = 0.62;
+    flagPivot.add(flag);
+
+    group.add(flagPivot);
+
+    // Точно до ръба на трасето (пред рекламния борд), малко след старт/финалната
+    // линия, с лице към трасето — да се вижда ясно от минаващия болид.
+    const i = Math.round(12 / track.spacing) % track.count;
+    const off = track.width / 2 + 1.4;
+    group.position.set(
+        track.xs[i] + track.nx[i] * off,
+        track.ys[i],
+        track.zs[i] + track.nz[i] * off
+    );
+    group.rotation.y = Math.atan2(-track.nx[i], -track.nz[i]);
+
+    return { group, flagPivot };
+}
+
+/**
+ * Кариран флаг — 8×8 черно/бяло каре. Строи се веднъж.
+ *
+ * @returns {THREE.CanvasTexture}
+ */
+function makeCheckeredTexture() {
+    const size = 128;
+    const squares = 8;
+    const cell = size / squares;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    for (let y = 0; y < squares; y++) {
+        for (let x = 0; x < squares; x++) {
+            ctx.fillStyle = (x + y) % 2 === 0 ? '#0a0a0a' : '#f4f4f4';
+            ctx.fillRect(x * cell, y * cell, cell, cell);
+        }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    return texture;
 }
 
 /**

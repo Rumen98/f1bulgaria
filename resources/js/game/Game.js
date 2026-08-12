@@ -39,8 +39,18 @@ const RECOVER_LOOKBACK = 25;
 /** Дял от скоростта, с който пускаме колата след връщане (намалена скорост). */
 const RECOVER_SPEED_FACTOR = 0.6;
 
-/** Максимално време, което един кадър може да добави — спира спиралата на смъртта. */
-const MAX_FRAME_TIME = 0.25;
+/** Максимално време, което един кадър може да добави — спира спиралата на
+ *  смъртта. Свалено (0.25→0.1): след GC пауза/смяна на таб 0.25 s → ~30 стъпки в
+ *  един кадър, който сам е дълъг и се самоподхранва. 0.1 = до 12 стъпки. */
+const MAX_FRAME_TIME = 0.1;
+
+/** HUD телеметрия — не по-често от 30 Hz. Vue реактивността на всеки кадър
+ *  (60+ Hz) е излишен diff/patch; 30 Hz е гладко за таймера, наполовина churn. */
+const TELEMETRY_INTERVAL = 1 / 30;
+
+/** Веене на карирания флаг на маршала — скорост (rad/s) и амплитуда (rad). */
+const FLAG_WAVE_SPEED = 8;
+const FLAG_WAVE_AMP = 0.6;
 
 const CAMERA = {
     distance: 9.5,
@@ -52,6 +62,20 @@ const CAMERA = {
     /** Колко бързо камерата догонва колата. По-високо = по-залепена. */
     followDamping: 7.5,
 };
+
+/**
+ * Груба евристика за слабо устройство (телефон / малко CPU ядра) — ползва се, за
+ * да се смъкне post-processing-ът там, където fill-rate-ът е тесен.
+ *
+ * @returns {boolean}
+ */
+function isLowPowerDevice() {
+    const ua = navigator.userAgent || '';
+    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+    const fewCores = (navigator.hardwareConcurrency || 8) <= 4;
+
+    return mobile || fewCores;
+}
 
 export class Game {
     /**
@@ -91,6 +115,7 @@ export class Game {
         const trackGroup = buildTrackMeshes(this.track);
         this.scene.add(trackGroup);
         this.surfaceMaterials = trackGroup.userData.surfaces;
+        this.marshalFlag = trackGroup.userData.marshalFlag; // вее се на летящата обиколка
         const trackReady = this.#loadTrackTextures();
 
         this.carRig = buildCar();
@@ -102,13 +127,20 @@ export class Game {
         // HDRI-то и външният болид се зареждат асинхронно. Изчакваме ги ПРЕДИ
         // старта (виж Game/Index.vue), за да не подменят вида по средата на
         // играта. Никога не reject-ва — при липса остава процедурното.
-        this.ready = Promise.all([envReady, carReady, trackReady]).then(() => undefined);
+        this.ready = Promise.all([envReady, carReady, trackReady]).then(() => this.#warmup());
 
-        // Сенки: всеки mesh хвърля и приема.
+        // Сенки: всичко ПРИЕМА сянка, но само колата ХВЪРЛЯ. Сенчестият pass е
+        // втори render на сцената — далечните/големите меши (земя, трибуни,
+        // сгради) хвърлят сянка, която не се вижда, а струва. Само болидът →
+        // сянката е там, където трябва, на цена от една кола.
         this.scene.traverse((o) => {
             if (o.isMesh) {
-                o.castShadow = true;
                 o.receiveShadow = true;
+            }
+        });
+        this.carRig.root.traverse((o) => {
+            if (o.isMesh) {
+                o.castShadow = true;
             }
         });
 
@@ -129,6 +161,12 @@ export class Game {
         // старта (късен pop) и не пипай renderer-а СЛЕД освобождаване.
         this.started = false;
         this.disposed = false;
+
+        // Преизползвани обекти (нула алокации/кадър в hot path) + акумулатори.
+        this._render = {};
+        this._projection = {};
+        this.telemetryAccum = TELEMETRY_INTERVAL; // първи кадър праща телеметрия веднага
+        this.flagWave = 0;
 
         this.#resetLapState();
         this.bestLapTicks = null;
@@ -345,7 +383,7 @@ export class Game {
 
         const sun = new THREE.DirectionalLight(0xfff2d8, 2.6);
         sun.castShadow = true;
-        sun.shadow.mapSize.set(2048, 2048);
+        sun.shadow.mapSize.set(1024, 1024); // 170 m кутия + само колата хвърля → 1024 стига
         sun.shadow.bias = -0.0004;
         sun.shadow.normalBias = 0.6;
         const s = 170; // половин размер на сенчестата зона около колата, m
@@ -415,19 +453,37 @@ export class Game {
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-        // Bloom (Фаза 2) — само ярките акценти греят: слънчеви отблясъци по
-        // clearcoat боята и яркото HDRI небе. Висок threshold + умерена сила =
-        // кинематографичен блясък без „млечен" екран. Евтин на тази резолюция.
-        this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.1, 0.5, 1.0));
-
-        // GTAO остава изключено нарочно: на full-res сваляше кадрите (вкл. телефон).
-
-        // SMAA — чист антиалиасинг върху вече композираната картина.
-        this.composer.addPass(new SMAAPass());
+        // На слаби устройства (телефон/малко ядра) bloom+SMAA са ~15 fullscreen
+        // прохода/кадър и свалят кадрите под играбилното — пропускаме ги, а MSAA
+        // от контекста (antialias:true) държи ръбовете. Десктопът получава пълния
+        // вид. GTAO остава изключено нарочно (на full-res сваляше кадрите).
+        if (!isLowPowerDevice()) {
+            // Bloom — само ярките акценти греят: слънчеви отблясъци по clearcoat
+            // боята и яркото HDRI небе. Висок threshold + умерена сила.
+            this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.1, 0.5, 1.0));
+            // SMAA — чист антиалиасинг върху вече композираната картина.
+            this.composer.addPass(new SMAAPass());
+        }
 
         // Финал: tone mapping (ACES от рендера) + sRGB към екрана. При composer
         // рендерът е линеен до OutputPass, затова няма двойно tone mapping.
         this.composer.addPass(new OutputPass());
+    }
+
+    /**
+     * Компилира шейдърите и post-processing passes ПРЕДИ старта, докато loading
+     * екранът е още горе (this.ready ги чака). Иначе първият composer.render()
+     * блокира главната нишка за 100–500ms — clearcoat/сенки/bloom/SMAA се
+     * компилират лениво при първото рисуване, точно щом играчът очаква да тръгне.
+     */
+    #warmup() {
+        if (this.disposed) {
+            return;
+        }
+        this.renderer.compile(this.scene, this.camera);
+        // renderer.compile не топли post passes-ите — трябват реални кадри.
+        this.composer.render();
+        this.composer.render();
     }
 
     #resetLapState() {
@@ -503,12 +559,13 @@ export class Game {
     }
 
     #readInput() {
-        const held = (...codes) => codes.some((code) => this.keys.has(code));
-
-        const throttle = held('ArrowUp', 'KeyW') ? 1 : 0;
-        const brake = held('ArrowDown', 'KeyS', 'Space') ? 1 : 0;
+        // Директни проверки, без closure/rest-масиви — извиква се на всеки кадър.
+        const keys = this.keys;
+        const throttle = keys.has('ArrowUp') || keys.has('KeyW') ? 1 : 0;
+        const brake = keys.has('ArrowDown') || keys.has('KeyS') || keys.has('Space') ? 1 : 0;
         const steer =
-            (held('ArrowLeft', 'KeyA') ? -1 : 0) + (held('ArrowRight', 'KeyD') ? 1 : 0);
+            (keys.has('ArrowLeft') || keys.has('KeyA') ? -1 : 0) +
+            (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0);
 
         this.input.throttle = Math.max(throttle, this.touch.throttle);
         this.input.brake = Math.max(brake, this.touch.brake);
@@ -536,7 +593,8 @@ export class Game {
             this.track,
             this.state.x,
             this.state.z,
-            this.trackIndexHint
+            this.trackIndexHint,
+            this._projection
         );
         this.trackIndexHint = projection.index;
         this.surface.height = projection.height;
@@ -571,13 +629,13 @@ export class Game {
      * @param {number} index
      */
     #rememberSafeState(index) {
-        this.safeState = {
-            index,
-            x: this.track.xs[index],
-            z: this.track.zs[index],
-            heading: Math.atan2(this.track.tx[index], this.track.tz[index]),
-            speed: this.state.vForward,
-        };
+        // Мутираме постоянен обект — извиква се на всяка стъпка на пистата.
+        const safe = this.safeState ?? (this.safeState = { index: 0, x: 0, z: 0, heading: 0, speed: 0 });
+        safe.index = index;
+        safe.x = this.track.xs[index];
+        safe.z = this.track.zs[index];
+        safe.heading = Math.atan2(this.track.tx[index], this.track.tz[index]);
+        safe.speed = this.state.vForward;
     }
 
     /**
@@ -890,7 +948,9 @@ export class Game {
         const speedRatio = clamp01(Math.abs(state.vForward) / CAR.maxSpeed);
         const targetFov = CAMERA.fovIdle + (CAMERA.fovFast - CAMERA.fovIdle) * speedRatio;
 
-        if (Math.abs(this.camera.fov - targetFov) > 0.01) {
+        // По-широк праг (0.01→0.05): щом fov се е установил, спираме да
+        // преизчисляваме проекционната матрица всеки кадър при почти-константна скорост.
+        if (Math.abs(this.camera.fov - targetFov) > 0.05) {
             this.camera.fov += (targetFov - this.camera.fov) * k;
             this.camera.updateProjectionMatrix();
         }
@@ -943,15 +1003,25 @@ export class Game {
         if (dHeading > Math.PI) dHeading -= 2 * Math.PI;
         else if (dHeading < -Math.PI) dHeading += 2 * Math.PI;
 
-        const render = {
-            ...this.state,
-            x: prevX + (this.state.x - prevX) * alpha,
-            z: prevZ + (this.state.z - prevZ) * alpha,
-            heading: prevHeading + dHeading * alpha,
-        };
+        // Преизползван обект вместо spread на всеки кадър — нула алокации.
+        const render = this._render;
+        Object.assign(render, this.state);
+        render.x = prevX + (this.state.x - prevX) * alpha;
+        render.z = prevZ + (this.state.z - prevZ) * alpha;
+        render.heading = prevHeading + dHeading * alpha;
 
         updateCarRig(this.carRig, render, this.surface, dt);
         this.#updateCamera(dt, render);
+
+        // Маршалът вее карирания флаг само на летящата (финалната) обиколка.
+        if (this.marshalFlag) {
+            if (this.phase === 'flying') {
+                this.flagWave += dt * FLAG_WAVE_SPEED;
+                this.marshalFlag.rotation.z = Math.sin(this.flagWave) * FLAG_WAVE_AMP;
+            } else if (this.marshalFlag.rotation.z !== 0) {
+                this.marshalFlag.rotation.z = 0; // в покой прътът е изправен
+            }
+        }
 
         // Сенчестата камера следва колата: посоката на слънцето е фиксирана,
         // движим само центъра, за да е острата сянка около играча.
@@ -963,6 +1033,15 @@ export class Game {
         );
 
         this.composer.render();
+
+        // HUD телеметрия — не по-често от 30 Hz (виж TELEMETRY_INTERVAL): Vue
+        // реактивността на всеки кадър е излишен diff/patch + GC натиск, а
+        // рендерът вече е нарисуван. Таймерът остава гладък.
+        this.telemetryAccum += dt;
+        if (this.telemetryAccum < TELEMETRY_INTERVAL) {
+            return;
+        }
+        this.telemetryAccum = 0;
 
         this.onTelemetry({
             speed: Math.round(speedKmh(this.state)),
