@@ -19,6 +19,8 @@ const error = ref(null);
 
 const emptyTelemetry = () => ({
     speed: 0,
+    rpm: 4000,
+    gear: 1,
     lapTime: null,
     lastLap: null,
     bestLap: null,
@@ -190,6 +192,30 @@ const formatSectorMs = (ms) => (ms === null || ms === undefined ? '—' : (ms / 
 const lastLapDelta = computed(() =>
     formatDelta(telemetry.value.lastLap, telemetry.value.bestLap)
 );
+
+// ── Оборотомер + предавка ──────────────────────────────────────────────────
+const REDLINE = 15000;
+const revFraction = computed(() => Math.min(1, (telemetry.value.rpm ?? 0) / REDLINE));
+const atRedline = computed(() => revFraction.value > 0.94);
+const gearLabel = computed(() => (telemetry.value.gear === 0 ? 'R' : String(telemetry.value.gear ?? 1)));
+
+// Сегменти на rev-бара с shift-lights: зелено → жълто → червено (последните мигат).
+const revSegments = computed(() => {
+    const total = 16;
+    const filled = Math.round(revFraction.value * total);
+    return Array.from({ length: total }, (_, i) => {
+        let color = 'bg-emerald-500';
+        if (i >= total - 3) {
+            color = 'bg-red-500';
+        } else if (i >= total - 7) {
+            color = 'bg-amber-400';
+        }
+        return { on: i < filled, color };
+    });
+});
+
+// Първо място в класацията на пистата (от всички потребители) → трофей.
+const isFirstPlace = computed(() => resultMeta.value?.rank === 1);
 
 /**
  * Three.js се зарежда динамично: ~600 KB, които нямат работа в основния
@@ -463,14 +489,44 @@ const releaseBrake = () => setInput({ brake: 0 });
                     Трасе © OpenStreetMap contributors · височини OpenTopoData
                 </div>
 
-                <!-- Скорост -->
+                <!-- Скорост + предавка + оборотомер -->
                 <div class="pointer-events-none absolute bottom-0 right-0 p-4 sm:p-6">
-                    <div class="rounded-lg bg-black/55 px-5 py-3 text-right backdrop-blur-sm">
-                        <div class="font-mono text-5xl font-black leading-none tabular-nums text-white sm:text-6xl">
-                            {{ telemetry.speed }}
+                    <div class="rounded-lg bg-black/55 px-5 py-3 backdrop-blur-sm">
+                        <!-- Rev бар с shift-lights (мига в червената зона) -->
+                        <div class="mb-2 flex justify-end gap-[3px]" :class="atRedline ? 'animate-pulse' : ''">
+                            <span
+                                v-for="(seg, i) in revSegments"
+                                :key="i"
+                                class="h-2 w-2 rounded-[2px]"
+                                :class="seg.on ? seg.color : 'bg-zinc-700/60'"
+                            ></span>
                         </div>
-                        <div class="mt-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
-                            км/ч
+
+                        <div class="flex items-end justify-end gap-4">
+                            <!-- Предавка -->
+                            <div class="text-center">
+                                <div class="font-mono text-4xl font-black leading-none tabular-nums text-white sm:text-5xl">
+                                    {{ gearLabel }}
+                                </div>
+                                <div class="text-[9px] font-semibold uppercase tracking-widest text-zinc-500">
+                                    предавка
+                                </div>
+                            </div>
+                            <!-- Скорост -->
+                            <div class="text-right">
+                                <div class="font-mono text-5xl font-black leading-none tabular-nums text-white sm:text-6xl">
+                                    {{ telemetry.speed }}
+                                </div>
+                                <div class="mt-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
+                                    км/ч
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Обороти -->
+                        <div class="mt-1 text-right font-mono text-[11px] tabular-nums text-zinc-400">
+                            {{ (telemetry.rpm ?? 0).toLocaleString('bg-BG') }}
+                            <span class="text-zinc-600">об/мин</span>
                         </div>
                     </div>
                 </div>
@@ -573,6 +629,21 @@ const releaseBrake = () => setInput({ brake: 0 });
                                 </defs>
                                 <rect width="120" height="8" fill="url(#chequer)" />
                             </svg>
+                        </div>
+
+                        <!-- Първо място в класацията на пистата → трофей -->
+                        <div v-if="isFirstPlace" class="mb-4 flex flex-col items-center">
+                            <img
+                                src="/game-textures/trophy/trophy.png"
+                                alt="Трофей за първо място"
+                                class="h-28 w-auto drop-shadow-[0_8px_22px_rgba(234,179,8,0.5)]"
+                            />
+                            <div class="mt-1 text-base font-black uppercase tracking-[0.2em] text-amber-400">
+                                Първо място!
+                            </div>
+                            <div class="text-[11px] text-zinc-400">
+                                Най-бързата обиколка на пистата — от всички
+                            </div>
                         </div>
 
                         <div class="mb-1 flex items-center justify-center gap-2">

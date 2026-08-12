@@ -18,6 +18,8 @@ import { buildCar, updateCarRig, attachCarModel } from './car.js';
 import { buildTrackMeshes, COLORS } from './mesh.js';
 import { CAR, FIXED_DT, createCarState, speedKmh, step } from './physics.js';
 import { prepareTrack, projectOnTrack } from './track.js';
+import { REDLINE, createDrivetrain, updateDrivetrain } from './drivetrain.js';
+import { EngineSound } from './sound.js';
 
 /** Брой сектори на обиколка, както в истинската Формула 1. */
 const SECTORS = 3;
@@ -168,6 +170,10 @@ export class Game {
         this.telemetryAccum = TELEMETRY_INTERVAL; // първи кадър праща телеметрия веднага
         this.flagWave = 0;
 
+        // Трансмисия (обороти/предавка за HUD + звук) и процедурен звук на двигателя.
+        this.drivetrain = createDrivetrain();
+        this.engineSound = new EngineSound();
+
         this.#resetLapState();
         this.bestLapTicks = null;
         this.lastLapTicks = null;
@@ -194,6 +200,7 @@ export class Game {
     /** Спира цикъла, без да освобождава ресурси. */
     stop() {
         this.running = false;
+        this.engineSound?.silence();
         if (this.rafId !== null) {
             cancelAnimationFrame(this.rafId);
             this.rafId = null;
@@ -240,6 +247,7 @@ export class Game {
      */
     setTouchInput(values) {
         Object.assign(this.touch, values);
+        this.engineSound.resume(); // жест от екрана → пуска аудиото (телефон)
     }
 
     /** Освобождава WebGL ресурсите. Задължително при unmount. */
@@ -286,6 +294,7 @@ export class Game {
         this.envRT?.dispose();
         this.hdrBackground?.dispose();
         this.renderer.dispose();
+        this.engineSound?.dispose();
     }
 
     // ── Вътрешни ─────────────────────────────────────────────────────────
@@ -544,6 +553,7 @@ export class Game {
             if (INTERESTING_KEYS.has(event.code)) {
                 event.preventDefault();
                 this.keys.add(event.code);
+                this.engineSound.resume(); // първи потребителски жест → пуска аудиото
             }
 
             if (event.code === 'KeyR') {
@@ -1034,6 +1044,10 @@ export class Game {
             }
         }
 
+        // Трансмисия (обороти/предавка) + звук на двигателя — гладко, всеки кадър.
+        updateDrivetrain(this.drivetrain, this.state.vForward, this.input.throttle);
+        this.engineSound.update(this.drivetrain.rpm, this.input.throttle, REDLINE);
+
         // Сенчестата камера следва колата: посоката на слънцето е фиксирана,
         // движим само центъра, за да е острата сянка около играча.
         this.sun.target.position.set(render.x, this.surface.height, render.z);
@@ -1056,6 +1070,8 @@ export class Game {
 
         this.onTelemetry({
             speed: Math.round(speedKmh(this.state)),
+            rpm: Math.round(this.drivetrain.rpm),
+            gear: this.drivetrain.gear,
             lapTime: this.phase === 'flying' ? this.lapTicks * FIXED_DT : null,
             lastLap: this.lastLapTicks === null ? null : this.lastLapTicks * FIXED_DT,
             bestLap: this.bestLapTicks === null ? null : this.bestLapTicks * FIXED_DT,
