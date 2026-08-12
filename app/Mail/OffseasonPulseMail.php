@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasUnsubscribeHeaders;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -12,7 +13,7 @@ use Illuminate\Queue\SerializesModels;
 
 class OffseasonPulseMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use HasUnsubscribeHeaders, Queueable, SerializesModels;
 
     /**
      * @param  array<int, array{title:string, url:string}>  $news  топ новини от периода

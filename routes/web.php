@@ -132,6 +132,15 @@ Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'uns
 Route::get('/newsletter/email-stop/{user}', [NewsletterController::class, 'userUnsubscribe'])
     ->middleware('signed')
     ->name('newsletter.user-unsubscribe');
+
+// One-click отписване (RFC 8058) — същите URI-та, но POST от пощенския
+// доставчик. List-Unsubscribe хедърът сочи именно тук, затова методите не
+// бива да искат сесия, CSRF токен или потвърждение от човек.
+Route::post('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribeOneClick'])
+    ->name('newsletter.unsubscribe.one-click');
+Route::post('/newsletter/email-stop/{user}', [NewsletterController::class, 'userUnsubscribeOneClick'])
+    ->middleware('signed')
+    ->name('newsletter.user-unsubscribe.one-click');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');
 
 Route::get('/dashboard', [CalendarController::class, 'index'])

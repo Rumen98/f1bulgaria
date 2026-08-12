@@ -8,6 +8,7 @@ use App\Models\NewsletterSubscriber;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Str;
 
 class NewsletterController extends Controller
@@ -76,5 +77,40 @@ class NewsletterController extends Controller
         $user->forceFill(['email_opt_out_at' => now()])->save();
 
         return redirect()->route('home')->with('success', 'Спряхме имейлите от Падок към този адрес.');
+    }
+
+    /**
+     * One-click отписване на абонат (RFC 8058) — POST от пощенския доставчик.
+     *
+     * Отговорът е 200, не пренасочване: доставчикът не следва redirect-и и
+     * третира всичко извън 2xx като счупено отписване, което вреди на
+     * репутацията повече от липсващ хедър. По същата причина непознат токен
+     * също връща 200 — повторното натискане на „Отписване" не е грешка.
+     */
+    public function unsubscribeOneClick(string $token): Response
+    {
+        NewsletterSubscriber::query()
+            ->where('unsubscribe_token', $token)
+            ->whereNull('unsubscribed_at')
+            ->update(['unsubscribed_at' => now()]);
+
+        return $this->oneClickAck();
+    }
+
+    /**
+     * One-click спиране на всички имейли за потребител с акаунт. Валидността
+     * идва от 'signed' middleware-а — подписът е в query string-а и оцелява
+     * при POST.
+     */
+    public function userUnsubscribeOneClick(User $user): Response
+    {
+        $user->forceFill(['email_opt_out_at' => now()])->save();
+
+        return $this->oneClickAck();
+    }
+
+    private function oneClickAck(): Response
+    {
+        return response('OK', 200)->header('Content-Type', 'text/plain; charset=utf-8');
     }
 }
