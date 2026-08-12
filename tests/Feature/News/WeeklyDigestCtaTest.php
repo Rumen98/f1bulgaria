@@ -75,15 +75,17 @@ it('води абоната без акаунт към регистрация, �
         ->and($html)->not->toContain('Дай прогноза за');
 });
 
-it('скрива поканата за Телеграм, докато няма зададен линк', function () {
+it('скрива Телеграм блока, докато няма зададен линк', function () {
     config(['services.telegram.community_url' => null]);
 
     expect(digestMail(null, nextRaceData(), token: 'tok'))->not->toContain('Телеграм');
 });
 
-it('показва поканата за Телеграм, когато линкът е зададен', function () {
-    config(['services.telegram.community_url' => 'https://t.me/padokbg_chat']);
+it('кани към Телеграм, когато линкът е зададен', function () {
+    config(['services.telegram.community_url' => 'https://t.me/padokbg']);
 
-    expect(digestMail(null, nextRaceData(), token: 'tok'))
-        ->toContain('https://t.me/padokbg_chat');
+    $html = digestMail(null, nextRaceData(), token: 'tok');
+
+    expect($html)->toContain('https://t.me/padokbg')
+        ->and($html)->toContain('Коментираме уикенда');
 });
