@@ -260,13 +260,19 @@ export class Game {
 
                 for (const material of materials) {
                     // material.dispose() НЕ чисти картите — освобождаваме ги ръчно,
-                    // иначе canvas текстурите (публика/бордове) и текстурите на
+                    // иначе canvas текстурите (публика/бордове/флаг) и текстурите на
                     // GLB болида текат GPU памет при всеки quit/restart.
                     for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) {
                         material[key]?.dispose?.();
                     }
                     material.dispose();
                 }
+            }
+
+            // geometry.dispose() НЕ чисти instanceMatrix буфера — трибуните,
+            // ориентирите и дърветата са InstancedMesh; освобождаваме ги изрично.
+            if (object.isInstancedMesh) {
+                object.dispose();
             }
         });
 
@@ -383,10 +389,14 @@ export class Game {
 
         const sun = new THREE.DirectionalLight(0xfff2d8, 2.6);
         sun.castShadow = true;
-        sun.shadow.mapSize.set(1024, 1024); // 170 m кутия + само колата хвърля → 1024 стига
+        sun.shadow.mapSize.set(1024, 1024); // върху стегнатата кутия (виж s) 1024 е остро
         sun.shadow.bias = -0.0004;
         sun.shadow.normalBias = 0.6;
-        const s = 170; // половин размер на сенчестата зона около колата, m
+        // Само болидът хвърля сянка (виж конструктора) и сенчестата камера следва
+        // колата — затова стягаме кутията до ~60 m около нея. 1024 върху 60 m е
+        // остро (~17 texel/m), докато старите 170 m разпиляваха картата по празен
+        // терен. По-малка кутия = по-остра сянка И по-евтино.
+        const s = 30; // половин размер на сенчестата зона около колата, m
         Object.assign(sun.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 900 });
         sun.shadow.camera.updateProjectionMatrix();
         this.scene.add(sun);
@@ -453,17 +463,18 @@ export class Game {
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-        // На слаби устройства (телефон/малко ядра) bloom+SMAA са ~15 fullscreen
-        // прохода/кадър и свалят кадрите под играбилното — пропускаме ги, а MSAA
-        // от контекста (antialias:true) държи ръбовете. Десктопът получава пълния
-        // вид. GTAO остава изключено нарочно (на full-res сваляше кадрите).
+        // Bloom е скъп (~11 fullscreen прохода — mip верига): само на десктоп.
+        // GTAO остава изключено нарочно (на full-res сваляше кадрите).
         if (!isLowPowerDevice()) {
-            // Bloom — само ярките акценти греят: слънчеви отблясъци по clearcoat
-            // боята и яркото HDRI небе. Висок threshold + умерена сила.
+            // Само ярките акценти греят: слънчеви отблясъци по clearcoat боята и
+            // яркото HDRI небе. Висок threshold + умерена сила.
             this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.1, 0.5, 1.0));
-            // SMAA — чист антиалиасинг върху вече композираната картина.
-            this.composer.addPass(new SMAAPass());
         }
+
+        // SMAA винаги — евтин AA (3 прохода) и ЕДИНСТВЕНИЯТ тук: composer-ът
+        // рендерира в собствен offscreen target, тъй че antialias:true на контекста
+        // не важи. На слабо устройство печелим от пропуснатия bloom, но пазим ръбовете.
+        this.composer.addPass(new SMAAPass());
 
         // Финал: tone mapping (ACES от рендера) + sRGB към екрана. При composer
         // рендерът е линеен до OutputPass, затова няма двойно tone mapping.
