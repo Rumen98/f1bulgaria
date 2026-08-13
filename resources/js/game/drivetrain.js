@@ -32,10 +32,35 @@ const GEAR_TOP = [15, 23, 32, 42, 53, 65, 78, 95];
  */
 
 /**
+ * @param {boolean} [manual]  ръчна трансмисия (играчът сменя с W/S)
  * @returns {Drivetrain}
  */
-export function createDrivetrain() {
-    return { gear: 1, rpm: IDLE, reverse: false };
+export function createDrivetrain(manual = false) {
+    return { gear: 1, rpm: IDLE, reverse: false, manual };
+}
+
+/**
+ * Ръчна смяна нагоре (W). От заден ход/неутрално → 1-ва.
+ *
+ * @param {Drivetrain} dt
+ */
+export function shiftUp(dt) {
+    if (dt.gear < 1) {
+        dt.gear = 1;
+    } else if (dt.gear < 8) {
+        dt.gear++;
+    }
+}
+
+/**
+ * Ръчна смяна надолу (S). Не влиза в заден ход (той е автоматичен при спиране).
+ *
+ * @param {Drivetrain} dt
+ */
+export function shiftDown(dt) {
+    if (dt.gear > 1) {
+        dt.gear--;
+    }
 }
 
 /**
@@ -73,6 +98,22 @@ export function updateDrivetrain(dt, vForward, throttle) {
     dt.reverse = false;
     const speed = vForward > 0 ? vForward : 0;
 
+    // ── Ръчна: играчът сменя (shiftUp/shiftDown); без автоматична смяна ──
+    if (dt.manual) {
+        if (dt.gear < 1) {
+            dt.gear = 1; // излизане от заден ход
+        }
+        let rpm = rpmFor(speed, dt.gear);
+        if (speed < 2) {
+            // Почти в покой оборотите следват газта (двигателят се върти).
+            rpm = Math.max(rpm, IDLE + throttle * (REDLINE - IDLE) * 0.45);
+        }
+        dt.rpm = clamp(rpm, IDLE, REDLINE);
+
+        return dt;
+    }
+
+    // ── Автоматична ──
     if (speed < 2) {
         // Почти в покой: оборотите следват газта (двигателят се върти без движение).
         dt.gear = 1;

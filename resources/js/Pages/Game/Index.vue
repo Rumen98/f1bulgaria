@@ -16,6 +16,7 @@ const game = shallowRef(null);
 const selectedTrack = ref(null);
 const loading = ref(false);
 const error = ref(null);
+const transmission = ref('auto'); // 'auto' | 'manual' (ръчна: W нагоре, S надолу)
 
 const emptyTelemetry = () => ({
     speed: 0,
@@ -258,7 +259,8 @@ const startGame = async (track) => {
             (values) => {
                 telemetry.value = values;
             },
-            onFinish
+            onFinish,
+            { transmission: transmission.value }
         );
 
         // Изчакай средата (HDRI + болид + текстури) ПРЕДИ първия кадър — иначе
@@ -329,6 +331,23 @@ const releaseBrake = () => setInput({ brake: 0 });
                     Избери писта и карай чиста обиколка. Трасетата са построени от
                     реалната геометрия на пистите — всеки завой е там, където му е мястото.
                 </p>
+
+                <!-- Избор на трансмисия -->
+                <div class="mt-5 flex items-center gap-3">
+                    <span class="text-sm font-semibold text-zinc-400">Трансмисия</span>
+                    <div class="inline-flex rounded-lg border border-zinc-700 bg-zinc-900/60 p-0.5">
+                        <button
+                            v-for="opt in [{ v: 'auto', l: 'Автоматична' }, { v: 'manual', l: 'Ръчна · W/S' }]"
+                            :key="opt.v"
+                            type="button"
+                            class="rounded-md px-4 py-1.5 text-sm font-semibold transition"
+                            :class="transmission === opt.v ? 'bg-[#e10600] text-white' : 'text-zinc-400 hover:text-white'"
+                            @click="transmission = opt.v"
+                        >
+                            {{ opt.l }}
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div
@@ -378,6 +397,10 @@ const releaseBrake = () => setInput({ brake: 0 });
                 газ, <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">↓</kbd> спирачка,
                 <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">←</kbd>
                 <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">→</kbd> завиване,
+                <template v-if="transmission === 'manual'">
+                    <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">W</kbd> предавка нагоре,
+                    <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">S</kbd> надолу,
+                </template>
                 <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">R</kbd> рестарт.
             </p>
 

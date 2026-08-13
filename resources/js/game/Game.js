@@ -18,7 +18,7 @@ import { buildCar, updateCarRig, attachCarModel } from './car.js';
 import { buildTrackMeshes, COLORS } from './mesh.js';
 import { CAR, FIXED_DT, createCarState, speedKmh, step } from './physics.js';
 import { prepareTrack, projectOnTrack } from './track.js';
-import { REDLINE, createDrivetrain, updateDrivetrain } from './drivetrain.js';
+import { REDLINE, createDrivetrain, shiftDown, shiftUp, updateDrivetrain } from './drivetrain.js';
 import { EngineSound } from './sound.js';
 
 /** Брой сектори на обиколка, както в истинската Формула 1. */
@@ -87,7 +87,7 @@ export class Game {
      * @param {(result: object) => void} [onFinish] Извиква се веднъж при
      *        завършена квалификационна обиколка (за резултатния екран).
      */
-    constructor(canvas, trackData, onTelemetry, onFinish = () => {}) {
+    constructor(canvas, trackData, onTelemetry, onFinish = () => {}, options = {}) {
         this.canvas = canvas;
         this.onTelemetry = onTelemetry;
         this.onFinish = onFinish;
@@ -171,7 +171,8 @@ export class Game {
         this.flagWave = 0;
 
         // Трансмисия (обороти/предавка за HUD + звук) и процедурен звук на двигателя.
-        this.drivetrain = createDrivetrain();
+        this.manualTransmission = options.transmission === 'manual';
+        this.drivetrain = createDrivetrain(this.manualTransmission);
         this.engineSound = new EngineSound();
 
         this.#resetLapState();
@@ -559,6 +560,16 @@ export class Game {
             if (event.code === 'KeyR') {
                 this.reset(true);
             }
+
+            // Ръчна трансмисия: W = нагоре, S = надолу (веднъж на натискане —
+            // event.repeat спира повтарянето при задържане).
+            if (this.manualTransmission && !event.repeat) {
+                if (event.code === 'KeyW') {
+                    shiftUp(this.drivetrain);
+                } else if (event.code === 'KeyS') {
+                    shiftDown(this.drivetrain);
+                }
+            }
         };
 
         this.onKeyUp = (event) => {
@@ -581,9 +592,11 @@ export class Game {
 
     #readInput() {
         // Директни проверки, без closure/rest-масиви — извиква се на всеки кадър.
+        // При ръчна трансмисия W/S са за смяна на предавка → само стрелките карат.
         const keys = this.keys;
-        const throttle = keys.has('ArrowUp') || keys.has('KeyW') ? 1 : 0;
-        const brake = keys.has('ArrowDown') || keys.has('KeyS') || keys.has('Space') ? 1 : 0;
+        const ws = !this.manualTransmission;
+        const throttle = keys.has('ArrowUp') || (ws && keys.has('KeyW')) ? 1 : 0;
+        const brake = keys.has('ArrowDown') || keys.has('Space') || (ws && keys.has('KeyS')) ? 1 : 0;
         const steer =
             (keys.has('ArrowLeft') || keys.has('KeyA') ? -1 : 0) +
             (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0);
