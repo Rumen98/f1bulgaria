@@ -120,11 +120,14 @@ export class EngineSound {
         const rev = Math.min(1, rpm / maxRpm);
 
         if (this.usingSample) {
-            // Скоростта на семпъла следва оборотите → „върти" с двигателя;
-            // смяната нагоре (спад на оборотите) сваля тона осезаемо.
-            this.source.playbackRate.setTargetAtTime(0.7 + rev * 0.85, now, 0.04);
-            const volume = 0.14 + throttle * 0.5 + rev * 0.2;
-            this.master.gain.setTargetAtTime(Math.min(1, volume), now, 0.06);
+            // Питчът следва оборотите с широк обхват → ясно се чуват оборотите и
+            // смяната на предавка (спад на тона при смяна нагоре).
+            this.source.playbackRate.setTargetAtTime(0.62 + rev * 1.05, now, 0.05);
+            // Силата зависи ПРЕДИМНО от газта: почти тихо на празен ход/при
+            // отпускане, силно при ускорение — така звукът РЕАГИРА на входа, а не
+            // „върви като пуснат клип" постоянно.
+            const target = 0.05 + throttle * 0.6 + rev * 0.18;
+            this.master.gain.setTargetAtTime(Math.min(1, target), now, 0.08);
             return;
         }
 

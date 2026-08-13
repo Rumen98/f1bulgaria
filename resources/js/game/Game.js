@@ -251,6 +251,12 @@ export class Game {
         this.engineSound.resume(); // жест от екрана → пуска аудиото (телефон)
     }
 
+    /** Задава трансмисията (авто/ръчна). Вика се ПРЕДИ старта (pre-start екран). */
+    setTransmission(mode) {
+        this.manualTransmission = mode === 'manual';
+        this.drivetrain.manual = this.manualTransmission;
+    }
+
     /** Освобождава WebGL ресурсите. Задължително при unmount. */
     dispose() {
         this.disposed = true;

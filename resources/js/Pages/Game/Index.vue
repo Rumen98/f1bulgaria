@@ -17,6 +17,7 @@ const selectedTrack = ref(null);
 const loading = ref(false);
 const error = ref(null);
 const transmission = ref('auto'); // 'auto' | 'manual' (ръчна: W нагоре, S надолу)
+const preStart = ref(false); // pre-start екран (избор трансмисия + управление) преди обиколката
 
 const emptyTelemetry = () => ({
     speed: 0,
@@ -241,6 +242,7 @@ const startGame = async (track) => {
         selectedTrack.value = track;
         result.value = null;
         resultMeta.value = null;
+        preStart.value = true; // pre-start екран (избор трансмисия + управление) преди старта
 
         // Лилавите рекорди се теглят фоново — трябват чак на финала.
         fetchLeaderboard(track.slug);
@@ -259,21 +261,18 @@ const startGame = async (track) => {
             (values) => {
                 telemetry.value = values;
             },
-            onFinish,
-            { transmission: transmission.value }
+            onFinish
         );
 
-        // Изчакай средата (HDRI + болид + текстури) ПРЕДИ първия кадър — иначе
-        // видът се сменя по средата. loading остава true дотук. Ако играчът
-        // напусне през това време (game.value става null или друга инстанция),
-        // не стартирай мъртвата инстанция.
+        // Изчакай средата (HDRI + болид + текстури) да се зареди. НЕ стартираме
+        // тук — стартът чака бутона „Карай" от pre-start екрана (beginLap), след
+        // като играчът избере трансмисия. Ако играчът напусне през това време
+        // (game.value става null/друга инстанция), не пипаме мъртвата инстанция.
         const instance = game.value;
         await instance.ready?.catch(() => {});
         if (game.value !== instance) {
             return;
         }
-        instance.start();
-
         window.addEventListener('resize', handleResize);
     } catch (e) {
         error.value = e.message ?? 'Нещо се обърка при зареждането.';
@@ -283,9 +282,20 @@ const startGame = async (track) => {
     }
 };
 
+// Пуска обиколката от pre-start екрана: прилага избраната трансмисия и стартира.
+const beginLap = () => {
+    if (!game.value) {
+        return;
+    }
+    game.value.setTransmission(transmission.value);
+    preStart.value = false;
+    game.value.start();
+};
+
 const quit = () => {
     teardown();
     selectedTrack.value = null;
+    preStart.value = false;
     telemetry.value = emptyTelemetry();
     result.value = null;
     resultMeta.value = null;
@@ -332,22 +342,6 @@ const releaseBrake = () => setInput({ brake: 0 });
                     реалната геометрия на пистите — всеки завой е там, където му е мястото.
                 </p>
 
-                <!-- Избор на трансмисия -->
-                <div class="mt-5 flex items-center gap-3">
-                    <span class="text-sm font-semibold text-zinc-400">Трансмисия</span>
-                    <div class="inline-flex rounded-lg border border-zinc-700 bg-zinc-900/60 p-0.5">
-                        <button
-                            v-for="opt in [{ v: 'auto', l: 'Автоматична' }, { v: 'manual', l: 'Ръчна · W/S' }]"
-                            :key="opt.v"
-                            type="button"
-                            class="rounded-md px-4 py-1.5 text-sm font-semibold transition"
-                            :class="transmission === opt.v ? 'bg-[#e10600] text-white' : 'text-zinc-400 hover:text-white'"
-                            @click="transmission = opt.v"
-                        >
-                            {{ opt.l }}
-                        </button>
-                    </div>
-                </div>
             </div>
 
             <div
@@ -397,11 +391,8 @@ const releaseBrake = () => setInput({ brake: 0 });
                 газ, <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">↓</kbd> спирачка,
                 <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">←</kbd>
                 <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">→</kbd> завиване,
-                <template v-if="transmission === 'manual'">
-                    <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">W</kbd> предавка нагоре,
-                    <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">S</kbd> надолу,
-                </template>
                 <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">R</kbd> рестарт.
+                Трансмисията (авто/ръчна) избираш преди всяка обиколка.
             </p>
 
             <!--
@@ -617,6 +608,71 @@ const releaseBrake = () => setInput({ brake: 0 });
                             @pointercancel="releaseThrottle"
                         >
                             Газ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ── Преди старта: избор на трансмисия + управление ────── -->
+                <div
+                    v-if="preStart"
+                    class="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+                >
+                    <div class="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900/95 p-6 shadow-2xl">
+                        <h2 class="text-center text-lg font-black uppercase tracking-wider text-zinc-100">
+                            {{ selectedTrack?.name }}
+                        </h2>
+                        <p class="mt-1 text-center text-xs text-zinc-500">
+                            Готви се за квалификационна обиколка
+                        </p>
+
+                        <div class="mt-5">
+                            <div class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+                                Трансмисия
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button
+                                    v-for="opt in [
+                                        { v: 'auto', l: 'Автоматична', h: 'Играта сменя предавките' },
+                                        { v: 'manual', l: 'Ръчна', h: 'W нагоре · S надолу' },
+                                    ]"
+                                    :key="opt.v"
+                                    type="button"
+                                    class="rounded-lg border p-3 text-left transition"
+                                    :class="transmission === opt.v ? 'border-[#e10600] bg-[#e10600]/10' : 'border-zinc-700 hover:border-zinc-500'"
+                                    @click="transmission = opt.v"
+                                >
+                                    <div class="text-sm font-bold text-zinc-100">{{ opt.l }}</div>
+                                    <div class="mt-0.5 text-[11px] text-zinc-400">{{ opt.h }}</div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 rounded-lg bg-black/40 p-3">
+                            <div class="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+                                Управление
+                            </div>
+                            <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-zinc-300">
+                                <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">↑</kbd> газ</span>
+                                <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">↓</kbd> спирачка</span>
+                                <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">←</kbd> <kbd class="rounded bg-zinc-800 px-1.5 py-0.5">→</kbd> завиване</span>
+                                <span v-if="transmission === 'manual'" class="font-semibold text-amber-300">
+                                    <kbd class="rounded bg-zinc-800 px-1.5 py-0.5">W</kbd> нагоре ·
+                                    <kbd class="rounded bg-zinc-800 px-1.5 py-0.5">S</kbd> надолу
+                                </span>
+                                <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">R</kbd> рестарт</span>
+                            </div>
+                            <p class="mt-2 text-[11px] text-zinc-500">
+                                Мини стартовата линия, за да пуснеш хронометъра.
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="mt-5 w-full rounded-lg bg-[#e10600] px-4 py-3 text-sm font-bold uppercase tracking-wider text-white transition hover:bg-[#ff0800] disabled:cursor-wait disabled:opacity-60"
+                            :disabled="loading"
+                            @click="beginLap"
+                        >
+                            {{ loading ? 'Зареждане…' : 'Карай' }}
                         </button>
                     </div>
                 </div>
