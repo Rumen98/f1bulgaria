@@ -2,7 +2,7 @@
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { formatDelta, formatLapTime } from '@/game/format.js';
 import { Head, usePage } from '@inertiajs/vue3';
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 
 const props = defineProps({
     tracks: { type: Array, default: () => [] },
@@ -18,6 +18,19 @@ const loading = ref(false);
 const error = ref(null);
 const transmission = ref('auto'); // 'auto' | 'manual' (ръчна: W нагоре, S надолу)
 const preStart = ref(false); // pre-start екран (избор трансмисия + управление) преди обиколката
+const isMobile = ref(false); // телефон/тъч → tilt завиване + авто-газ, скрити ръчни
+const tiltError = ref(false); // накланянето не е достъпно/разрешено
+
+onMounted(() => {
+    isMobile.value =
+        /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches);
+
+    // Ръчните скорости са неудобни на телефон — само авто.
+    if (isMobile.value) {
+        transmission.value = 'auto';
+    }
+});
 
 const emptyTelemetry = () => ({
     speed: 0,
@@ -288,6 +301,14 @@ const beginLap = () => {
         return;
     }
     game.value.setTransmission(transmission.value);
+
+    // Телефон: авто-газ + завиване с накланяне. Разрешението за жироскоп (iOS)
+    // се иска ТУК, защото тапът на „Карай" е потребителски жест.
+    if (isMobile.value) {
+        game.value.autoThrottle = true;
+        enableTilt();
+    }
+
     preStart.value = false;
     game.value.start();
 };
@@ -308,6 +329,7 @@ const handleResize = () => game.value?.resize();
 
 const teardown = () => {
     window.removeEventListener('resize', handleResize);
+    disableTilt();
     game.value?.dispose();
     game.value = null;
 };
@@ -316,15 +338,94 @@ const teardown = () => {
 // пазят шепа такива и после отказват да създават нови.
 onBeforeUnmount(teardown);
 
-// ── Управление от екрана (телефон) ────────────────────────────────────────
+// ── Управление на телефон: накланяне (волан) + бутон спирачка, газта е авто ──
 const setInput = (values) => game.value?.setTouchInput(values);
-
-const holdSteer = (direction) => setInput({ steer: direction });
-const releaseSteer = () => setInput({ steer: 0 });
-const holdThrottle = () => setInput({ throttle: 1 });
-const releaseThrottle = () => setInput({ throttle: 0 });
 const holdBrake = () => setInput({ brake: 1 });
 const releaseBrake = () => setInput({ brake: 0 });
+
+// Аналогов волан от накланянето, устойчив на портрет/пейзаж. Проектираме наклона
+// върху ХОРИЗОНТАЛНАТА ОС НА ЕКРАНА (не на устройството): в портрет това е gamma,
+// в пейзаж — beta, автоматично според ориентацията. Калибрира се спрямо хвата на
+// старта (и при завъртане), мъртва зона ±TILT_DEADZONE°, ±TILT_MAX° = пълен волан.
+const TILT_MAX = 28;
+const TILT_DEADZONE = 2.5;
+const TILT_INVERT = false; // ако на реалния телефон завива наобратно → true
+let tiltNeutral = null;
+
+const orientationAngle = () => {
+    if (typeof window.screen?.orientation?.angle === 'number') {
+        return window.screen.orientation.angle;
+    }
+    if (typeof window.orientation === 'number') {
+        return (((window.orientation % 360) + 360) % 360);
+    }
+
+    return 0;
+};
+
+const onTilt = (event) => {
+    if (
+        event.gamma === null || event.gamma === undefined ||
+        event.beta === null || event.beta === undefined
+    ) {
+        return;
+    }
+    // Наклонът на екрана = проекция на (gamma, beta) върху хоризонталната ос,
+    // завъртяна с ориентацията: портрет → gamma, пейзаж → ±beta.
+    const rad = (orientationAngle() * Math.PI) / 180;
+    const tilt = event.gamma * Math.cos(rad) + event.beta * Math.sin(rad);
+
+    if (tiltNeutral === null) {
+        tiltNeutral = tilt; // първи прочит (или след завъртане) = неутрално
+    }
+    let delta = tilt - tiltNeutral;
+    const sign = Math.sign(delta);
+    delta = Math.max(0, Math.abs(delta) - TILT_DEADZONE) * sign;
+    let steer = Math.max(-1, Math.min(1, delta / (TILT_MAX - TILT_DEADZONE)));
+    if (TILT_INVERT) {
+        steer = -steer;
+    }
+    setInput({ steer });
+};
+
+// Портрет ↔ пейзаж сменя неутралното положение → рекалибрираме.
+const onOrientationChange = () => {
+    tiltNeutral = null;
+};
+
+const enableTilt = async () => {
+    tiltError.value = false;
+    tiltNeutral = null; // рекалибрира при следващия прочит
+    try {
+        // iOS 13+: иска изрично разрешение при потребителски жест.
+        if (
+            typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function'
+        ) {
+            const res = await DeviceOrientationEvent.requestPermission();
+            if (res !== 'granted') {
+                tiltError.value = true;
+
+                return;
+            }
+        }
+        window.addEventListener('deviceorientation', onTilt);
+        window.addEventListener('orientationchange', onOrientationChange);
+    } catch {
+        tiltError.value = true;
+    }
+};
+
+const disableTilt = () => {
+    window.removeEventListener('deviceorientation', onTilt);
+    window.removeEventListener('orientationchange', onOrientationChange);
+    tiltNeutral = null;
+};
+
+// Рекалибрира центъра на волана към текущия хват.
+const recenterTilt = () => {
+    tiltNeutral = null;
+};
 </script>
 
 <template>
@@ -563,35 +664,20 @@ const releaseBrake = () => setInput({ brake: 0 });
                     </button>
                 </div>
 
-                <!-- Управление на телефон: скрито на десктоп, където има клавиатура. -->
-                <div class="absolute inset-x-0 bottom-0 flex select-none items-end justify-between p-4 sm:hidden">
-                    <div class="flex gap-3">
+                <!-- Управление на телефон: накланяне = волан, газта е авто, само
+                     бутон „Спирачка". Показва се само на тъч устройства. -->
+                <div v-if="isMobile" class="pointer-events-none absolute inset-x-0 bottom-0 select-none p-4">
+                    <div class="flex items-end justify-between gap-3">
                         <button
                             type="button"
-                            class="h-16 w-16 rounded-full bg-white/10 text-2xl text-white backdrop-blur-sm active:bg-white/25"
-                            @pointerdown.prevent="holdSteer(-1)"
-                            @pointerup="releaseSteer"
-                            @pointerleave="releaseSteer"
-                            @pointercancel="releaseSteer"
+                            class="pointer-events-auto rounded-lg bg-black/50 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-200 backdrop-blur-sm active:bg-black/70"
+                            @pointerdown.prevent="recenterTilt"
                         >
-                            ←
+                            Центрирай волана
                         </button>
                         <button
                             type="button"
-                            class="h-16 w-16 rounded-full bg-white/10 text-2xl text-white backdrop-blur-sm active:bg-white/25"
-                            @pointerdown.prevent="holdSteer(1)"
-                            @pointerup="releaseSteer"
-                            @pointerleave="releaseSteer"
-                            @pointercancel="releaseSteer"
-                        >
-                            →
-                        </button>
-                    </div>
-
-                    <div class="flex gap-3">
-                        <button
-                            type="button"
-                            class="h-16 w-16 rounded-full bg-white/10 text-xs font-bold uppercase text-white backdrop-blur-sm active:bg-white/25"
+                            class="pointer-events-auto h-20 w-40 rounded-2xl bg-white/15 text-base font-bold uppercase tracking-wider text-white backdrop-blur-sm active:bg-white/30"
                             @pointerdown.prevent="holdBrake"
                             @pointerup="releaseBrake"
                             @pointerleave="releaseBrake"
@@ -599,17 +685,10 @@ const releaseBrake = () => setInput({ brake: 0 });
                         >
                             Спирачка
                         </button>
-                        <button
-                            type="button"
-                            class="h-16 w-16 rounded-full bg-[#e10600]/80 text-xs font-bold uppercase text-white backdrop-blur-sm active:bg-[#e10600]"
-                            @pointerdown.prevent="holdThrottle"
-                            @pointerup="releaseThrottle"
-                            @pointerleave="releaseThrottle"
-                            @pointercancel="releaseThrottle"
-                        >
-                            Газ
-                        </button>
                     </div>
+                    <p v-if="tiltError" class="mt-2 text-center text-[11px] font-semibold text-amber-400">
+                        Накланянето не е достъпно на това устройство.
+                    </p>
                 </div>
 
                 <!-- ── Преди старта: избор на трансмисия + управление ────── -->
@@ -625,7 +704,7 @@ const releaseBrake = () => setInput({ brake: 0 });
                             Готви се за квалификационна обиколка
                         </p>
 
-                        <div class="mt-5">
+                        <div v-if="!isMobile" class="mt-5">
                             <div class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
                                 Трансмисия
                             </div>
@@ -651,7 +730,14 @@ const releaseBrake = () => setInput({ brake: 0 });
                             <div class="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
                                 Управление
                             </div>
-                            <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-zinc-300">
+                            <!-- Телефон: накланяне + авто-газ + спирачка -->
+                            <div v-if="isMobile" class="space-y-1.5 text-xs text-zinc-300">
+                                <div>📱 <span class="font-semibold">Накланяй телефона</span> наляво/надясно, за да завиваш</div>
+                                <div>🏎️ Газта е <span class="font-semibold">автоматична</span> — само насочваш и спираш</div>
+                                <div>🛑 Задръж <span class="font-semibold">Спирачка</span>, за да намалиш за завоите</div>
+                            </div>
+                            <!-- Десктоп: клавиатура -->
+                            <div v-else class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-zinc-300">
                                 <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">↑</kbd> газ</span>
                                 <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">↓</kbd> спирачка</span>
                                 <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">←</kbd> <kbd class="rounded bg-zinc-800 px-1.5 py-0.5">→</kbd> завиване</span>

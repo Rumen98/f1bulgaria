@@ -149,6 +149,9 @@ export class Game {
         this.input = { throttle: 0, brake: 0, steer: 0 };
         this.keys = new Set();
         this.touch = { throttle: 0, brake: 0, steer: 0 };
+        // Авто-газ (мобилно): болидът ускорява сам, играчът само насочва (tilt) и
+        // спира. Включва се от Vue при мобилно устройство.
+        this.autoThrottle = false;
 
         // Асфалтът под колата: височина за рендера, наклон за гравитацията.
         this.surface = { height: this.track.ys[0], gradient: this.track.gradient[0] };
@@ -601,8 +604,12 @@ export class Game {
             (keys.has('ArrowLeft') || keys.has('KeyA') ? -1 : 0) +
             (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0);
 
-        this.input.throttle = Math.max(throttle, this.touch.throttle);
         this.input.brake = Math.max(brake, this.touch.brake);
+        // Авто-газ: пълна газ, освен когато спираш (спирачката вдига газта). Иначе
+        // нормалната газ от клавиатура/тъч.
+        this.input.throttle = this.autoThrottle
+            ? (this.input.brake > 0 ? 0 : 1)
+            : Math.max(throttle, this.touch.throttle);
 
         // Дясноориентирана three.js сцена + chase камера зад колата → физическото
         // „надясно" (+x) се РЕНДЕРИРА вляво на екрана. Обръщаме тук (клавиатура и
