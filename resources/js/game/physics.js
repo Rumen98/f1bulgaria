@@ -137,7 +137,12 @@ const GRAVITY = 9.81;
  * @property {number} z
  * @property {number} heading      Радиани; forward = (sin h, cos h)
  * @property {number} vForward     Надлъжна скорост, m/s
- * @property {number} vLateral     Странична скорост, m/s (+ = надясно)
+ * @property {number} vLateral     Странична скорост, m/s. + е по локалната ос
+ *                                 (cos h, -sin h) — след обръщането на z при
+ *                                 зареждане (виж track.js) тя сочи СРЕЩУ
+ *                                 нормалата на трасето, т.е. екранно наляво.
+ *                                 Физиката е самосъгласувана; посоките на
+ *                                 входа ги превежда Game.#readInput.
  * @property {number} steer        Текущо положение на волана, [-1, 1]
  * @property {number} yawRate      Ъглова скорост, rad/s (динамично състояние)
  * @property {number} slip         0..1, колко плъзга задницата — за ефекти
@@ -175,11 +180,16 @@ export function createCarState(track) {
  * @param {CarState} state
  * @param {CarInput} input
  * @param {number} dt
- * @param {boolean} onTrack Дали колата е върху асфалта
+ * @param {boolean} onTrack Дали колата е върху асфалта (вкл. кербовете)
  * @param {number} gradient Наклон на трасето по посоката на движение (dy/ds)
+ * @param {{gripFactor: number, drag: number}|null} offRoad Характер на
+ *        повърхността ИЗВЪН трасето: чакълът дърпа много по-силно от тревата,
+ *        асфалтовият апрон — почти никак. null = тревата по подразбиране.
+ *        Стойностите идват детерминирано от данните на пистата, така че
+ *        бъдещият сървърен replay остава възпроизводим.
  */
-export function step(state, input, dt, onTrack, gradient = 0) {
-    const gripFactor = onTrack ? 1 : CAR.offTrackGripFactor;
+export function step(state, input, dt, onTrack, gradient = 0, offRoad = null) {
+    const gripFactor = onTrack ? 1 : (offRoad?.gripFactor ?? CAR.offTrackGripFactor);
 
     // ── Волан ────────────────────────────────────────────────────────────
     // Воланът се движи с крайна скорост, не мигновено. На клавиатура това е
@@ -217,7 +227,7 @@ export function step(state, input, dt, onTrack, gradient = 0) {
     accel -= CAR.rollingResistance * state.vForward * (onTrack ? 1 : 3);
 
     if (!onTrack) {
-        accel -= Math.sign(state.vForward) * CAR.offTrackDrag;
+        accel -= Math.sign(state.vForward) * (offRoad?.drag ?? CAR.offTrackDrag);
     }
 
     // Съставяща на тежестта по склона. `gradient` е тангенсът на наклона, а на
@@ -326,7 +336,9 @@ export function step(state, input, dt, onTrack, gradient = 0) {
     const sin = Math.sin(state.heading);
     const cos = Math.cos(state.heading);
 
-    // forward = (sin, cos); right = (cos, -sin)
+    // forward = (sin, cos); страничната ос = (cos, -sin). В екранни/световни
+    // термини тази ос е наляво (виж бележката при vLateral) — без значение за
+    // самата симулация, стига Game.#readInput да превежда входа последователно.
     state.x += (state.vForward * sin + state.vLateral * cos) * dt;
     state.z += (state.vForward * cos - state.vLateral * sin) * dt;
 }

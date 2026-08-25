@@ -8,6 +8,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { buildCircuitDecor, createTerrainSampler, fenceMesh } from './decor.js';
 import { findKerbRanges } from './track.js';
 
 export const COLORS = {
@@ -73,13 +74,14 @@ const Y = {
  * Генерира цялата статична геометрия на пистата.
  *
  * @param {import('./track.js').Track} track
+ * @param {import('./circuits.js').CircuitStyle} circuit Визуалната идентичност
  * @returns {THREE.Group}
  */
-export function buildTrackMeshes(track) {
+export function buildTrackMeshes(track, circuit) {
     const group = new THREE.Group();
     const half = track.width / 2;
 
-    group.add(buildGround(track));
+    group.add(buildGround(track, circuit));
 
     // Асфалтът и тревата тръгват с процедурен (vertex-color) материал. Ако
     // техните PBR текстури се заредят успешно ПРЕДИ старта, Game.js ги подменя
@@ -105,13 +107,33 @@ export function buildTrackMeshes(track) {
     );
     group.add(buildKerbs(track));
     group.add(buildStartLine(track));
-    group.add(buildDistanceMarkers(track));
 
-    for (const mesh of buildLandmarks(track)) {
+    // Декорът, който прави пистата разпознаваема: питлейн, решетка, гантри,
+    // табели, чакъл, терен, специалните ориентири (виж decor.js). Семплерът на
+    // терена е ОБЩ за terrain mesh-а, дърветата и сградите — една повърхност.
+    const sampler = createTerrainSampler(track, circuit);
+    const decor = buildCircuitDecor(track, circuit, sampler);
+    group.add(decor.group);
+    group.userData.startLights = decor.startLights;
+    group.userData.animations = decor.animations;
+    // Чакълът влиза в същата PBR подмяна като асфалта/тревата (Game).
+    if (decor.gravelMaterial) {
+        group.userData.surfaces.gravel = decor.gravelMaterial;
+    }
+
+    // На градска писта стълбчетата са безсмислени (стените са навсякъде), а в
+    // диапазона на питовете се сблъскват с комплекса.
+    if (!circuit.streetWalls) {
+        group.add(buildDistanceMarkers(track, decor.pitRange));
+    }
+
+    for (const mesh of buildLandmarks(track, circuit, sampler)) {
         group.add(mesh);
     }
 
-    group.add(buildStartGrandstands(track));
+    if (circuit.startGrandstands) {
+        group.add(buildStartGrandstands(track, circuit, decor.pitRange));
+    }
 
     // Маршал с кариран флаг до старт/финала — flagPivot се вее от Game.#frame
     // на летящата (финална) обиколка.
@@ -130,9 +152,11 @@ export function buildTrackMeshes(track) {
  * Спа се четат от една снимка.
  *
  * @param {import('./track.js').Track} track
+ * @param {import('./circuits.js').CircuitStyle} circuit
+ * @param {import('./decor.js').TerrainSampler} sampler
  * @returns {THREE.Object3D[]}
  */
-function buildLandmarks(track) {
+function buildLandmarks(track, circuit, sampler) {
     const landmarks = track.landmarks;
 
     if (!landmarks) {
@@ -143,6 +167,7 @@ function buildLandmarks(track) {
 
     const grandstands = extrudeRings(
         track,
+        sampler,
         landmarks.grandstands ?? [],
         LANDMARK_HEIGHT.grandstand,
         COLORS.grandstand
@@ -153,17 +178,20 @@ function buildLandmarks(track) {
 
     // Изхвърляме сградите, които попадат върху/до трасето — в град като Монако
     // OSM има footprint-и точно на пистата (бежевите блокове през асфалта).
+    // Височината е част от идентичността: жилищните блокове на Монако правят
+    // каньона, а паддок постройките на Силвърстоун са ниски.
     const buildings = extrudeRings(
         track,
+        sampler,
         (landmarks.buildings ?? []).filter((ring) => !overlapsTrack(track, ring, track.width / 2 + 3)),
-        LANDMARK_HEIGHT.building,
+        circuit.buildingHeight ?? LANDMARK_HEIGHT.building,
         COLORS.building
     );
     if (buildings) {
         out.push(buildings);
     }
 
-    const trees = buildTrees(track, landmarks.trees ?? []);
+    const trees = buildTrees(track, circuit, sampler, landmarks.trees ?? []);
     if (trees) {
         out.push(trees);
     }
@@ -225,10 +253,15 @@ function distToSegmentSq(px, pz, ax, az, bx, bz) {
  *
  * Инстанцирани (3 draw call-а за всички секции) и без сянка — леко за телефон.
  *
+ * Строят се само СРЕЩУ питовете — от другата страна стои пит комплексът
+ * (decor.js), точно както главната трибуна на реална писта гледа към боксовете.
+ *
  * @param {import('./track.js').Track} track
+ * @param {import('./circuits.js').CircuitStyle} circuit
+ * @param {{sign: number}} pitRange
  * @returns {THREE.Group}
  */
-function buildStartGrandstands(track) {
+function buildStartGrandstands(track, circuit, pitRange) {
     const { xs, ys, zs, nx, nz, tx, tz, count, spacing, width } = track;
     const group = new THREE.Group();
     const half = width / 2;
@@ -245,7 +278,7 @@ function buildStartGrandstands(track) {
 
     // Процедурна „публика" — хиляди цветни точки върху тъмни седалки → пълни
     // трибуни без external asset. Строи се веднъж, споделя се от всички секции.
-    const crowd = makeCrowdTexture();
+    const crowd = makeCrowdTexture(circuit.crowdAccent);
     crowd.repeat.set(6, 3);
     const bodyMat = new THREE.MeshStandardMaterial({ map: crowd, color: 0xffffff, metalness: 0.0, roughness: 0.9 });
     const roofMat = new THREE.MeshStandardMaterial({ color: COLORS.grandstandRoof, metalness: 0.45, roughness: 0.5 });
@@ -276,7 +309,7 @@ function buildStartGrandstands(track) {
     // Инстанцирани: 3 draw call-а (тяло/покрив/борд) вместо ~36 отделни меша —
     // и толкова по-малко в сенчестия pass. Не хвърлят сянка (виж Game: само
     // колата хвърля) и не се cull-ват (3 евтини рисувания, винаги налични).
-    const capacity = sections * 2;
+    const capacity = sections;
     const bodies = new THREE.InstancedMesh(bodyGeo, bodyMat, capacity);
     const roofs = new THREE.InstancedMesh(roofGeo, roofMat, capacity);
     const hoards = new THREE.InstancedMesh(hoardGeo, hoardMat, capacity);
@@ -287,10 +320,12 @@ function buildStartGrandstands(track) {
     const scale = new THREE.Vector3(1, 1, 1);
     let n = 0;
 
-    for (const sign of [1, -1]) {
+    for (const sign of [-pitRange.sign]) {
         for (let s = 0; s < sections; s++) {
             const i = (((s * step - startBack) % count) + count) % count;
-            quaternion.setFromAxisAngle(UP, Math.atan2(tx[i], tz[i]));
+            // Наклонената банка гледа към +X в локални координати; от лявата
+            // страна (sign<0) секцията се обръща на 180°, за да гледа трасето.
+            quaternion.setFromAxisAngle(UP, Math.atan2(tx[i], tz[i]) + (sign < 0 ? Math.PI : 0));
             const off = sign * (half + GAP + DEPTH / 2);
 
             position.set(xs[i] + nx[i] * off, ys[i] + HEIGHT / 2, zs[i] + nz[i] * off);
@@ -317,6 +352,20 @@ function buildStartGrandstands(track) {
         group.add(mesh);
     }
 
+    // Защитна ограда между трасето и трибуните — по целия им фронт. Долният
+    // ръб слиза под нивото на спуснатата трева (иначе виси на ~половин метър).
+    const fenceSign = -pitRange.sign;
+    group.add(
+        fenceMesh(
+            track,
+            -startBack,
+            -startBack + sections * step,
+            fenceSign * (half + 2.0),
+            -0.8,
+            3.2
+        )
+    );
+
     return group;
 }
 
@@ -327,12 +376,13 @@ function buildStartGrandstands(track) {
  * си свалят кадрите на телефон под играбилното.
  *
  * @param {import('./track.js').Track} track
+ * @param {import('./decor.js').TerrainSampler} sampler
  * @param {Array<Array<Array<number>>>} rings
  * @param {number} baseHeight
  * @param {number} color
  * @returns {THREE.Mesh|null}
  */
-function extrudeRings(track, rings, baseHeight, color) {
+function extrudeRings(track, sampler, rings, baseHeight, color) {
     if (rings.length === 0) {
         return null;
     }
@@ -368,10 +418,11 @@ function extrudeRings(track, rings, baseHeight, color) {
 
         geometry.rotateX(-Math.PI / 2);
 
-        // Сядат на нивото на най-близката част от трасето. Точен терен нямаме
-        // и не ни трябва — на 400 m разстояние разликата не се чете.
+        // Сядат върху общия терен (семплера) — същата мрежа рендерира и
+        // релефа, така че сграда на хълм стои НА хълма, не виси до него.
+        // Лекият минус компенсира наклона на терена под широк контур.
         const centroid = ringCentroid(ring);
-        geometry.translate(0, groundHeightNear(track, centroid[0], centroid[1]), 0);
+        geometry.translate(0, sampler.heightAt(centroid[0], centroid[1]) - 0.4, 0);
 
         geometries.push(geometry);
     }
@@ -399,61 +450,172 @@ function extrudeRings(track, rings, baseHeight, color) {
 }
 
 /**
- * Дървета в горските зони, като инстанции на един прост силует.
+ * Дървета в горските зони — силуетът зависи от пистата: смърчове в Ардените
+ * и Щирия, широколистни в кралския парк на Монца, ниски храсти по дюните на
+ * Зандвоорт. 'mixed' редува двата вида детерминирано.
  *
  * @param {import('./track.js').Track} track
+ * @param {import('./circuits.js').CircuitStyle} circuit
+ * @param {import('./decor.js').TerrainSampler} sampler
  * @param {Array<Array<number>>} trees
- * @returns {THREE.InstancedMesh|null}
+ * @returns {THREE.Group|null}
  */
-function buildTrees(track, trees) {
+function buildTrees(track, circuit, sampler, trees) {
     if (trees.length === 0) {
         return null;
     }
 
-    const trunk = new THREE.CylinderGeometry(0.22, 0.3, 2.4, 5);
-    trunk.translate(0, 1.2, 0);
+    const kindFor = (seed) => {
+        if (circuit.trees === 'mixed') {
+            return hashNoise(seed * 7.91) > 0.45 ? 'deciduous' : 'conifer';
+        }
+        return circuit.trees;
+    };
 
-    const foliage = new THREE.ConeGeometry(2.1, 6.5, 6);
-    foliage.translate(0, 5.6, 0);
+    // Сгъстяване на гората: OSM дава по едно дърво на площ, а Монца и Спа са
+    // тунели от зеленина. При density > 1 всяко дърво получава клонинги,
+    // разхвърляни детерминирано около него.
+    //
+    // Всяко разположение (и клонинг, и оригинал) се проверява срещу трасето —
+    // клонинг на 5–18 m от дърво до банкета иначе стъпва на асфалта или в
+    // чакъла. Клирънсът покрива и run-off зоната; стъпка 2 реда (8 m), за да
+    // не пропусне точка между два семпъла.
+    const clearance = track.width / 2 + 9;
+    const clearanceSq = clearance * clearance;
+    const clearOfTrack = (x, z) => {
+        const { xs, zs, count } = track;
+        for (let i = 0; i < count; i += 2) {
+            const dx = x - xs[i];
+            const dz = z - zs[i];
+            if (dx * dx + dz * dz < clearanceSq) {
+                return false;
+            }
+        }
+        return true;
+    };
 
-    // Два цвята в една геометрия: по-евтино от два InstancedMesh-а.
-    paintGeometry(trunk, COLORS.trunk);
-    paintGeometry(foliage, COLORS.foliage);
+    const density = circuit.treeDensity ?? 1;
+    const placements = [];
+    for (let i = 0; i < trees.length && placements.length < 2600; i++) {
+        const [x, z, s] = trees[i];
+        if (clearOfTrack(x, z)) {
+            placements.push([x, z, s, i]);
+        }
 
-    const geometry = mergeGeometries([trunk, foliage], false);
-    trunk.dispose();
-    foliage.dispose();
-
-    if (!geometry) {
-        return null;
+        const extra = Math.floor(density - 1 + hashNoise(i * 13.7));
+        for (let e = 0; e < extra && placements.length < 2600; e++) {
+            const angle = hashNoise(i * 17.3 + e * 7.1) * Math.PI * 2;
+            const radius = 5 + hashNoise(i * 23.9 + e * 3.3) * 13;
+            const cx = x + Math.cos(angle) * radius;
+            const cz = z + Math.sin(angle) * radius;
+            if (clearOfTrack(cx, cz)) {
+                placements.push([cx, cz, s * (0.8 + hashNoise(i + e * 41.7) * 0.5), i * 31 + e + 1009]);
+            }
+        }
     }
 
-    const mesh = new THREE.InstancedMesh(
-        geometry,
-        new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 }),
-        trees.length
-    );
+    // Разпределяме инстанциите по вид: до два InstancedMesh-а на писта.
+    const buckets = new Map();
+    for (let p = 0; p < placements.length; p++) {
+        const kind = kindFor(placements[p][3]);
+        if (!buckets.has(kind)) {
+            buckets.set(kind, []);
+        }
+        buckets.get(kind).push(p);
+    }
 
+    const group = new THREE.Group();
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
     const quaternion = new THREE.Quaternion();
     const scale = new THREE.Vector3();
 
-    for (let i = 0; i < trees.length; i++) {
-        const [x, z, s] = trees[i];
+    for (const [kind, indices] of buckets) {
+        const geometry = treeGeometry(kind, circuit.foliage);
 
-        position.set(x, groundHeightNear(track, x, z) - 0.2, z);
-        quaternion.setFromAxisAngle(UP, hashNoise(i) * Math.PI * 2);
-        scale.set(s, s * (0.85 + hashNoise(i * 3) * 0.4), s);
+        if (!geometry) {
+            continue;
+        }
 
-        matrix.compose(position, quaternion, scale);
-        mesh.setMatrixAt(i, matrix);
+        const mesh = new THREE.InstancedMesh(
+            geometry,
+            new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 }),
+            indices.length
+        );
+
+        for (let n = 0; n < indices.length; n++) {
+            const [x, z, s, seed] = placements[indices[n]];
+
+            position.set(x, sampler.heightAt(x, z) - 0.2, z);
+            quaternion.setFromAxisAngle(UP, hashNoise(seed) * Math.PI * 2);
+            scale.set(s, s * (0.85 + hashNoise(seed * 3) * 0.4), s);
+
+            matrix.compose(position, quaternion, scale);
+            mesh.setMatrixAt(n, matrix);
+        }
+
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.frustumCulled = false;
+        group.add(mesh);
     }
 
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.frustumCulled = false;
+    return group.children.length > 0 ? group : null;
+}
 
-    return mesh;
+/**
+ * Геометрията на едно дърво от даден вид, с боядисани върхове.
+ *
+ * @param {'conifer'|'deciduous'|'shrub'} kind
+ * @param {number} foliageColor
+ * @returns {THREE.BufferGeometry|null}
+ */
+function treeGeometry(kind, foliageColor) {
+    // mergeGeometries отказва микс от indexed (цилиндър/конус) и non-indexed
+    // (икосаедър) геометрии — нормализираме всичко до non-indexed.
+    const parts = [];
+    const add = (geometry, color) => {
+        const flat = geometry.index ? geometry.toNonIndexed() : geometry;
+        if (flat !== geometry) {
+            geometry.dispose();
+        }
+        paintGeometry(flat, color);
+        parts.push(flat);
+    };
+
+    if (kind === 'shrub') {
+        // Нисък крайбрежен храст — без стъбло, сплескана топка.
+        const bush = new THREE.IcosahedronGeometry(1.5, 0);
+        bush.scale(1, 0.62, 1);
+        bush.translate(0, 0.85, 0);
+        add(bush, foliageColor);
+    } else if (kind === 'deciduous') {
+        const trunk = new THREE.CylinderGeometry(0.26, 0.34, 2.6, 5);
+        trunk.translate(0, 1.3, 0);
+        add(trunk, COLORS.trunk);
+
+        const crown = new THREE.IcosahedronGeometry(2.6, 0);
+        crown.translate(0, 4.6, 0);
+        add(crown, foliageColor);
+
+        const crownTop = new THREE.IcosahedronGeometry(1.7, 0);
+        crownTop.translate(0.7, 6.2, 0.3);
+        add(crownTop, foliageColor);
+    } else {
+        const trunk = new THREE.CylinderGeometry(0.22, 0.3, 2.4, 5);
+        trunk.translate(0, 1.2, 0);
+        add(trunk, COLORS.trunk);
+
+        const cone = new THREE.ConeGeometry(2.1, 6.5, 6);
+        cone.translate(0, 5.6, 0);
+        add(cone, foliageColor);
+    }
+
+    const geometry = mergeGeometries(parts, false);
+    for (const part of parts) {
+        part.dispose();
+    }
+
+    return geometry;
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -492,37 +654,6 @@ function ringCentroid(ring) {
     }
 
     return [x / ring.length, z / ring.length];
-}
-
-/**
- * Височината на трасето най-близо до дадена точка.
- *
- * Груб скан през всяка десета точка: ориентирите се разполагат веднъж при
- * зареждане, а на стотици метри разстояние по-голяма точност е излишна.
- *
- * @param {import('./track.js').Track} track
- * @param {number} x
- * @param {number} z
- * @returns {number}
- */
-function groundHeightNear(track, x, z) {
-    const { xs, ys, zs, count } = track;
-
-    let best = 0;
-    let bestDistSq = Infinity;
-
-    for (let i = 0; i < count; i += 10) {
-        const dx = x - xs[i];
-        const dz = z - zs[i];
-        const distSq = dx * dx + dz * dz;
-
-        if (distSq < bestDistSq) {
-            bestDistSq = distSq;
-            best = ys[i];
-        }
-    }
-
-    return best - Math.sqrt(bestDistSq) * RUNOFF_DROP;
 }
 
 /**
@@ -652,8 +783,8 @@ function buildKerbs(track) {
             const i0 = ((r % count) + count) % count;
             const i1 = (((r + 1) % count) + count) % count;
 
-            // Кербът е от вътрешната страна на завоя: при ляв завой (side=+1)
-            // вътрешната страна е лявата, т.е. по посока на нормалата.
+            // Кербът е от вътрешната страна на завоя: при завой към нормалата
+            // (side=+1) вътрешната страна е тази на нормалата.
             const inner = range.side > 0 ? half : -half;
             const outer = range.side > 0 ? half + KERB_WIDTH : -half - KERB_WIDTH;
 
@@ -676,17 +807,19 @@ function buildKerbs(track) {
                 colors.push(colour.r, colour.g, colour.b);
             }
 
-            // Винтингът се обръща според страната — иначе кербовете отдясно
-            // сочат надолу и изчезват при backface culling.
+            // Винтингът се обръща според страната — при side>0 отместванията
+            // растат (нагоре по нормалата), при side<0 намаляват. Двата бранша
+            // бяха разменени и ВСИЧКИ кербове гледаха надолу (изчезваха при
+            // backface culling) — правилно е растящи отмествания → прав ред.
             if (range.side > 0) {
-                indices.push(
-                    vertexBase, vertexBase + 2, vertexBase + 1,
-                    vertexBase + 1, vertexBase + 2, vertexBase + 3
-                );
-            } else {
                 indices.push(
                     vertexBase, vertexBase + 1, vertexBase + 2,
                     vertexBase + 1, vertexBase + 3, vertexBase + 2
+                );
+            } else {
+                indices.push(
+                    vertexBase, vertexBase + 2, vertexBase + 1,
+                    vertexBase + 1, vertexBase + 2, vertexBase + 3
                 );
             }
         }
@@ -753,14 +886,21 @@ function buildStartLine(track) {
  * прелитат, плоският асфалт не дава референция колко бързо се движиш.
  *
  * @param {import('./track.js').Track} track
+ * @param {{from: number, to: number, sign: number}} pitRange Пропуска се пит зоната
  * @returns {THREE.InstancedMesh}
  */
-function buildDistanceMarkers(track) {
+function buildDistanceMarkers(track, pitRange) {
     const { xs, ys, zs, nx, nz, count, spacing, width } = track;
     const half = width / 2 + 2.5;
 
     const every = Math.max(1, Math.round(25 / spacing));
     const capacity = Math.floor(count / every) * 2;
+
+    // Пит зоната в увити редове: [from..to] спрямо ред 0 може да е отрицателно.
+    const inPit = (i) => {
+        const wrapped = i > count / 2 ? i - count : i;
+        return wrapped > pitRange.from && wrapped < pitRange.to;
+    };
 
     const geometry = new THREE.BoxGeometry(0.25, 1.1, 0.25);
     const material = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.9 });
@@ -776,6 +916,11 @@ function buildDistanceMarkers(track) {
         }
 
         for (const side of [1, -1]) {
+            // На страната на питовете стълбчето би стояло в питлейна.
+            if (inPit(i) && side === pitRange.sign) {
+                continue;
+            }
+
             matrix.setPosition(
                 xs[i] + nx[i] * half * side,
                 ys[i] + 0.55 - half * RUNOFF_DROP,
@@ -801,12 +946,14 @@ function buildDistanceMarkers(track) {
 }
 
 /**
- * Земята под всичко — покрива хоризонта отвъд тревната зона.
+ * Земята под всичко — покрива хоризонта отвъд терена (decor.js), в цвета на
+ * основната палитра на пистата.
  *
  * @param {import('./track.js').Track} track
+ * @param {import('./circuits.js').CircuitStyle} circuit
  * @returns {THREE.Mesh}
  */
-function buildGround(track) {
+function buildGround(track, circuit) {
     const { xs, ys, zs, count } = track;
 
     let minX = Infinity;
@@ -827,15 +974,17 @@ function buildGround(track) {
     const geometry = new THREE.PlaneGeometry(size, size);
     geometry.rotateX(-Math.PI / 2);
 
+    const ground = new THREE.Color(circuit.terrain.base).multiplyScalar(0.72);
     const mesh = new THREE.Mesh(
         geometry,
-        new THREE.MeshStandardMaterial({ color: COLORS.ground, metalness: 0, roughness: 1 })
+        new THREE.MeshStandardMaterial({ color: ground, metalness: 0, roughness: 1 })
     );
 
-    // Под най-ниската точка на трасето и под спуснатия ръб на тревата.
+    // Под най-ниската точка на трасето, спуснатия ръб на тревата И най-ниските
+    // падини на терена (релефът слиза до ~30% от амплитудата под нулата).
     mesh.position.set(
         (minX + maxX) / 2,
-        minY - RUNOFF_WIDTH * RUNOFF_DROP - 0.5,
+        minY - RUNOFF_WIDTH * RUNOFF_DROP - 1.4 - circuit.terrain.amplitude * 0.35,
         (minZ + maxZ) / 2
     );
 
@@ -942,21 +1091,27 @@ function makeCheckeredTexture() {
  * (зрители). Детерминирана (hashNoise, не Math.random) — без мъждукане при
  * презареждане. Строи се веднъж и се tiling-ва по трибуните.
  *
+ * @param {number|null} accent Доминиращ цвят (тифозите на Монца, оранжевата
+ *        армия на Зандвоорт) — около 40% от точките го получават.
  * @returns {THREE.CanvasTexture}
  */
-function makeCrowdTexture() {
+function makeCrowdTexture(accent = null) {
     const size = 256;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#23272e';
+    ctx.fillStyle = '#2c313a';
     ctx.fillRect(0, 0, size, size);
 
     const colors = ['#d94f4f', '#e6e6e6', '#4f7fd9', '#e0c24f', '#5ad07a', '#c94fd9', '#d98a4f', '#ffffff', '#4a4f57', '#f0f0f0'];
+    const accentCss = accent === null ? null : '#' + accent.toString(16).padStart(6, '0');
     for (let i = 0; i < 4600; i++) {
-        ctx.fillStyle = colors[Math.floor(hashNoise(i * 1.37) * colors.length)];
+        ctx.fillStyle =
+            accentCss !== null && hashNoise(i * 5.13) < 0.4
+                ? accentCss
+                : colors[Math.floor(hashNoise(i * 1.37) * colors.length)];
         ctx.fillRect(hashNoise(i * 2.11) * size, hashNoise(i * 3.71) * size, 2, 2);
     }
 

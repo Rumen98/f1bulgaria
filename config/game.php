@@ -46,7 +46,10 @@ return [
         'monza' => ['feature' => 'it-1922', 'width' => 14.0, 'start_offset' => 0.0, 'max_slope' => 0.06],
         'spa' => ['feature' => 'be-1925', 'width' => 13.5, 'start_offset' => 0.0, 'max_slope' => 0.18],
         'silverstone' => ['feature' => 'gb-1948', 'width' => 13.0, 'start_offset' => 0.0, 'max_slope' => 0.05],
-        'monaco' => ['feature' => 'mc-1929', 'width' => 9.0, 'start_offset' => 0.0, 'max_slope' => 0.15],
+        // start_offset: суровият GeoJSON започва при Казиното (върха на трасето);
+        // реалният старт/финал е на правата Rascasse → Sainte Dévote, на
+        // пристанищното ниво — ~2770 m по посоката на обиколката.
+        'monaco' => ['feature' => 'mc-1929', 'width' => 9.0, 'start_offset' => 2770.0, 'max_slope' => 0.15],
         'suzuka' => ['feature' => 'jp-1962', 'width' => 13.0, 'start_offset' => 0.0, 'max_slope' => 0.10],
         'red_bull_ring' => ['feature' => 'at-1969', 'width' => 13.5, 'start_offset' => 0.0, 'max_slope' => 0.12],
         'zandvoort' => ['feature' => 'nl-1948', 'width' => 12.0, 'start_offset' => 0.0, 'max_slope' => 0.08],

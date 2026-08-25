@@ -12,12 +12,15 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { buildCar, updateCarRig, attachCarModel } from './car.js';
+import { circuitFor } from './circuits.js';
+import { runoffRanges } from './decor.js';
 import { buildTrackMeshes, COLORS } from './mesh.js';
 import { CAR, FIXED_DT, createCarState, speedKmh, step } from './physics.js';
-import { prepareTrack, projectOnTrack } from './track.js';
+import { findKerbRanges, prepareTrack, projectOnTrack } from './track.js';
 import { createDrivetrain, shiftDown, shiftUp, updateDrivetrain } from './drivetrain.js';
 
 /** Брой сектори на обиколка, както в истинската Формула 1. */
@@ -62,6 +65,46 @@ const CAMERA = {
     fovFast: 84,
     /** Колко бързо камерата догонва колата. По-високо = по-залепена. */
     followDamping: 7.5,
+    /** Бордова (halo) камера: око на пилота над кокпита. */
+    onboardHeight: 1.05,
+    onboardForward: 0.25,
+    onboardLookAhead: 55,
+};
+
+/**
+ * „Broadcast" грейд: лека наситеност, топли светли/хладни тъмни тонове и
+ * мека винетка. Работи в линейно пространство, преди tone mapping-а на
+ * OutputPass — един fullscreen проход, евтин и за телефон.
+ */
+const GRADE_SHADER = {
+    uniforms: {
+        tDiffuse: { value: null },
+    },
+    vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse;
+        varying vec2 vUv;
+        void main() {
+            vec4 base = texture2D(tDiffuse, vUv);
+            vec3 col = base.rgb;
+
+            float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+            col = mix(vec3(luma), col, 1.08);
+            col *= vec3(1.02, 1.0, 0.985);
+            col += vec3(0.0, 0.0015, 0.004) * max(0.0, 1.0 - luma);
+
+            float d = distance(vUv, vec2(0.5));
+            col *= 1.0 - smoothstep(0.55, 0.95, d) * 0.16;
+
+            gl_FragColor = vec4(col, base.a);
+        }
+    `,
 };
 
 /**
@@ -91,6 +134,8 @@ export class Game {
         this.onTelemetry = onTelemetry;
         this.onFinish = onFinish;
         this.track = prepareTrack(trackData);
+        // Визуалната идентичност на пистата: питлейн, терен, светлина (circuits.js).
+        this.circuit = circuitFor(this.track.slug);
 
         this.renderer = new THREE.WebGLRenderer({
             canvas,
@@ -100,23 +145,27 @@ export class Game {
         // Над 2 нищо не се печели визуално, а на телефон убива кадрите.
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // Филмов tone mapping + сенки (Фаза 1 реализъм).
+        // Филмов tone mapping + сенки (Фаза 1 реализъм). Експозицията е част от
+        // атмосферата на пистата (мек Спа срещу ярко крайбрежие в Зандвоорт).
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 0.95;
+        this.renderer.toneMappingExposure = this.circuit.atmosphere.exposure;
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+        const atmosphere = this.circuit.atmosphere;
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(COLORS.sky); // сменя се от небето по-долу
-        this.scene.fog = new THREE.Fog(0xbcd3e6, 300, 1100);
+        this.scene.fog = new THREE.Fog(atmosphere.fogColor, atmosphere.fogNear, atmosphere.fogFar);
 
         this.camera = new THREE.PerspectiveCamera(CAMERA.fovIdle, 1, 0.5, 2200);
 
         const envReady = this.#setupEnvironment();
-        const trackGroup = buildTrackMeshes(this.track);
+        const trackGroup = buildTrackMeshes(this.track, this.circuit);
         this.scene.add(trackGroup);
         this.surfaceMaterials = trackGroup.userData.surfaces;
         this.marshalFlag = trackGroup.userData.marshalFlag; // вее се на летящата обиколка
+        this.startLights = trackGroup.userData.startLights; // 5-те светлини на гантрито
+        this.decorAnimations = trackGroup.userData.animations ?? []; // виенското колело и др.
         const trackReady = this.#loadTrackTextures();
 
         this.carRig = buildCar();
@@ -130,10 +179,12 @@ export class Game {
         // играта. Никога не reject-ва — при липса остава процедурното.
         this.ready = Promise.all([envReady, carReady, trackReady]).then(() => this.#warmup());
 
-        // Сенки: всичко ПРИЕМА сянка, но само колата ХВЪРЛЯ. Сенчестият pass е
-        // втори render на сцената — далечните/големите меши (земя, трибуни,
-        // сгради) хвърлят сянка, която не се вижда, а струва. Само болидът →
-        // сянката е там, където трябва, на цена от една кола.
+        // Сенки: всичко ПРИЕМА сянка; хвърлят я колата и подбраният декор
+        // близо до трасето (гантри, пит стена/гараж, гуми, табели, мостове —
+        // виж castShadow в decor.js). Тежките далечни меши (земя, терен,
+        // дървета, OSM сгради) не хвърлят: тяхната сянка не се вижда, а струва.
+        // Сенчестият pass рисува декора всеки кадър (frustumCulled=false), но
+        // общата му геометрия е десетки хиляди триъгълника — поносимо.
         this.scene.traverse((o) => {
             if (o.isMesh) {
                 o.receiveShadow = true;
@@ -155,6 +206,44 @@ export class Game {
 
         // Асфалтът под колата: височина за рендера, наклон за гравитацията.
         this.surface = { height: this.track.ys[0], gradient: this.track.gradient[0] };
+
+        // Повърхности по ред от осевата линия: кербове (яздят се, с вибрация)
+        // и run-off зони (чакълът дърпа истински, тревата — както досега).
+        // Детерминирани от данните → бъдещият сървърен replay ги възпроизвежда.
+        this.kerbSide = new Int8Array(this.track.count);
+        for (const range of findKerbRanges(this.track)) {
+            for (let r = range.from; r <= range.to; r++) {
+                this.kerbSide[((r % this.track.count) + this.track.count) % this.track.count] = range.side;
+            }
+        }
+        // Битови флагове (1 = зона отдясно/+1, 2 = отляво/-1): в шикан двете
+        // страни имат чакъл на съседни редове — просто презаписване би дало
+        // трева върху нарисуван чакъл.
+        this.runoffSide = new Uint8Array(this.track.count);
+        if (this.circuit.runoff !== 'none') {
+            for (const range of runoffRanges(this.track)) {
+                const bit = range.side < 0 ? 1 : 2; // зоната е от -side страната
+                for (let r = range.from; r <= range.to; r++) {
+                    this.runoffSide[((r % this.track.count) + this.track.count) % this.track.count] |= bit;
+                }
+            }
+        }
+        this.runoffPhysics =
+            this.circuit.runoff === 'gravel'
+                ? { gripFactor: 0.28, drag: 13 }
+                : this.circuit.runoff === 'asphalt'
+                    ? { gripFactor: 0.75, drag: 3.5 }
+                    : null;
+        this.offSurface = null; // 'gravel' | 'asphalt' | 'grass' | null
+        this.onKerb = false;
+        this.effectTime = 0;
+        // Шейкът от миналия кадър — вади се преди изглаждането на камерата,
+        // за да не влиза в персистентното ѝ състояние (иначе амплитудата
+        // зависи от кадровата честота).
+        this.cameraShakeOffset = 0;
+
+        // Камера: chase (по подразбиране) или бордова (C).
+        this.cameraMode = 'chase';
 
         this.trackIndexHint = null;
         this.accumulator = 0;
@@ -299,6 +388,9 @@ export class Game {
         this.cubeRT?.dispose();
         this.envRT?.dispose();
         this.hdrBackground?.dispose();
+        // Shadow map-ът на слънцето е отделен render target — нито traverse-ът,
+        // нито renderer.dispose() го чистят (~4 MB GPU на рестарт).
+        this.sun?.shadow?.dispose?.();
         this.renderer.dispose();
     }
 
@@ -345,25 +437,36 @@ export class Game {
                 }
                 return;
             }
+            // Чакълът тръгва с процедурна canvas карта — освобождаваме я, преди
+            // да я подменим, иначе стои в GPU паметта до края на сесията.
+            material.map?.dispose?.();
             material.map = map;
             material.normalMap = normalMap;
             material.roughnessMap = roughnessMap;
             material.vertexColors = false;
-            material.color.set(0xffffff);
+            // Тревата се тонира според пистата (изсушена в Зандвоорт, златиста
+            // в Монца) — текстурата е обща, характерът идва от тона.
+            material.color.set(name === 'grass' ? this.circuit.grassTint : 0xffffff);
             material.needsUpdate = true;
         });
 
         // Бавна мрежа да не държи loading екрана безкрайно.
         return Promise.race([
-            Promise.all([applyTo('asphalt', 'asphalt', [6, 4]), applyTo('grass', 'grass', [8, 3])]),
+            Promise.all([
+                applyTo('asphalt', 'asphalt', [6, 4]),
+                applyTo('grass', 'grass', [8, 3]),
+                applyTo('gravel', 'gravel', [2, 2]),
+            ]),
             new Promise((resolve) => setTimeout(resolve, 6000)),
         ]);
     }
 
     #setupEnvironment() {
-        // Посока на слънцето от азимут/елевация. Ниско слънце = дълги сенки.
-        const elevation = 32;
-        const azimuth = 130;
+        // Посока на слънцето от азимут/елевация — част от атмосферата на
+        // пистата (ниското златно слънце на Монца, високото на Монако).
+        const atmosphere = this.circuit.atmosphere;
+        const elevation = atmosphere.sunElevation;
+        const azimuth = atmosphere.sunAzimuth;
         const phi = THREE.MathUtils.degToRad(90 - elevation);
         const theta = THREE.MathUtils.degToRad(azimuth);
         const sunDir = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
@@ -401,7 +504,7 @@ export class Game {
         // Намалена — HDRI-то вече дава небесен fill, затова аналитичната е по-слаба.
         this.scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x33402f, 0.75));
 
-        const sun = new THREE.DirectionalLight(0xfff2d8, 2.6);
+        const sun = new THREE.DirectionalLight(atmosphere.sunColor, atmosphere.sunIntensity);
         sun.castShadow = true;
         sun.shadow.mapSize.set(1024, 1024); // върху стегнатата кутия (виж s) 1024 е остро
         sun.shadow.bias = -0.0004;
@@ -485,6 +588,9 @@ export class Game {
             this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.1, 0.5, 1.0));
         }
 
+        // Broadcast грейд — един евтин fullscreen проход, на всички устройства.
+        this.composer.addPass(new ShaderPass(GRADE_SHADER));
+
         // SMAA винаги — евтин AA (3 прохода) и ЕДИНСТВЕНИЯТ тук: composer-ът
         // рендерира в собствен offscreen target, тъй че antialias:true на контекста
         // не важи. На слабо устройство печелим от пропуснатия bloom, но пазим ръбовете.
@@ -564,6 +670,12 @@ export class Game {
                 this.reset(true);
             }
 
+            // C превключва chase ↔ бордова (halo) камера.
+            if (event.code === 'KeyC' && !event.repeat) {
+                this.cameraMode = this.cameraMode === 'chase' ? 'onboard' : 'chase';
+                this.lookTarget = null; // погледът да не замахне от старата точка
+            }
+
             // Ръчна трансмисия: W = нагоре, S = надолу (веднъж на натискане —
             // event.repeat спира повтарянето при задържане).
             if (this.manualTransmission && !event.repeat) {
@@ -641,7 +753,33 @@ export class Game {
         this.surface.height = projection.height;
         this.surface.gradient = projection.gradient;
 
-        const onTrack = Math.abs(projection.lateral) < this.track.width / 2;
+        // Кербовете се броят за трасе (както в реалните track limits): пълно
+        // сцепление + вибрация, без предупреждения. Извън тях повърхността
+        // определя наказанието — чакълът е капан, асфалтовият апрон прощава.
+        const half = this.track.width / 2;
+        const absLateral = Math.abs(projection.lateral);
+        const lateralSide = projection.lateral > 0 ? 1 : -1;
+        const strictlyOn = absLateral < half;
+        const kerbHere = this.kerbSide[projection.index] === lateralSide;
+        const onTrack = strictlyOn || (kerbHere && absLateral < half + 1.15);
+
+        let offRoad = null;
+        if (!onTrack) {
+            const zoneBit = lateralSide > 0 ? 1 : 2;
+            if (
+                this.runoffPhysics &&
+                (this.runoffSide[projection.index] & zoneBit) !== 0 &&
+                absLateral < half + 8
+            ) {
+                offRoad = this.runoffPhysics;
+                this.offSurface = this.circuit.runoff;
+            } else {
+                this.offSurface = 'grass';
+            }
+        } else {
+            this.offSurface = null;
+        }
+        this.onKerb = onTrack && kerbHere && absLateral > half - 0.45;
 
         if (onTrack) {
             // Помним последното безопасно състояние — там ни връща спасяването.
@@ -658,7 +796,7 @@ export class Game {
             }
         }
 
-        step(this.state, this.input, FIXED_DT, onTrack, projection.gradient);
+        step(this.state, this.input, FIXED_DT, onTrack, projection.gradient, offRoad);
 
         this.#updateLapTiming(projection, onTrack);
     }
@@ -768,6 +906,12 @@ export class Game {
         this.surface.gradient = this.track.gradient[target.index];
         this.recoverTarget = target;
         this.snapRender = true;
+
+        // Повърхността отпреди излитането да не разтресе камерата на пуска —
+        // респ. точката е на осевата линия, върху чист асфалт.
+        this.offSurface = null;
+        this.onKerb = false;
+        this.cameraShakeOffset = 0;
 
         // Камерата да не помете през картата — залепяме я зад колата на новото
         // място и пресъздаваме look-таргета.
@@ -944,6 +1088,40 @@ export class Game {
         const forwardX = Math.sin(state.heading);
         const forwardZ = Math.cos(state.heading);
 
+        // ── Бордова (halo) камера: твърдо закачена за болида ────────────────
+        // Без изглаждане на позицията — истинската onboard се тресе с колата,
+        // това Е усещането. Погледът напред остава леко изгладен.
+        if (this.cameraMode === 'onboard') {
+            this.camera.position.set(
+                state.x + forwardX * CAMERA.onboardForward,
+                this.surface.height + CAMERA.onboardHeight,
+                state.z + forwardZ * CAMERA.onboardForward
+            );
+
+            const { ys, spacing, count } = this.track;
+            const aheadIndex =
+                this.trackIndexHint === null
+                    ? 0
+                    : (this.trackIndexHint + Math.round(CAMERA.onboardLookAhead / spacing)) % count;
+
+            const lookX = state.x + forwardX * CAMERA.onboardLookAhead;
+            const lookY = ys[aheadIndex] + 1.0;
+            const lookZ = state.z + forwardZ * CAMERA.onboardLookAhead;
+
+            const kLook = 1 - Math.exp(-14 * dt);
+            if (!this.lookTarget) {
+                this.lookTarget = new THREE.Vector3(lookX, lookY, lookZ);
+            } else {
+                this.lookTarget.x += (lookX - this.lookTarget.x) * kLook;
+                this.lookTarget.y += (lookY - this.lookTarget.y) * kLook;
+                this.lookTarget.z += (lookZ - this.lookTarget.z) * kLook;
+            }
+            this.camera.lookAt(this.lookTarget);
+
+            this.#updateFov(dt, state);
+            return;
+        }
+
         const targetX = state.x - forwardX * CAMERA.distance;
         const targetZ = state.z - forwardZ * CAMERA.distance;
 
@@ -984,14 +1162,24 @@ export class Game {
 
         this.camera.lookAt(this.lookTarget);
 
-        // Разширяването на зрителното поле със скоростта е основният трик за
-        // усещане за скорост — по-силен от самото движение.
+        this.#updateFov(dt, state);
+    }
+
+    /**
+     * Разширяването на зрителното поле със скоростта е основният трик за
+     * усещане за скорост — по-силен от самото движение. Общо за двете камери.
+     *
+     * @param {number} dt
+     * @param {import('./physics.js').CarState} state
+     */
+    #updateFov(dt, state) {
         const speedRatio = clamp01(Math.abs(state.vForward) / CAR.maxSpeed);
         const targetFov = CAMERA.fovIdle + (CAMERA.fovFast - CAMERA.fovIdle) * speedRatio;
 
         // По-широк праг (0.01→0.05): щом fov се е установил, спираме да
         // преизчисляваме проекционната матрица всеки кадър при почти-константна скорост.
         if (Math.abs(this.camera.fov - targetFov) > 0.05) {
+            const k = 1 - Math.exp(-CAMERA.followDamping * dt);
             this.camera.fov += (targetFov - this.camera.fov) * k;
             this.camera.updateProjectionMatrix();
         }
@@ -1052,7 +1240,28 @@ export class Game {
         render.heading = prevHeading + dHeading * alpha;
 
         updateCarRig(this.carRig, render, this.surface, dt);
+
+        // Шейкът от миналия кадър се маха ПРЕДИ изглаждането — chase камерата
+        // интегрира от текущата си позиция и иначе офсетът се наслагва с
+        // коефициент, зависещ от кадровата честота (на 240 Hz ставаше ~5×).
+        this.camera.position.y -= this.cameraShakeOffset;
         this.#updateCamera(dt, render);
+
+        // Тактилни повърхности: чакълът тресе камерата, кербът вибрира болида.
+        // Чисто визуални — физиката вече е сметната в стъпката.
+        this.effectTime += dt;
+        let shake = 0;
+        if (this.offSurface === 'gravel' && Math.abs(this.state.vForward) > 4) {
+            shake = Math.sin(this.effectTime * 43) * 0.035 + Math.sin(this.effectTime * 61) * 0.02;
+        }
+        let rumble = 0;
+        if (this.onKerb && Math.abs(this.state.vForward) > 8) {
+            rumble = Math.sin(this.effectTime * 85) * 0.014;
+        }
+        this.carRig.body.position.y = rumble;
+        this.cameraShakeOffset =
+            this.cameraMode === 'onboard' ? shake + rumble * 0.8 : shake * 0.45 + rumble * 0.2;
+        this.camera.position.y += this.cameraShakeOffset;
 
         // Маршалът вее карирания флаг само на летящата (финалната) обиколка.
         if (this.marshalFlag) {
@@ -1061,6 +1270,20 @@ export class Game {
                 this.marshalFlag.rotation.z = Math.sin(this.flagWave) * FLAG_WAVE_AMP;
             } else if (this.marshalFlag.rotation.z !== 0) {
                 this.marshalFlag.rotation.z = 0; // в покой прътът е изправен
+            }
+        }
+
+        // Декор анимации (виенското колело на Сузука се върти бавно).
+        for (const animate of this.decorAnimations) {
+            animate(dt);
+        }
+
+        // Петте светлини на гантрито: червени по време на загряващата обиколка,
+        // угасват щом пресечеш линията — „lights out and away we go".
+        if (this.startLights) {
+            const target = this.phase === 'formation' ? 3.2 : 0;
+            if (this.startLights.emissiveIntensity !== target) {
+                this.startLights.emissiveIntensity = target;
             }
         }
 

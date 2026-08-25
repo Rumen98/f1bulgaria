@@ -492,7 +492,8 @@ const recenterTilt = () => {
                 газ, <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">↓</kbd> спирачка,
                 <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">←</kbd>
                 <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">→</kbd> завиване,
-                <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">R</kbd> рестарт.
+                <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">R</kbd> рестарт,
+                <kbd class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">C</kbd> бордова камера.
                 Трансмисията (авто/ръчна) избираш преди всяка обиколка.
             </p>
 
@@ -746,6 +747,7 @@ const recenterTilt = () => {
                                     <kbd class="rounded bg-zinc-800 px-1.5 py-0.5">S</kbd> надолу
                                 </span>
                                 <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">R</kbd> рестарт</span>
+                                <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">C</kbd> камера</span>
                             </div>
                             <p class="mt-2 text-[11px] text-zinc-500">
                                 Мини стартовата линия, за да пуснеш хронометъра.

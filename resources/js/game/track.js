@@ -11,6 +11,13 @@
  * посока и скорост, а височината влиза само през гравитацията. Опростява
  * симулацията, без да отнема нищо от усещането — колата и без това не се
  * отделя от асфалта.
+ *
+ * ОРИЕНТАЦИЯ: данните идват в географски координати (x = изток, z = север).
+ * three.js е дясноориентирана с y нагоре, така че северът трябва да е -z —
+ * иначе светът се рендерира ОГЛЕДАЛНО и Parabolica става ляв завой. Затова
+ * тук z се обръща веднъж при зареждане (точки И ориентири); всичко надолу по
+ * веригата (тангенти, нормали, кривина, мешове) се извежда от обърнатите
+ * координати и е коректно от само себе си.
  */
 
 /** Праг на кривина (1/m), над който завоят получава керб. */
@@ -31,10 +38,11 @@ const CURVATURE_SMOOTHING_PASSES = 4;
  * @property {Float32Array} zs
  * @property {Float32Array} tx    Хоризонтална тангента X (единичен вектор)
  * @property {Float32Array} tz
- * @property {Float32Array} nx    Хоризонтална нормала X (наляво спрямо посоката)
+ * @property {Float32Array} nx    Хоризонтална нормала X (надясно спрямо посоката)
  * @property {Float32Array} nz
  * @property {Float32Array} gradient   dy/ds по посоката на движение
- * @property {Float32Array} curvature  Знакова кривина, 1/m (+ = ляв завой)
+ * @property {Float32Array} curvature  Знакова кривина, 1/m (+ = десен завой,
+ *                                     т.е. завой към страната на нормалата)
  * @property {number} count
  * @property {number} elevationRange
  */
@@ -56,7 +64,8 @@ export function prepareTrack(data) {
         xs[i] = p[0];
         // Търпим и стария двумерен формат [x, z] — тогава трасето е плоско.
         ys[i] = p.length > 2 ? p[1] : 0;
-        zs[i] = p.length > 2 ? p[2] : p[1];
+        // Север (z в данните) → -z в three.js — виж бележката за ориентацията.
+        zs[i] = -(p.length > 2 ? p[2] : p[1]);
     }
 
     const tx = new Float32Array(count);
@@ -81,7 +90,9 @@ export function prepareTrack(data) {
         tx[i] = dx;
         tz[i] = dz;
 
-        // Нормала наляво спрямо посоката на движение (XZ равнина, Y нагоре).
+        // Нормала надясно спрямо посоката на движение (XZ равнина, Y нагоре,
+        // z вече е обърнато). Формулата фиксира ориентацията на (t, n) рамката
+        // независимо от данните — затова навивката на мешовете не зависи от нея.
         nx[i] = -dz;
         nz[i] = dx;
 
@@ -127,7 +138,28 @@ export function prepareTrack(data) {
         count,
         elevationRange: maxY - minY,
         // Реални контури от OpenStreetMap (ODbL) — виж game:fetch-landmarks.
-        landmarks: data.landmarks ?? null,
+        landmarks: flipLandmarks(data.landmarks ?? null),
+    };
+}
+
+/**
+ * Обръща z на ориентирите — същата трансформация като на точките на трасето
+ * (север → -z), за да останат на реалните си места спрямо него.
+ *
+ * @param {{grandstands?: Array, buildings?: Array, trees?: Array}|null} landmarks
+ * @returns {object|null}
+ */
+function flipLandmarks(landmarks) {
+    if (!landmarks) {
+        return null;
+    }
+
+    const flipRing = (ring) => ring.map(([x, z]) => [x, -z]);
+
+    return {
+        grandstands: (landmarks.grandstands ?? []).map(flipRing),
+        buildings: (landmarks.buildings ?? []).map(flipRing),
+        trees: (landmarks.trees ?? []).map(([x, z, s]) => [x, -z, s]),
     };
 }
 
@@ -160,7 +192,7 @@ function smoothCyclic(values) {
  * @param {number} z
  * @param {number|null} hint Последният известен индекс
  * @returns {{index: number, lateral: number, distance: number, height: number, gradient: number}}
- *          lateral: отместване от осевата линия в метри (+ = наляво)
+ *          lateral: отместване от осевата линия в метри (+ = към нормалата, надясно)
  *          distance: изминато разстояние по обиколката в метри
  *          height: височина на асфалта под тази позиция
  */
@@ -244,7 +276,8 @@ export function heightAt(track, index, along) {
  * знакът на кривината дава коя страна е това.
  *
  * @param {Track} track
- * @returns {Array<{from: number, to: number, side: number}>} side: +1 ляво, -1 дясно
+ * @returns {Array<{from: number, to: number, side: number}>} side: +1 по нормалата
+ *          (дясно), -1 срещу нея (ляво)
  */
 export function findKerbRanges(track) {
     const { curvature, count } = track;
