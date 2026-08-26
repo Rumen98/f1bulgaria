@@ -29,27 +29,38 @@ const dismiss = () => {
 
 <template>
     <Card padding="lg">
-        <div class="flex items-start justify-between gap-4">
-            <div>
-                <h2 class="font-display text-lg font-bold text-white">Как ти се струва Падок?</h2>
-                <p class="mt-1 text-sm text-zinc-400">
-                    Два клика са достатъчни — а отговорите определят какво строим след това.
-                </p>
-            </div>
+        <div class="relative">
             <button
                 type="button"
                 aria-label="Скрий анкетата"
                 :disabled="formProcessing || dismissing"
-                class="shrink-0 text-zinc-500 transition hover:text-white disabled:opacity-50"
+                class="absolute -right-1 -top-1 rounded-md p-1 text-zinc-500 transition hover:bg-zinc-800/60 hover:text-white disabled:opacity-50"
                 @click="dismiss"
             >
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
                 </svg>
             </button>
-        </div>
-        <div class="mt-4 max-w-xl">
-            <SurveyForm source="prompt" @processing="formProcessing = $event" />
+
+            <!-- На десктоп текстът застава вляво, формата вдясно — картата е на
+                 цялата ширина на контейнера и една тясна колона я оставя куха. -->
+            <div class="lg:flex lg:items-start lg:gap-12">
+                <div class="mb-6 pr-8 lg:mb-0 lg:w-72 lg:shrink-0">
+                    <p class="text-xs font-bold uppercase tracking-widest text-zinc-500">Обратна връзка</p>
+                    <h2 class="mt-1.5 font-display text-xl font-black sm:text-2xl">
+                        Как ти се струва <span class="text-red-600">Падок</span>?
+                    </h2>
+                    <p class="mt-2 text-sm leading-relaxed text-zinc-400">
+                        Два клика са достатъчни — а отговорите определят какво строим след това.
+                    </p>
+                    <p class="mt-4 hidden text-xs text-zinc-500 lg:block">
+                        Четем всеки отговор лично. Без анкети по имейл, без напомняния.
+                    </p>
+                </div>
+                <div class="min-w-0 flex-1 lg:max-w-xl">
+                    <SurveyForm source="prompt" @processing="formProcessing = $event" />
+                </div>
+            </div>
         </div>
     </Card>
 </template>
