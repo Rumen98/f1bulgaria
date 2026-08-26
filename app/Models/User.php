@@ -93,4 +93,10 @@ class User extends Authenticatable implements FilamentUser
             ->withPivot('awarded_at')
             ->withTimestamps();
     }
+
+    /** @return HasMany<SurveyResponse, $this> */
+    public function surveyResponses(): HasMany
+    {
+        return $this->hasMany(SurveyResponse::class);
+    }
 }

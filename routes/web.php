@@ -12,6 +12,7 @@ use App\Http\Controllers\F2Controller;
 use App\Http\Controllers\F2DriversController;
 use App\Http\Controllers\F2RaceController;
 use App\Http\Controllers\F2TeamsController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
@@ -155,6 +156,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Обратна връзка — постоянна страница + карта-подкана в PublicLayout
+    // (SurveyPromptService решава кога се показва). Отговорите се четат във Filament.
+    // Throttle с изричен префикс: голият 'throttle:5,1' ползва ЕДНА кофа на
+    // потребител за всички рутове — спам по формата щеше да блокира и X-а на картата.
+    Route::get('/obratna-vrazka', [FeedbackController::class, 'show'])->name('feedback');
+    Route::post('/obratna-vrazka', [FeedbackController::class, 'store'])
+        ->middleware('throttle:5,1,feedback-store')
+        ->name('feedback.store');
+    Route::post('/obratna-vrazka/dismiss', [FeedbackController::class, 'dismiss'])
+        ->middleware('throttle:5,1,feedback-dismiss')
+        ->name('feedback.dismiss');
 });
 
 require __DIR__.'/auth.php';

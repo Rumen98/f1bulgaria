@@ -1,4 +1,5 @@
 <script setup>
+import SurveyPromptCard from '@/Components/Feedback/SurveyPromptCard.vue';
 import FlagIcon from '@/Components/FlagIcon.vue';
 import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
 import { hasRoute } from '@/utils/routes';
@@ -8,6 +9,11 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
 const flashSuccess = computed(() => page.props.flash?.success);
+// Картата-подкана за обратна връзка (SurveyPromptService решава кога).
+// На /obratna-vrazka не се дублира с формата на самата страница.
+const showSurveyPrompt = computed(
+    () => Boolean(page.props.survey?.shouldPrompt) && !page.url.startsWith('/obratna-vrazka'),
+);
 
 // Основна навигация (винаги видима на десктоп) + справочна (под „Енциклопедия ▾").
 // Елементите с `feature` се показват само ако флагът е включен (config/features.php).
@@ -159,6 +165,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                 {{ flashSuccess }}
             </div>
 
+            <SurveyPromptCard v-if="showSurveyPrompt" class="mb-6" />
+
             <slot />
         </main>
 
@@ -240,6 +248,11 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                 <Link :href="route('terms')" class="transition hover:text-zinc-300">Условия за ползване</Link>
                 <span class="text-zinc-700" aria-hidden="true">·</span>
                 <Link :href="route('contact')" class="transition hover:text-zinc-300">Контакт</Link>
+                <!-- Само за логнати — формата изисква акаунт, а гост би отскочил в login. -->
+                <template v-if="user">
+                    <span class="text-zinc-700" aria-hidden="true">·</span>
+                    <Link :href="route('feedback')" class="transition hover:text-zinc-300">Обратна връзка</Link>
+                </template>
             </nav>
         </footer>
     </div>
