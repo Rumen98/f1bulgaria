@@ -29,6 +29,8 @@ const selectedTrack = ref(null);
 const loading = ref(false);
 const error = ref(null);
 const transmission = ref('auto'); // 'auto' | 'manual' (ръчна: W нагоре, S надолу)
+const rivals = ref('race'); // 'race' (AI съперници на пистата) | 'solo' (чиста обиколка)
+const RIVAL_COUNT = 5;
 const preStart = ref(false); // pre-start екран (избор трансмисия + управление) преди обиколката
 const isMobile = ref(false); // телефон/тъч → tilt завиване + авто-газ, скрити ръчни
 const tiltError = ref(false); // накланянето не е достъпно/разрешено
@@ -48,6 +50,8 @@ const emptyTelemetry = () => ({
     speed: 0,
     rpm: 4000,
     gear: 1,
+    position: 1,
+    fieldSize: 1,
     lapTime: null,
     lastLap: null,
     bestLap: null,
@@ -347,6 +351,9 @@ const beginLap = () => {
         return;
     }
     game.value.setTransmission(transmission.value);
+    // Съперниците не пипат физиката/хронометъра на играча — чист time trial
+    // с трафик. Виж Game.setOpponents за „защо без колизии".
+    game.value.setOpponents(rivals.value === 'race' ? RIVAL_COUNT : 0);
 
     // Телефон: авто-газ + завиване с накланяне. Разрешението за жироскоп (iOS)
     // се иска ТУК, защото тапът на „Карай" е потребителски жест.
@@ -618,6 +625,12 @@ const recenterTilt = () => {
                                     </span>
                                 </span>
                             </div>
+                            <div v-if="telemetry.fieldSize > 1" class="flex justify-between gap-6">
+                                <span class="text-zinc-400">Позиция</span>
+                                <span class="font-mono tabular-nums font-bold" :class="telemetry.position === 1 ? 'text-amber-300' : 'text-zinc-200'">
+                                    П{{ telemetry.position }}<span class="font-normal text-zinc-500">/{{ telemetry.fieldSize }}</span>
+                                </span>
+                            </div>
                         </div>
 
                         <div v-if="!telemetry.started" class="mt-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
@@ -753,7 +766,10 @@ const recenterTilt = () => {
                     v-if="preStart"
                     class="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
                 >
-                    <div class="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900/95 p-6 shadow-2xl">
+                    <!-- max-h + scroll: на телефон в пейзаж секциите (съперници +
+                         трансмисия) надвишават височината — модалът се скролва,
+                         вместо да се отреже. -->
+                    <div class="max-h-full w-full max-w-md overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/95 p-6 shadow-2xl">
                         <h2 class="text-center text-lg font-black uppercase tracking-wider text-zinc-100">
                             {{ selectedTrack?.name }}
                         </h2>
@@ -761,7 +777,33 @@ const recenterTilt = () => {
                             Готви се за квалификационна обиколка
                         </p>
 
-                        <div v-if="!isMobile" class="mt-5">
+                        <div class="mt-5">
+                            <div class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+                                Пистата
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button
+                                    v-for="opt in [
+                                        { v: 'race', l: 'Състезание', h: `${RIVAL_COUNT} съперници на пистата` },
+                                        { v: 'solo', l: 'Сам на пистата', h: 'Чиста обиколка за атака' },
+                                    ]"
+                                    :key="opt.v"
+                                    type="button"
+                                    class="rounded-lg border p-3 text-left transition"
+                                    :class="rivals === opt.v ? 'border-[#e10600] bg-[#e10600]/10' : 'border-zinc-700 hover:border-zinc-500'"
+                                    @click="rivals = opt.v"
+                                >
+                                    <div class="text-sm font-bold text-zinc-100">{{ opt.l }}</div>
+                                    <div class="mt-0.5 text-[11px] text-zinc-400">{{ opt.h }}</div>
+                                </button>
+                            </div>
+                            <p v-if="rivals === 'race'" class="mt-1.5 text-[11px] text-zinc-500">
+                                Съперниците не се блъскат с теб — хронометърът ти остава чист,
+                                а позицията П1–П{{ RIVAL_COUNT + 1 }} се брои от старта.
+                            </p>
+                        </div>
+
+                        <div v-if="!isMobile" class="mt-4">
                             <div class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
                                 Трансмисия
                             </div>

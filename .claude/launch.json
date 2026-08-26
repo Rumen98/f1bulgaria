@@ -9,6 +9,12 @@
             "url": "https://f1bulgaria.test"
         },
         {
+            "name": "padok-qa",
+            "runtimeExecutable": "php",
+            "runtimeArgs": ["artisan", "serve", "--port=8126"],
+            "port": 8126
+        },
+        {
             "name": "padok-feedback",
             "runtimeExecutable": "php",
             "runtimeArgs": ["C:\\Users\\yorda\\Downloads\\yordan\\f1bulgaria-feedback\\artisan", "serve", "--port=8010"],

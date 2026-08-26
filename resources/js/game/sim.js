@@ -62,9 +62,12 @@ const MAX_TRACE_TICKS = 150000;
  *
  * @param {import('./track.js').Track} track  Вече минал през prepareTrack
  * @param {import('./circuits.js').CircuitStyle} circuit
+ * @param {Simulation|null} [shared] Симулация на СЪЩАТА писта, чиито
+ *        повърхностни таблици (кербове/run-off) да се преизползват — AI
+ *        съперниците не преизчисляват идентичните сканове на кривината.
  */
-export function createSim(track, circuit) {
-    return new Simulation(track, circuit);
+export function createSim(track, circuit, shared = null) {
+    return new Simulation(track, circuit, shared);
 }
 
 /**
@@ -79,27 +82,34 @@ export function createSimFromData(trackData) {
 }
 
 class Simulation {
-    constructor(track, circuit) {
+    constructor(track, circuit, shared = null) {
         this.track = track;
         this.circuit = circuit;
 
         // Повърхности по ред от осевата линия: кербове (яздят се, с вибрация)
         // и run-off зони (чакълът дърпа истински, тревата — както досега).
-        this.kerbSide = new Int8Array(track.count);
-        for (const range of findKerbRanges(track)) {
-            for (let r = range.from; r <= range.to; r++) {
-                this.kerbSide[((r % track.count) + track.count) % track.count] = range.side;
-            }
-        }
-
-        // Битови флагове (1 = зона отдясно/+1, 2 = отляво/-1): в шикан двете
-        // страни имат чакъл на съседни редове.
-        this.runoffSide = new Uint8Array(track.count);
-        if (circuit.runoff !== 'none') {
-            for (const range of runoffRanges(track)) {
-                const bit = range.side < 0 ? 1 : 2; // зоната е от -side страната
+        // Таблиците са чисто четими след построяване → при подадена сестринска
+        // симулация (същата писта) се споделят, вместо да се сканира повторно.
+        if (shared !== null) {
+            this.kerbSide = shared.kerbSide;
+            this.runoffSide = shared.runoffSide;
+        } else {
+            this.kerbSide = new Int8Array(track.count);
+            for (const range of findKerbRanges(track)) {
                 for (let r = range.from; r <= range.to; r++) {
-                    this.runoffSide[((r % track.count) + track.count) % track.count] |= bit;
+                    this.kerbSide[((r % track.count) + track.count) % track.count] = range.side;
+                }
+            }
+
+            // Битови флагове (1 = зона отдясно/+1, 2 = отляво/-1): в шикан
+            // двете страни имат чакъл на съседни редове.
+            this.runoffSide = new Uint8Array(track.count);
+            if (circuit.runoff !== 'none') {
+                for (const range of runoffRanges(track)) {
+                    const bit = range.side < 0 ? 1 : 2; // зоната е от -side страната
+                    for (let r = range.from; r <= range.to; r++) {
+                        this.runoffSide[((r % track.count) + track.count) % track.count] |= bit;
+                    }
                 }
             }
         }
@@ -116,6 +126,15 @@ class Simulation {
         this.trackIndexHint = null;
         this.offSurface = null; // 'gravel' | 'asphalt' | 'grass' | null
         this.onKerb = false;
+
+        // AI съперниците (Game.js) карат в собствени симулации, чиито обиколки
+        // никого не интересуват — флагът спира записа им (памет за нищо).
+        this.recordEnabled = true;
+
+        // Наказателното връщане на старта (3-то предупреждение) е заради
+        // хронометъра на ИГРАЧА. За бот то е телепорт през половината писта
+        // пред очите на играча + надут брояч на обиколките му — изключва се.
+        this.recoverToStartEnabled = true;
 
         // Преизползвани обекти — нула алокации на тик.
         this._projection = {};
@@ -304,7 +323,7 @@ class Simulation {
         this.currentSector = sector;
         this.timerGated = false;
 
-        this.recording = true;
+        this.recording = this.recordEnabled;
         this.recInputs = [];
         this.recFrames = [];
         const s = this.state;
@@ -374,7 +393,7 @@ class Simulation {
 
         if (this.phase === 'flying') {
             this.warnings++;
-            if (this.warnings >= MAX_WARNINGS) {
+            if (this.warnings >= MAX_WARNINGS && this.recoverToStartEnabled) {
                 toStart = true;
             }
         }

@@ -15,6 +15,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { driveAutopilot } from './autopilot.js';
 import { buildCar, updateCarRig, attachCarModel } from './car.js';
 import { circuitFor } from './circuits.js';
 import { buildTrackMeshes, COLORS } from './mesh.js';
@@ -43,6 +44,13 @@ const MAX_FRAME_TIME = 0.1;
 /** HUD телеметрия — не по-често от 30 Hz. Vue реактивността на всеки кадър
  *  (60+ Hz) е излишен diff/patch; 30 Hz е гладко за таймера, наполовина churn. */
 const TELEMETRY_INTERVAL = 1 / 30;
+
+/** Ливреи на AI съперниците — генерични цветове, без реални отбори. */
+const LIVERIES = [0x2563eb, 0xff7a00, 0x00a36c, 0xd7d7de, 0xe6007e, 0xf5c400];
+
+/** Под това разстояние до играча съперникът изсветлява — визуалният сигнал,
+ *  че колите не се блъскат (колизии няма нарочно, виж setOpponents). */
+const RIVAL_FADE_DISTANCE = 9;
 
 /** Веене на карирания флаг на маршала — скорост (rad/s) и амплитуда (rad). */
 const FLAG_WAVE_SPEED = 8;
@@ -238,6 +246,13 @@ export class Game {
         this.lastLapFrames = null; // кадрите на току-що завършената обиколка
         this.replay = null; // {frames, t, camIndex} — активен ТВ реплей
 
+        // AI съперници („състезание"): всеки със собствена детерминирана
+        // симулация + автопилот. НЕ пипат физиката на играча — виж setOpponents.
+        this.opponents = [];
+        // Изминат път от зеления старт (за позицията П1..Пn): цели обиколки +
+        // прогрес − стартов прогрес, следи се и за играча.
+        this.playerRace = { laps: 0, lastProgress: 0, startProgress: 0 };
+
         this.accumulator = 0;
         this.lastFrame = 0;
         this.running = false;
@@ -271,6 +286,11 @@ export class Game {
         this.running = true;
         this.started = true;
         this.lastFrame = performance.now();
+        this.playerRace = {
+            laps: 0,
+            lastProgress: this.sim.lastProgress,
+            startProgress: this.sim.lastProgress,
+        };
         this.sound.start();
         this.rafId = requestAnimationFrame(this.#frame);
     }
@@ -294,7 +314,88 @@ export class Game {
         this.stopReplay();
         this.sim.reset(keepRecords);
         this.accumulator = 0;
+        // Нова обиколка = нов старт на сесията: полето се престроява.
+        this.playerRace = { laps: 0, lastProgress: 0, startProgress: 0 };
+        this.#gridOpponents();
         this.#placeCameraBehindCar();
+    }
+
+    /**
+     * Конфигурира AI съперниците (вика се от pre-start екрана, преди start()).
+     *
+     * Нарочно БЕЗ колизии: съперник, който може да те избута, би направил
+     * сървърното преиграване на твоята обиколка нечестно (валидаторът не знае
+     * за тях). Твоят хронометър остава чист time trial; „състезанието" е
+     * позицията срещу полето + трафикът на пистата. Близо до теб съперникът
+     * изсветлява — знакът, че минаването един през друг е правило, не бъг.
+     *
+     * @param {number} count 0 = сам на пистата
+     */
+    setOpponents(count) {
+        this.#clearOpponents();
+
+        if (!count) {
+            return;
+        }
+
+        // Детерминирано по пистата — една и съща решетка при всеки рестарт.
+        const rand = mulberry32(hashString(this.track.slug));
+
+        // Геометрията на болида е идентична за всички ботове — първият риг я
+        // дава на останалите (5× по-малко GPU буфери). Материалите остават
+        // per-кола (ливрея + изсветляване).
+        let templateGeometries = null;
+
+        for (let i = 0; i < count; i++) {
+            // Ботът дели готовите повърхностни таблици на играча (същата
+            // писта) — без 5 повторни скана на кривината при „Карай".
+            const sim = createSim(this.track, this.circuit, this.sim);
+            // Обиколките на ботовете не интересуват никого — без запис и без
+            // наказателен телепорт на старта (само локалното връщане).
+            sim.recordEnabled = false;
+            sim.recoverToStartEnabled = false;
+
+            const rig = buildOpponentRig(LIVERIES[i % LIVERIES.length]);
+            if (templateGeometries === null) {
+                templateGeometries = [];
+                rig.root.traverse((object) => {
+                    if (object.isMesh) {
+                        templateGeometries.push(object.geometry);
+                    }
+                });
+            } else {
+                // buildCar е детерминиран → редът на обхождане съвпада 1:1.
+                let next = 0;
+                rig.root.traverse((object) => {
+                    if (object.isMesh) {
+                        object.geometry.dispose();
+                        object.geometry = templateGeometries[next++];
+                    }
+                });
+            }
+            this.scene.add(rig.root);
+
+            this.opponents.push({
+                sim,
+                rig,
+                input: { steer: 0, throttle: 0, brake: 0 },
+                // Разлики в темпото/линията — полето да не кара в индийска нишка.
+                pace: 0.9 + rand() * 0.22,
+                steerGain: 2.65 + rand() * 0.35,
+                lookBias: (rand() - 0.5) * 6,
+                slotJitter: rand() * 0.5,
+                laps: 0,
+                lastProgress: 0,
+                startProgress: 0,
+                prevX: 0,
+                prevZ: 0,
+                prevHeading: 0,
+                opacity: 1,
+                _render: {},
+            });
+        }
+
+        this.#gridOpponents();
     }
 
     /**
@@ -310,7 +411,12 @@ export class Game {
 
         this.replay = { frames: this.lastLapFrames, t: 0, camIndex: -1 };
         this.ghostRig.root.visible = false;
-        // ТВ картина: без halo и без двигател в ухото.
+        // ТВ картина: без halo и без двигател в ухото. Съперниците се крият —
+        // записът е само на играча, а замразени в кадъра биха изглеждали
+        // катастрофирали.
+        for (const opp of this.opponents) {
+            opp.rig.root.visible = false;
+        }
         this.halo.visible = false;
         this.sound.stop();
 
@@ -325,6 +431,9 @@ export class Game {
         this.replay = null;
         this.lookTarget = null;
         this.halo.visible = this.cameraMode === 'onboard';
+        for (const opp of this.opponents) {
+            opp.rig.root.visible = true;
+        }
         if (this.running) {
             this.sound.start();
         }
@@ -728,14 +837,27 @@ export class Game {
         };
 
         // Alt-Tab по време на завой оставя клавиша „натиснат" завинаги.
-        this.onBlur = () => this.keys.clear();
+        // Звукът също спира: за разлика от visibilitychange, blur хваща и
+        // фокус към ДРУГО приложение при все още видим браузър (Windows) —
+        // иначе двигателят бучи, докато човекът си гледа пощата.
+        this.onBlur = () => {
+            this.keys.clear();
+            this.sound.stop();
+        };
+        this.onFocus = () => {
+            if (this.running && !this.replay && !document.hidden) {
+                this.sound.start();
+            }
+        };
 
         // В скрит таб rAF спира, но Web Audio продължава — двигателят би
         // бучал на замразени обороти до безкрай. Спираме/пускаме със скриването.
+        // !replay като в onFocus: ТВ реплеят е без двигател и връщането в таба
+        // не бива да пуска замразения дрон върху него.
         this.onVisibility = () => {
             if (document.hidden) {
                 this.sound.stop();
-            } else if (this.running) {
+            } else if (this.running && !this.replay) {
                 this.sound.start();
             }
         };
@@ -743,6 +865,7 @@ export class Game {
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
         window.addEventListener('blur', this.onBlur);
+        window.addEventListener('focus', this.onFocus);
         document.addEventListener('visibilitychange', this.onVisibility);
     }
 
@@ -750,6 +873,7 @@ export class Game {
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
         window.removeEventListener('blur', this.onBlur);
+        window.removeEventListener('focus', this.onFocus);
         document.removeEventListener('visibilitychange', this.onVisibility);
     }
 
@@ -958,7 +1082,31 @@ export class Game {
                 this.#onLapFinished(event);
             }
 
+            // Съперниците тиктакат в същия фиксиран ритъм, всеки в своя
+            // симулация — физиката на играча не ги вижда.
+            for (const opp of this.opponents) {
+                const os = opp.sim.state;
+                opp.prevX = os.x;
+                opp.prevZ = os.z;
+                opp.prevHeading = os.heading;
+
+                driveAutopilot(opp.sim, opp.input, opp);
+                const oppEvent = opp.sim.tick(opp.input);
+                if (oppEvent?.type === 'finished') {
+                    // Ботът не спира на резултатен екран — направо нова
+                    // обиколка (и recovery мрежата остава активна).
+                    opp.sim.phase = 'formation';
+                }
+            }
+
             this.accumulator -= FIXED_DT;
+        }
+
+        // Изминат път за позицията П1..Пn — праговете хващат и пресичане на
+        // линията, и връщане назад (телепорт от recovery през линията).
+        trackWrap(this.playerRace, sim.lastProgress);
+        for (const opp of this.opponents) {
+            trackWrap(opp, opp.sim.lastProgress);
         }
 
         // След телепорт (връщане на пистата) не интерполираме от старото място —
@@ -996,6 +1144,9 @@ export class Game {
         // Духът: полупрозрачният съперник повтаря рекордната обиколка, тик
         // по тик срещу твоя хронометър — вижда се само на летящата обиколка.
         this.#updateGhost();
+
+        // Съперниците: интерполация като при играча + изсветляване наблизо.
+        this.#updateOpponents(alpha, dt, render);
 
         // Изгладени ускорения за G-force наклоните на бордовата камера.
         const renderV = state.vForward;
@@ -1086,6 +1237,7 @@ export class Game {
             gravel: sim.offSurface === 'gravel',
             speed: Math.abs(state.vForward),
         });
+        this.#updateRivalSound(render);
 
         // Сенчестата камера следва колата: посоката на слънцето е фиксирана,
         // движим само центъра, за да е острата сянка около играча.
@@ -1107,10 +1259,24 @@ export class Game {
         }
         this.telemetryAccum = 0;
 
+        // Позиция в „състезанието": по изминат път от зеления старт.
+        let position = 1;
+        if (this.opponents.length > 0) {
+            const race = this.playerRace;
+            const covered = race.laps + race.lastProgress - race.startProgress;
+            for (const opp of this.opponents) {
+                if (opp.laps + opp.lastProgress - opp.startProgress > covered) {
+                    position++;
+                }
+            }
+        }
+
         this.onTelemetry({
             speed: Math.round(speedKmh(state)),
             rpm: Math.round(this.drivetrain.rpm),
             gear: this.drivetrain.gear,
+            position,
+            fieldSize: this.opponents.length + 1,
             lapTime: sim.phase === 'flying' ? sim.lapTicks * FIXED_DT : null,
             lastLap: sim.lastLapTicks === null ? null : sim.lastLapTicks * FIXED_DT,
             bestLap: sim.bestLapTicks === null ? null : sim.bestLapTicks * FIXED_DT,
@@ -1127,6 +1293,155 @@ export class Game {
             maxWarnings: MAX_WARNINGS,
         });
     };
+
+    /** Маха съперниците от сцената и освобождава ресурсите им. */
+    #clearOpponents() {
+        // Геометриите са споделени между риговете (виж setOpponents) —
+        // всяка се освобождава по веднъж.
+        const disposed = new Set();
+
+        for (const opp of this.opponents) {
+            this.scene.remove(opp.rig.root);
+            opp.rig.root.traverse((object) => {
+                if (object.isMesh && !disposed.has(object.geometry)) {
+                    disposed.add(object.geometry);
+                    object.geometry.dispose();
+                }
+            });
+            for (const material of opp.rig.materials) {
+                material.dispose();
+            }
+        }
+        this.opponents = [];
+    }
+
+    /**
+     * Престроява полето: съперниците се пръскат равномерно по трасето
+     * (встрани от стартовата линия на играча) с летящ старт — сесия в ход,
+     * в която се включваш, не редичка коли, през които минаваш на грида.
+     */
+    #gridOpponents() {
+        const t = this.track;
+        const n = this.opponents.length;
+
+        for (let i = 0; i < n; i++) {
+            const opp = this.opponents[i];
+            // Слотове в [0.08, 0.92] от обиколката + детерминиран джитър.
+            const f = 0.08 + (0.84 * (i + opp.slotJitter)) / Math.max(1, n);
+            const index = Math.min(t.count - 1, Math.floor(f * t.count));
+
+            opp.sim.reset(false);
+            const s = opp.sim.state;
+            s.x = t.xs[index];
+            s.z = t.zs[index];
+            s.heading = Math.atan2(t.tx[index], t.tz[index]);
+            s.vForward = 24; // летящ старт — сесията вече тече
+            opp.sim.trackIndexHint = index;
+            opp.sim.lastProgress = f;
+            opp.sim.surface.height = t.ys[index];
+            opp.sim.surface.gradient = t.gradient[index];
+            opp.sim.surface.bank = t.bankSlope[index];
+
+            opp.laps = 0;
+            opp.lastProgress = f;
+            opp.startProgress = f;
+            opp.prevX = s.x;
+            opp.prevZ = s.z;
+            opp.prevHeading = s.heading;
+
+            opp.opacity = 1;
+            for (const material of opp.rig.materials) {
+                material.opacity = 1;
+            }
+            opp.rig.root.visible = true;
+            updateCarRig(opp.rig, s, opp.sim.surface, 1);
+        }
+    }
+
+    /**
+     * Рендер на съперниците: същата интерполация между стъпките като при
+     * играча + изсветляване при близост (сигналът „няма колизии").
+     *
+     * @param {number} alpha Остатък от акумулатора, [0..1)
+     * @param {number} dt
+     * @param {object} playerRender Интерполираното състояние на играча
+     */
+    #updateOpponents(alpha, dt, playerRender) {
+        for (const opp of this.opponents) {
+            const s = opp.sim.state;
+
+            // Телепорт (recovery) — без интерполация през картата.
+            if (opp.sim.snapRender) {
+                opp.prevX = s.x;
+                opp.prevZ = s.z;
+                opp.prevHeading = s.heading;
+                opp.sim.snapRender = false;
+            }
+
+            let dH = s.heading - opp.prevHeading;
+            if (dH > Math.PI) dH -= 2 * Math.PI;
+            else if (dH < -Math.PI) dH += 2 * Math.PI;
+
+            const render = opp._render;
+            Object.assign(render, s);
+            render.x = opp.prevX + (s.x - opp.prevX) * alpha;
+            render.z = opp.prevZ + (s.z - opp.prevZ) * alpha;
+            render.heading = opp.prevHeading + dH * alpha;
+
+            updateCarRig(opp.rig, render, opp.sim.surface, dt);
+
+            const distance = Math.hypot(render.x - playerRender.x, render.z - playerRender.z);
+            const opacity =
+                distance < RIVAL_FADE_DISTANCE
+                    ? 0.35 + (distance / RIVAL_FADE_DISTANCE) * 0.65
+                    : 1;
+
+            if (Math.abs(opacity - opp.opacity) > 0.01) {
+                opp.opacity = opacity;
+                for (const material of opp.rig.materials) {
+                    material.opacity = opacity;
+                }
+            }
+        }
+    }
+
+    /**
+     * Най-близкият съперник в ухото: сила по разстоянието, панорама по
+     * страната спрямо камерата.
+     *
+     * @param {object} render Интерполираното състояние на играча
+     */
+    #updateRivalSound(render) {
+        if (this.opponents.length === 0) {
+            return;
+        }
+
+        let nearest = Infinity;
+        let speed = 0;
+        let nx = 0;
+        let nz = 0;
+
+        for (const opp of this.opponents) {
+            const s = opp.sim.state;
+            const d = Math.hypot(s.x - render.x, s.z - render.z);
+            if (d < nearest) {
+                nearest = d;
+                speed = Math.abs(s.vForward);
+                nx = s.x;
+                nz = s.z;
+            }
+        }
+
+        // Панорама: проекция върху дясната ос на камерата (матрицата е от
+        // предния кадър — закъснение от 1 кадър, нечуто).
+        let pan = 0;
+        if (Number.isFinite(nearest) && nearest > 0.001) {
+            const e = this.camera.matrixWorld.elements;
+            pan = ((nx - this.camera.position.x) * e[0] + (nz - this.camera.position.z) * e[2]) / 25;
+        }
+
+        this.sound.updateRival(nearest, speed, pan);
+    }
 
     /**
      * Духът: интерполира кадрите на рекордната обиколка спрямо ТЕКУЩИЯ
@@ -1359,6 +1674,96 @@ function buildGhostRig() {
     });
 
     return rig;
+}
+
+/**
+ * Съперник: процедурният болид с генерична ливрея (само боята се сменя —
+ * никакви реални отбори). Материалите са клонирани per-кола, за да може
+ * изсветляването при близост да не пипа другите.
+ *
+ * @param {number} color
+ * @returns {ReturnType<typeof buildCar> & {materials: THREE.Material[]}}
+ */
+function buildOpponentRig(color) {
+    const rig = buildCar();
+    const materials = [];
+    const cloned = new Map();
+
+    rig.root.traverse((object) => {
+        if (!object.isMesh) {
+            return;
+        }
+
+        let material = cloned.get(object.material);
+        if (!material) {
+            material = object.material.clone();
+            // Боядисва се само боята (MeshPhysical) — гуми/тъмни части остават.
+            if (material.isMeshPhysicalMaterial) {
+                material.color.set(color);
+            }
+            // Винаги transparent: превключването on/off рекомпилира шейдъра.
+            material.transparent = true;
+            cloned.set(object.material, material);
+            materials.push(material);
+        }
+        object.material = material;
+        object.castShadow = true;
+    });
+
+    rig.materials = materials;
+
+    return rig;
+}
+
+/**
+ * Брои пресичанията на стартовата линия (в двете посоки) по прогреса.
+ *
+ * @param {{laps: number, lastProgress: number}} entry
+ * @param {number} progress
+ */
+function trackWrap(entry, progress) {
+    if (entry.lastProgress > 0.85 && progress < 0.15) {
+        entry.laps++;
+    } else if (entry.lastProgress < 0.15 && progress > 0.85) {
+        entry.laps--;
+    }
+    entry.lastProgress = progress;
+}
+
+/**
+ * Детерминиран PRNG (mulberry32) — решетката на съперниците е една и съща
+ * при всяко зареждане на пистата.
+ *
+ * @param {number} seed
+ * @returns {() => number} [0, 1)
+ */
+function mulberry32(seed) {
+    let a = seed >>> 0;
+
+    return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+/**
+ * FNV-1a хеш на низ → seed за mulberry32.
+ *
+ * @param {string} value
+ * @returns {number}
+ */
+function hashString(value) {
+    let hash = 2166136261;
+
+    for (let i = 0; i < value.length; i++) {
+        hash ^= value.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+
+    return hash >>> 0;
 }
 
 /**

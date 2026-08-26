@@ -55,6 +55,14 @@ export function createEngineSound() {
     let ctx = null;
     let nodes = null;
     let muted = readMuted();
+    // Отложеният suspend от stop(): пази се, за да може start() да го отмени.
+    // Иначе бърз stop→start (blur→focus, край на реплей) първо резюмира
+    // контекста, а закъснелият таймер го суспендва — и звукът "умира".
+    let suspendTimer = null;
+    // В спряно състояние (реплей/blur/меню) unmute с M НЕ бива да вдига
+    // мастера — контекстът е още 'running' до отложения suspend и замразеният
+    // двигател би избучал за части от секундата.
+    let stopped = true;
 
     const build = () => {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -177,7 +185,27 @@ export function createEngineSound() {
         windFilter.connect(windGain);
         windGain.connect(compressor);
 
-        for (const src of [sawA, sawB, pulse, kerbLfo, intake, kerb, gravel, wind]) {
+        // Съперник наблизо: втори, приглушен двигател — чува се само когато
+        // друга кола е на метри, с панорама според това от коя страна е.
+        const rival = ctx.createOscillator();
+        rival.type = 'sawtooth';
+        const rivalFilter = ctx.createBiquadFilter();
+        rivalFilter.type = 'lowpass';
+        rivalFilter.frequency.value = 900;
+        const rivalGain = ctx.createGain();
+        rivalGain.gain.value = 0;
+        rival.connect(rivalFilter);
+        rivalFilter.connect(rivalGain);
+        // StereoPanner липсва в стари WebKit — тогава направо в компресора.
+        const rivalPan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+        if (rivalPan) {
+            rivalGain.connect(rivalPan);
+            rivalPan.connect(compressor);
+        } else {
+            rivalGain.connect(compressor);
+        }
+
+        for (const src of [sawA, sawB, pulse, kerbLfo, intake, kerb, gravel, wind, rival]) {
             src.start();
         }
 
@@ -194,6 +222,9 @@ export function createEngineSound() {
             kerbDepth,
             gravelGain,
             windGain,
+            rival,
+            rivalGain,
+            rivalPan,
         };
     };
 
@@ -208,6 +239,12 @@ export function createEngineSound() {
                     return;
                 }
             }
+            // Отменя висящ suspend от предишен stop() — виж suspendTimer.
+            if (suspendTimer !== null) {
+                clearTimeout(suspendTimer);
+                suspendTimer = null;
+            }
+            stopped = false;
             ctx.resume?.();
             if (!muted) {
                 nodes.master.gain.setTargetAtTime(MASTER_VOLUME, ctx.currentTime, 0.2);
@@ -215,10 +252,17 @@ export function createEngineSound() {
         },
 
         stop() {
+            stopped = true;
             if (ctx && nodes) {
                 nodes.master.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
                 // Суспендваме след затихването — паузата/менюто са тихи.
-                setTimeout(() => ctx?.suspend?.(), 300);
+                if (suspendTimer !== null) {
+                    clearTimeout(suspendTimer);
+                }
+                suspendTimer = setTimeout(() => {
+                    suspendTimer = null;
+                    ctx?.suspend?.();
+                }, 300);
             }
         },
 
@@ -226,7 +270,10 @@ export function createEngineSound() {
             muted = value;
             writeMuted(value);
             if (ctx && nodes) {
-                nodes.master.gain.setTargetAtTime(muted ? 0 : MASTER_VOLUME, ctx.currentTime, 0.05);
+                // Спряно състояние остава тихо и при unmute — предпочитанието
+                // е записано, силата идва при следващия start().
+                const level = muted || stopped ? 0 : MASTER_VOLUME;
+                nodes.master.gain.setTargetAtTime(level, ctx.currentTime, 0.05);
             }
         },
 
@@ -270,7 +317,39 @@ export function createEngineSound() {
             nodes.windGain.gain.setTargetAtTime(windLevel, t, 0.1);
         },
 
+        /**
+         * Най-близкият съперник: сила по разстоянието, тон по скоростта му,
+         * панорама според страната. Извън обхват → тишина.
+         *
+         * @param {number} distance Метри до най-близката друга кола (Infinity = няма)
+         * @param {number} speed Нейната скорост, m/s
+         * @param {number} pan [-1, 1] — отляво/отдясно на камерата
+         */
+        updateRival(distance, speed, pan) {
+            if (!ctx || !nodes || ctx.state !== 'running') {
+                return;
+            }
+
+            const t = ctx.currentTime;
+            const audible = Number.isFinite(distance) && distance < 70;
+            const level = audible ? Math.max(0, 1 - distance / 70) ** 2 * 0.22 : 0;
+
+            // Псевдо-обороти от скоростта — достатъчно за "профучаване".
+            const rpm = 5000 + Math.min(1, speed / 92) * 9500;
+            nodes.rival.frequency.setTargetAtTime(
+                Math.max(40, (rpm / 60) * FIRINGS_PER_REV),
+                t,
+                0.04
+            );
+            nodes.rivalGain.gain.setTargetAtTime(level, t, 0.06);
+            nodes.rivalPan?.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.06);
+        },
+
         dispose() {
+            if (suspendTimer !== null) {
+                clearTimeout(suspendTimer);
+                suspendTimer = null;
+            }
             ctx?.close?.();
             ctx = null;
             nodes = null;
