@@ -43,15 +43,27 @@ const CURVATURE_SMOOTHING_PASSES = 4;
  * @property {Float32Array} gradient   dy/ds по посоката на движение
  * @property {Float32Array} curvature  Знакова кривина, 1/m (+ = десен завой,
  *                                     т.е. завой към страната на нормалата)
+ * @property {Float32Array} halfWidths Полуширина на трасето за всяка точка —
+ *                                     базовата, наслоена с widthProfile от
+ *                                     конфига на пистата (фунията на Монца Т1,
+ *                                     тясната среда на Зандвоорт)
+ * @property {Float32Array} bankSlope  Напречен наклон tan(ъгъл) със знак:
+ *                                     y на повърхността = y - offset·bankSlope
+ *                                     (вътрешният ръб на банкиран завой е
+ *                                     по-ниско). Ненулев само в banking
+ *                                     диапазоните от конфига.
  * @property {number} count
  * @property {number} elevationRange
  */
 
 /**
  * @param {object} data Съдържанието на {slug}.json
+ * @param {object} [style] Визуалната идентичност (circuits.js) — оттам идват
+ *        widthProfile и banking. Детерминирани от конфига → бъдещият сървърен
+ *        replay ги възпроизвежда 1:1.
  * @returns {Track}
  */
-export function prepareTrack(data) {
+export function prepareTrack(data, style = null) {
     const count = data.points.length;
     const spacing = data.spacing;
 
@@ -119,6 +131,9 @@ export function prepareTrack(data) {
         if (ys[i] > maxY) maxY = ys[i];
     }
 
+    const halfWidths = buildHalfWidths(count, spacing, data.width / 2, style?.widthProfile ?? []);
+    const bankSlope = buildBankSlope(count, spacing, curvature, style?.banking ?? []);
+
     return {
         slug: data.slug,
         name: data.name,
@@ -135,6 +150,8 @@ export function prepareTrack(data) {
         nz,
         gradient,
         curvature,
+        halfWidths,
+        bankSlope,
         count,
         elevationRange: maxY - minY,
         // Реални контури от OpenStreetMap (ODbL) — виж game:fetch-landmarks.
@@ -161,6 +178,89 @@ function flipLandmarks(landmarks) {
         buildings: (landmarks.buildings ?? []).map(flipRing),
         trees: (landmarks.trees ?? []).map(([x, z, s]) => [x, -z, s]),
     };
+}
+
+/**
+ * Полуширина за всяка точка: базовата, върху която widthProfile диапазоните
+ * се наслагват с плавни ~60 m преходи (иначе трасето прави стъпало).
+ *
+ * @param {number} count
+ * @param {number} spacing
+ * @param {number} baseHalf
+ * @param {Array<{from: number, to: number, width: number}>} profile Метри по обиколката
+ * @returns {Float32Array}
+ */
+function buildHalfWidths(count, spacing, baseHalf, profile) {
+    const halves = new Float32Array(count).fill(baseHalf);
+    const ramp = Math.max(1, Math.round(60 / spacing));
+
+    for (const zone of profile) {
+        const from = Math.round(zone.from / spacing);
+        const to = Math.round(zone.to / spacing);
+        const target = zone.width / 2;
+
+        for (let r = from; r <= to; r++) {
+            const i = ((r % count) + count) % count;
+
+            // Рампите са ВЪТРЕ в диапазона — рампа отвъд `to` преливаше
+            // разширението на Монца във вече завиващия първи апекс на шикана
+            // (клампата по радиуса режеше платното, а кербът оставаше на
+            // старата ширина и увисваше). min() покрива и къси зони.
+            const w = Math.min(smooth01((r - from) / ramp), smooth01((to - r) / ramp));
+
+            halves[i] = halves[i] + (target - halves[i]) * w;
+        }
+    }
+
+    return halves;
+}
+
+/**
+ * Напречният наклон (банкинг) за всяка точка: tan(ъгъла), със знак от
+ * кривината в диапазона — вътрешният ръб на завоя е ПО-НИСКО. Рампи ~45 m
+ * в двата края, за да не се появява стена от асфалт.
+ *
+ * @param {number} count
+ * @param {number} spacing
+ * @param {Float32Array} curvature
+ * @param {Array<{from: number, to: number, deg: number}>} banking Метри по обиколката
+ * @returns {Float32Array}
+ */
+function buildBankSlope(count, spacing, curvature, banking) {
+    const slope = new Float32Array(count);
+    const ramp = Math.max(1, Math.round(45 / spacing));
+
+    for (const zone of banking) {
+        const from = Math.round(zone.from / spacing);
+        const to = Math.round(zone.to / spacing);
+
+        // Посоката на завоя определя кой ръб пада: усредняваме кривината в
+        // сърцевината на диапазона, за да не зависим от локалния шум.
+        let sum = 0;
+        for (let r = from; r <= to; r++) {
+            sum += curvature[((r % count) + count) % count];
+        }
+        const sign = sum >= 0 ? 1 : -1;
+        const magnitude = Math.tan((zone.deg * Math.PI) / 180) * sign;
+
+        for (let r = from; r <= to; r++) {
+            const i = ((r % count) + count) % count;
+
+            // Рампите са вътре в диапазона (виж buildHalfWidths).
+            const w = Math.min(smooth01((r - from) / ramp), smooth01((to - r) / ramp));
+
+            slope[i] = magnitude * w;
+        }
+    }
+
+    return slope;
+}
+
+/** Плавна S-крива върху [0,1]. */
+function smooth01(v) {
+    const t = v < 0 ? 0 : v > 1 ? 1 : v;
+
+    return t * t * (3 - 2 * t);
 }
 
 /**
@@ -237,6 +337,7 @@ export function projectOnTrack(track, x, z, hint = null, out = {}) {
     // физична стъпка, затова caller-ът подава постоянен обект без алокация/кадър.
     out.index = bestIndex;
     out.lateral = lateral;
+    out.along = along;
     out.distance = bestIndex * track.spacing + along;
     out.height = heightAt(track, bestIndex, along);
     out.gradient = track.gradient[bestIndex];
@@ -265,6 +366,29 @@ export function heightAt(track, index, along) {
 
     const a = ys[(((index + base) % count) + count) % count];
     const b = ys[(((index + base + 1) % count) + count) % count];
+
+    return a + (b - a) * t;
+}
+
+/**
+ * Напречният наклон на `along` метра след точка `index`, интерполиран между
+ * съседните точки — по същата причина като heightAt: стъпаловидният bank по
+ * рампите на банкинга местеше колата с ~26 cm на всяко прекосяване на ред.
+ *
+ * @param {Track} track
+ * @param {number} index
+ * @param {number} along
+ * @returns {number}
+ */
+export function bankAt(track, index, along) {
+    const { bankSlope, spacing, count } = track;
+
+    const steps = along / spacing;
+    const base = Math.floor(steps);
+    const t = steps - base;
+
+    const a = bankSlope[(((index + base) % count) + count) % count];
+    const b = bankSlope[(((index + base + 1) % count) + count) % count];
 
     return a + (b - a) * t;
 }

@@ -79,7 +79,9 @@ const Y = {
  */
 export function buildTrackMeshes(track, circuit) {
     const group = new THREE.Group();
-    const half = track.width / 2;
+    // Ширината е ПО ТОЧКА (widthProfile: фунията на Монца Т1, тясната среда
+    // на Зандвоорт) — всички ленти следват halfWidths, не константа.
+    const halfAt = (i) => track.halfWidths[i];
 
     group.add(buildGround(track, circuit));
 
@@ -87,12 +89,18 @@ export function buildTrackMeshes(track, circuit) {
     // техните PBR текстури се заредят успешно ПРЕДИ старта, Game.js ги подменя
     // (виж #loadTrackTextures); при неуспех остава процедурният цвят — никога
     // черно. Пазим материалите за тази подмяна в userData.
-    const grass = ribbonMesh(track, -(half + RUNOFF_WIDTH), half + RUNOFF_WIDTH, Y.grass, {
-        color: COLORS.grass,
-        variation: 0.1,
-        drop: RUNOFF_DROP,
-    });
-    const asphalt = ribbonMesh(track, -half, half, Y.asphalt, {
+    const grass = ribbonMesh(
+        track,
+        (r, i) => -(halfAt(i) + RUNOFF_WIDTH),
+        (r, i) => halfAt(i) + RUNOFF_WIDTH,
+        Y.grass,
+        {
+            color: COLORS.grass,
+            variation: 0.1,
+            drop: RUNOFF_DROP,
+        }
+    );
+    const asphalt = ribbonMesh(track, (r, i) => -halfAt(i), (r, i) => halfAt(i), Y.asphalt, {
         color: COLORS.asphalt,
         variation: 0.06,
     });
@@ -100,10 +108,14 @@ export function buildTrackMeshes(track, circuit) {
     group.add(asphalt);
     group.userData.surfaces = { asphalt: asphalt.material, grass: grass.material };
     group.add(
-        ribbonMesh(track, half - EDGE_LINE_WIDTH, half, Y.edgeLine, { color: COLORS.edgeLine })
+        ribbonMesh(track, (r, i) => halfAt(i) - EDGE_LINE_WIDTH, (r, i) => halfAt(i), Y.edgeLine, {
+            color: COLORS.edgeLine,
+        })
     );
     group.add(
-        ribbonMesh(track, -half, -half + EDGE_LINE_WIDTH, Y.edgeLine, { color: COLORS.edgeLine })
+        ribbonMesh(track, (r, i) => -halfAt(i), (r, i) => -halfAt(i) + EDGE_LINE_WIDTH, Y.edgeLine, {
+            color: COLORS.edgeLine,
+        })
     );
     group.add(buildKerbs(track));
     group.add(buildStartLine(track));
@@ -116,6 +128,7 @@ export function buildTrackMeshes(track, circuit) {
     group.add(decor.group);
     group.userData.startLights = decor.startLights;
     group.userData.animations = decor.animations;
+    group.userData.marshalPosts = decor.marshalPosts;
     // Чакълът влиза в същата PBR подмяна като асфалта/тревата (Game).
     if (decor.gravelMaterial) {
         group.userData.surfaces.gravel = decor.gravelMaterial;
@@ -262,9 +275,9 @@ function distToSegmentSq(px, pz, ax, az, bx, bz) {
  * @returns {THREE.Group}
  */
 function buildStartGrandstands(track, circuit, pitRange) {
-    const { xs, ys, zs, nx, nz, tx, tz, count, spacing, width } = track;
+    const { xs, ys, zs, nx, nz, tx, tz, count, spacing } = track;
     const group = new THREE.Group();
-    const half = width / 2;
+    const half = track.halfWidths[0];
 
     const GAP = 7; // отстъп навън от ръба на асфалта, m
     const DEPTH = 18; // дълбочина навън, m
@@ -350,6 +363,85 @@ function buildStartGrandstands(track, circuit, pitRange) {
         mesh.castShadow = false;
         mesh.frustumCulled = false;
         group.add(mesh);
+    }
+
+    // 3D публика на предните редове: при близък поглед текстурата е плоска,
+    // а няколко десетки low-poly фигури я „отлепят". Тела и глави са ОТДЕЛНИ
+    // инстанцирани мешове с общи матрици: instanceColor се УМНОЖАВА с
+    // цветовете на върховете — обща геометрия би оцветила и главите в цвета
+    // на тениската.
+    {
+        const bodyGeo = new THREE.BoxGeometry(0.36, 0.52, 0.24);
+        bodyGeo.translate(0, 0.26, 0);
+        const headGeo = new THREE.IcosahedronGeometry(0.11, 0);
+        headGeo.translate(0, 0.66, 0);
+
+        const perRow = 10;
+        const rows2 = 2;
+        const capacity3d = sections * perRow * rows2;
+
+        const bodies3d = new THREE.InstancedMesh(
+            bodyGeo,
+            new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }),
+            capacity3d
+        );
+        const heads3d = new THREE.InstancedMesh(
+            headGeo,
+            new THREE.MeshStandardMaterial({ color: 0xe0b28e, roughness: 0.85 }),
+            capacity3d
+        );
+
+        const shirt = new THREE.Color();
+        const shirts = [0xd94f4f, 0xe6e6e6, 0x4f7fd9, 0xe0c24f, 0x5ad07a, 0xd98a4f, 0x4a4f57];
+        const local = new THREE.Vector3();
+        let idx = 0;
+
+        for (const sign of [-pitRange.sign]) {
+            for (let s = 0; s < sections; s++) {
+                const i = (((s * step - startBack) % count) + count) % count;
+                quaternion.setFromAxisAngle(UP, Math.atan2(tx[i], tz[i]) + (sign < 0 ? Math.PI : 0));
+                const off = sign * (half + GAP + DEPTH / 2);
+
+                for (let row = 0; row < rows2; row++) {
+                    for (let p = 0; p < perRow; p++) {
+                        // Локално в рамката на секцията: x към трасето, y върху
+                        // наклонената седалкова банка (същата формула като
+                        // смъкването на върховете ѝ).
+                        const seatX = DEPTH / 2 - 1.4 - row * 2.6;
+                        const seatFront = (seatX + DEPTH / 2) / DEPTH;
+                        local.set(
+                            seatX,
+                            HEIGHT * (1 - 0.6 * seatFront) + 0.28,
+                            (p / (perRow - 1) - 0.5) * SECTION * 0.8
+                        );
+                        local.applyQuaternion(quaternion);
+
+                        position.set(
+                            xs[i] + nx[i] * off + local.x,
+                            ys[i] + local.y,
+                            zs[i] + nz[i] * off + local.z
+                        );
+                        matrix.compose(position, quaternion, scale);
+                        bodies3d.setMatrixAt(idx, matrix);
+                        heads3d.setMatrixAt(idx, matrix);
+
+                        shirt.set(shirts[Math.floor(hashNoise(idx * 3.7) * shirts.length)]);
+                        bodies3d.setColorAt(idx, shirt);
+                        idx++;
+                    }
+                }
+            }
+        }
+
+        for (const mesh of [bodies3d, heads3d]) {
+            mesh.count = idx;
+            mesh.instanceMatrix.needsUpdate = true;
+            if (mesh.instanceColor) {
+                mesh.instanceColor.needsUpdate = true;
+            }
+            mesh.frustumCulled = false;
+            group.add(mesh);
+        }
     }
 
     // Защитна ограда между трасето и трибуните — по целия им фронт. Долният
@@ -664,14 +756,14 @@ function ringCentroid(ring) {
  * ръбовете пропорционално на отдалечеността им.
  *
  * @param {import('./track.js').Track} track
- * @param {number} fromOffset
- * @param {number} toOffset
+ * @param {number|((row: number, i: number) => number)} fromOffset
+ * @param {number|((row: number, i: number) => number)} toOffset
  * @param {number} y
  * @param {{color: number, variation?: number, drop?: number}} options
  * @returns {THREE.Mesh}
  */
 function ribbonMesh(track, fromOffset, toOffset, y, options) {
-    const { xs, ys, zs, nx, nz, count, spacing, curvature } = track;
+    const { xs, ys, zs, nx, nz, count, spacing, curvature, bankSlope } = track;
 
     // +1 ред върхове: последният дублира първия, за да се затвори цикълът с
     // коректни UV координати (иначе последният сегмент опъва текстурата назад).
@@ -697,7 +789,8 @@ function ribbonMesh(track, fromOffset, toOffset, y, options) {
         const innerLimit = k !== 0 ? (0.5 / k) : 0;
 
         for (let side = 0; side < 2; side++) {
-            let offset = side === 0 ? fromOffset : toOffset;
+            const raw = side === 0 ? fromOffset : toOffset;
+            let offset = typeof raw === 'function' ? raw(r, i) : raw;
             if (k > 0) {
                 offset = Math.min(offset, innerLimit);
             } else if (k < 0) {
@@ -707,7 +800,8 @@ function ribbonMesh(track, fromOffset, toOffset, y, options) {
             const vi = (r * 2 + side) * 3;
 
             positions[vi] = xs[i] + nx[i] * offset;
-            positions[vi + 1] = ys[i] + y - Math.abs(offset) * drop;
+            // Банкингът накланя платното напречно: вътрешният ръб пада.
+            positions[vi + 1] = ys[i] + y - Math.abs(offset) * drop - offset * bankSlope[i];
             positions[vi + 2] = zs[i] + nz[i] * offset;
 
             const uvi = (r * 2 + side) * 2;
@@ -766,8 +860,7 @@ function ribbonMesh(track, fromOffset, toOffset, y, options) {
  * @returns {THREE.Mesh}
  */
 function buildKerbs(track) {
-    const { xs, ys, zs, nx, nz, count, spacing, width } = track;
-    const half = width / 2;
+    const { xs, ys, zs, nx, nz, count, spacing, halfWidths, bankSlope } = track;
     const ranges = findKerbRanges(track);
 
     const positions = [];
@@ -783,25 +876,26 @@ function buildKerbs(track) {
             const i0 = ((r % count) + count) % count;
             const i1 = (((r + 1) % count) + count) % count;
 
-            // Кербът е от вътрешната страна на завоя: при завой към нормалата
-            // (side=+1) вътрешната страна е тази на нормалата.
-            const inner = range.side > 0 ? half : -half;
-            const outer = range.side > 0 ? half + KERB_WIDTH : -half - KERB_WIDTH;
-
             const colour = Math.floor((r - range.from) / blockSteps) % 2 === 0 ? red : white;
             const vertexBase = positions.length / 3;
 
             // Вътрешният ръб е на нивото на трасето, външният — издигнат: кербът
-            // става наклонена 3D лента (rumble strip), не плоско петно.
-            for (const [idx, offset, h] of [
-                [i0, inner, Y.kerb],
-                [i0, outer, KERB_HEIGHT],
-                [i1, inner, Y.kerb],
-                [i1, outer, KERB_HEIGHT],
+            // става наклонена 3D лента (rumble strip), не плоско петно. Ръбът
+            // следва ширината ПО ТОЧКА и банкинга на платното.
+            for (const [idx, sideMul, h] of [
+                [i0, 0, Y.kerb],
+                [i0, 1, KERB_HEIGHT],
+                [i1, 0, Y.kerb],
+                [i1, 1, KERB_HEIGHT],
             ]) {
+                // Кербът е от вътрешната страна на завоя: при завой към
+                // нормалата (side=+1) вътрешната страна е тази на нормалата.
+                const edge = range.side > 0 ? halfWidths[idx] : -halfWidths[idx];
+                const offset = edge + range.side * sideMul * KERB_WIDTH;
+
                 positions.push(
                     xs[idx] + nx[idx] * offset,
-                    ys[idx] + h,
+                    ys[idx] + h - offset * bankSlope[idx],
                     zs[idx] + nz[idx] * offset
                 );
                 colors.push(colour.r, colour.g, colour.b);
@@ -849,8 +943,8 @@ function buildKerbs(track) {
  * @returns {THREE.Mesh}
  */
 function buildStartLine(track) {
-    const { xs, ys, zs, nx, nz, tx, tz, width, spacing } = track;
-    const half = width / 2;
+    const { xs, ys, zs, nx, nz, tx, tz, spacing } = track;
+    const half = track.halfWidths[0];
     const depth = Math.max(0.6, spacing * 0.4);
 
     const positions = [];
@@ -890,8 +984,7 @@ function buildStartLine(track) {
  * @returns {THREE.InstancedMesh}
  */
 function buildDistanceMarkers(track, pitRange) {
-    const { xs, ys, zs, nx, nz, count, spacing, width } = track;
-    const half = width / 2 + 2.5;
+    const { xs, ys, zs, nx, nz, count, spacing, halfWidths, bankSlope } = track;
 
     const every = Math.max(1, Math.round(25 / spacing));
     const capacity = Math.floor(count / every) * 2;
@@ -921,10 +1014,11 @@ function buildDistanceMarkers(track, pitRange) {
                 continue;
             }
 
+            const offset = (halfWidths[i] + 2.5) * side;
             matrix.setPosition(
-                xs[i] + nx[i] * half * side,
-                ys[i] + 0.55 - half * RUNOFF_DROP,
-                zs[i] + nz[i] * half * side
+                xs[i] + nx[i] * offset,
+                ys[i] + 0.55 - Math.abs(offset) * RUNOFF_DROP - offset * bankSlope[i],
+                zs[i] + nz[i] * offset
             );
             mesh.setMatrixAt(instance, matrix);
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Database\Factories\GameLapRecordFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +23,10 @@ class GameLapRecord extends Model
         'sector1_ms',
         'sector2_ms',
         'sector3_ms',
+        'input_trace',
+        'sim_version',
+        'verify_status',
+        'verified_lap_ms',
     ];
 
     /** @return array<string, string> */
@@ -32,7 +37,24 @@ class GameLapRecord extends Model
             'sector1_ms' => 'integer',
             'sector2_ms' => 'integer',
             'sector3_ms' => 'integer',
+            'sim_version' => 'integer',
+            'verified_lap_ms' => 'integer',
         ];
+    }
+
+    /**
+     * Обиколките, които се броят в класацията: всичко освен отхвърлените от
+     * сървърното преиграване. NULL (стари записи/без трейс) и pending/error
+     * остават — не наказваме никого без доказателство.
+     *
+     * @param  Builder<GameLapRecord>  $query
+     * @return Builder<GameLapRecord>
+     */
+    public function scopeCounted(Builder $query): Builder
+    {
+        return $query->where(function (Builder $inner): void {
+            $inner->whereNull('verify_status')->orWhere('verify_status', '!=', 'rejected');
+        });
     }
 
     /** @return BelongsTo<User, $this> */

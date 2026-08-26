@@ -17,31 +17,23 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { buildCar, updateCarRig, attachCarModel } from './car.js';
 import { circuitFor } from './circuits.js';
-import { runoffRanges } from './decor.js';
 import { buildTrackMeshes, COLORS } from './mesh.js';
-import { CAR, FIXED_DT, createCarState, speedKmh, step } from './physics.js';
-import { findKerbRanges, prepareTrack, projectOnTrack } from './track.js';
+import { CAR, FIXED_DT, speedKmh } from './physics.js';
+import {
+    FRAME_EVERY,
+    MAX_WARNINGS,
+    SIM_VERSION,
+    createSim,
+    decodeFrames,
+    encodeFrames,
+    encodeTrace,
+} from './sim.js';
+import { createEngineSound } from './sound.js';
+import { prepareTrack } from './track.js';
 import { createDrivetrain, shiftDown, shiftUp, updateDrivetrain } from './drivetrain.js';
 
-/** Брой сектори на обиколка, както в истинската Формула 1. */
-const SECTORS = 3;
-
-/** Продължителност на връщането на пистата (брояч 3-2-1), в тикове. */
-const RECOVER_TICKS = 360; // 3 s при 120 Hz
-
-/** Колко дълго извън пистата, преди да пуснем връщане — за да не се задейства
- *  при кратко клъцване на бордюр/тревата. */
-const OFFTRACK_GRACE = 48; // 0.4 s
-
-/** Позволени излизания в квалификационната, преди времето да се изтрие. */
-const MAX_WARNINGS = 3;
-
-/** Колко метра ПРЕДИ мястото на излизане да върнем колата — за да има място да
- *  се насочи и да не излети пак в средата на завоя. */
-const RECOVER_LOOKBACK = 25;
-
-/** Дял от скоростта, с който пускаме колата след връщане (намалена скорост). */
-const RECOVER_SPEED_FACTOR = 0.6;
+/** localStorage ключ на духа (най-бързата ТИ обиколка на това устройство). */
+const ghostKey = (slug) => `padok-ghost-${slug}`;
 
 /** Максимално време, което един кадър може да добави — спира спиралата на
  *  смъртта. Свалено (0.25→0.1): след GC пауза/смяна на таб 0.25 s → ~30 стъпки в
@@ -133,9 +125,10 @@ export class Game {
         this.canvas = canvas;
         this.onTelemetry = onTelemetry;
         this.onFinish = onFinish;
-        this.track = prepareTrack(trackData);
-        // Визуалната идентичност на пистата: питлейн, терен, светлина (circuits.js).
-        this.circuit = circuitFor(this.track.slug);
+        // Визуалната идентичност на пистата: питлейн, терен, светлина, а вече
+        // и ГЕОМЕТРИЯ — widthProfile/banking влизат в prepareTrack (circuits.js).
+        this.circuit = circuitFor(trackData.slug);
+        this.track = prepareTrack(trackData, this.circuit);
 
         this.renderer = new THREE.WebGLRenderer({
             canvas,
@@ -166,6 +159,8 @@ export class Game {
         this.marshalFlag = trackGroup.userData.marshalFlag; // вее се на летящата обиколка
         this.startLights = trackGroup.userData.startLights; // 5-те светлини на гантрито
         this.decorAnimations = trackGroup.userData.animations ?? []; // виенското колело и др.
+        this.marshalPosts = trackGroup.userData.marshalPosts ?? []; // жълти флагове по постовете
+        this.activeYellowPost = null;
         const trackReady = this.#loadTrackTextures();
 
         this.carRig = buildCar();
@@ -196,7 +191,10 @@ export class Game {
             }
         });
 
-        this.state = createCarState(this.track);
+        // Цялата постъпкова логика (повърхности, физика, хронометър, запис на
+        // входа) живее в sim.js — същият код тича и в сървърната валидация.
+        this.sim = createSim(this.track, this.circuit);
+
         this.input = { throttle: 0, brake: 0, steer: 0 };
         this.keys = new Set();
         this.touch = { throttle: 0, brake: 0, steer: 0 };
@@ -204,48 +202,42 @@ export class Game {
         // спира. Включва се от Vue при мобилно устройство.
         this.autoThrottle = false;
 
-        // Асфалтът под колата: височина за рендера, наклон за гравитацията.
-        this.surface = { height: this.track.ys[0], gradient: this.track.gradient[0] };
-
-        // Повърхности по ред от осевата линия: кербове (яздят се, с вибрация)
-        // и run-off зони (чакълът дърпа истински, тревата — както досега).
-        // Детерминирани от данните → бъдещият сървърен replay ги възпроизвежда.
-        this.kerbSide = new Int8Array(this.track.count);
-        for (const range of findKerbRanges(this.track)) {
-            for (let r = range.from; r <= range.to; r++) {
-                this.kerbSide[((r % this.track.count) + this.track.count) % this.track.count] = range.side;
-            }
-        }
-        // Битови флагове (1 = зона отдясно/+1, 2 = отляво/-1): в шикан двете
-        // страни имат чакъл на съседни редове — просто презаписване би дало
-        // трева върху нарисуван чакъл.
-        this.runoffSide = new Uint8Array(this.track.count);
-        if (this.circuit.runoff !== 'none') {
-            for (const range of runoffRanges(this.track)) {
-                const bit = range.side < 0 ? 1 : 2; // зоната е от -side страната
-                for (let r = range.from; r <= range.to; r++) {
-                    this.runoffSide[((r % this.track.count) + this.track.count) % this.track.count] |= bit;
-                }
-            }
-        }
-        this.runoffPhysics =
-            this.circuit.runoff === 'gravel'
-                ? { gripFactor: 0.28, drag: 13 }
-                : this.circuit.runoff === 'asphalt'
-                    ? { gripFactor: 0.75, drag: 3.5 }
-                    : null;
-        this.offSurface = null; // 'gravel' | 'asphalt' | 'grass' | null
-        this.onKerb = false;
         this.effectTime = 0;
         // Шейкът от миналия кадър — вади се преди изглаждането на камерата,
         // за да не влиза в персистентното ѝ състояние (иначе амплитудата
         // зависи от кадровата честота).
         this.cameraShakeOffset = 0;
 
-        // Камера: chase (по подразбиране) или бордова (C).
+        // Камера: chase (по подразбиране) или бордова (C). Halo силуетът е
+        // дете на камерата — видим само в бордовия режим.
         this.cameraMode = 'chase';
+        this.scene.add(this.camera);
+        this.halo = buildHaloOverlay();
+        this.halo.visible = false;
+        this.camera.add(this.halo);
 
-        this.trackIndexHint = null;
+        // G-force наклоните на бордовата камера (изгладени ускорения).
+        this.gLong = 0;
+        this.gLat = 0;
+        this.prevRenderV = 0;
+
+        // Звукът: синтезиран двигател (sound.js). Контекстът се създава чак
+        // при start() — бутонът „Карай" е потребителският жест.
+        this.sound = createEngineSound();
+
+        // Vue-то закача този callback, за да маха replay overlay-а, когато
+        // реплеят свърши отвътре (R рестарт/reset), не само от своя бутон.
+        this.onReplayEnd = () => {};
+
+        // Духът: най-бързата обиколка на това устройство, полупрозрачен болид,
+        // каращ редом с теб на летящата обиколка. Реплеят ползва същите кадри.
+        this.ghost = this.#loadGhost();
+        this.ghostRig = buildGhostRig();
+        this.ghostRig.root.visible = false;
+        this.scene.add(this.ghostRig.root);
+        this.lastLapFrames = null; // кадрите на току-що завършената обиколка
+        this.replay = null; // {frames, t, camIndex} — активен ТВ реплей
+
         this.accumulator = 0;
         this.lastFrame = 0;
         this.running = false;
@@ -257,18 +249,12 @@ export class Game {
 
         // Преизползвани обекти (нула алокации/кадър в hot path) + акумулатори.
         this._render = {};
-        this._projection = {};
         this.telemetryAccum = TELEMETRY_INTERVAL; // първи кадър праща телеметрия веднага
         this.flagWave = 0;
 
         // Трансмисия (обороти/предавка за HUD).
         this.manualTransmission = options.transmission === 'manual';
         this.drivetrain = createDrivetrain(this.manualTransmission);
-
-        this.#resetLapState();
-        this.bestLapTicks = null;
-        this.lastLapTicks = null;
-        this.lastSectors = [null, null, null]; // секторни разбивки на последната обиколка
 
         this.#placeCameraBehindCar();
         this.#bindEvents();
@@ -285,12 +271,14 @@ export class Game {
         this.running = true;
         this.started = true;
         this.lastFrame = performance.now();
+        this.sound.start();
         this.rafId = requestAnimationFrame(this.#frame);
     }
 
     /** Спира цикъла, без да освобождава ресурси. */
     stop() {
         this.running = false;
+        this.sound.stop();
         if (this.rafId !== null) {
             cancelAnimationFrame(this.rafId);
             this.rafId = null;
@@ -303,19 +291,46 @@ export class Game {
      * @param {boolean} keepRecords Дали рекордът да се запази
      */
     reset(keepRecords = true) {
-        this.state = createCarState(this.track);
-        this.surface = { height: this.track.ys[0], gradient: this.track.gradient[0] };
-        this.trackIndexHint = null;
+        this.stopReplay();
+        this.sim.reset(keepRecords);
         this.accumulator = 0;
-        this.#resetLapState();
+        this.#placeCameraBehindCar();
+    }
 
-        if (!keepRecords) {
-            this.bestLapTicks = null;
-            this.lastLapTicks = null;
-            this.lastSectors = [null, null, null];
+    /**
+     * ТВ реплей на последната завършена обиколка: колата повтаря кадрите,
+     * камерата скача между крайпътни постове като телевизионна режисура.
+     *
+     * @returns {boolean} Дали има какво да се повтори
+     */
+    startReplay() {
+        if (!this.lastLapFrames || this.lastLapFrames.length < 6) {
+            return false;
         }
 
+        this.replay = { frames: this.lastLapFrames, t: 0, camIndex: -1 };
+        this.ghostRig.root.visible = false;
+        // ТВ картина: без halo и без двигател в ухото.
+        this.halo.visible = false;
+        this.sound.stop();
+
+        return true;
+    }
+
+    /** Изход от реплея — обратно към резултатния екран/колата. */
+    stopReplay() {
+        if (!this.replay) {
+            return;
+        }
+        this.replay = null;
+        this.lookTarget = null;
+        this.halo.visible = this.cameraMode === 'onboard';
+        if (this.running) {
+            this.sound.start();
+        }
         this.#placeCameraBehindCar();
+        // Vue-то маха своя replay overlay през този callback.
+        this.onReplayEnd();
     }
 
     /** Преоразмерява рендера към текущия размер на canvas-а. */
@@ -349,6 +364,7 @@ export class Game {
     dispose() {
         this.disposed = true;
         this.stop();
+        this.sound.dispose();
         this.#unbindEvents();
 
         this.scene.traverse((object) => {
@@ -545,7 +561,9 @@ export class Game {
             const timer = setTimeout(done, 6000);
 
             new RGBELoader().load(
-                '/game-hdri/sky_2k.hdr',
+                // Небето е част от идентичността: мрачното на Спа не е това на
+                // Монако. Файлът идва от atmosphere.hdri (по подразбиране общото).
+                `/game-hdri/${atmosphere.hdri ?? 'sky_2k'}.hdr`,
                 (hdr) => {
                     // Късно (след timeout/старт) или след освобождаване — не
                     // подменяй фона (би било pop) и не пускай PMREM на мъртъв renderer.
@@ -617,46 +635,58 @@ export class Game {
         this.composer.render();
     }
 
-    #resetLapState() {
-        this.lapTicks = 0;
-        this.sectorsVisited = new Array(SECTORS).fill(false);
-        this.lastProgress = 0;
-        // Тайм-триал: 'formation' (загряваща, без хронометър) → 'flying'
-        // (квалификационната, която пазим) → 'finished' (кариран флаг + резултат).
-        this.phase = 'formation';
-        this.lapValid = true;
-        this.sectorTicks = new Array(SECTORS).fill(null);
-        this.currentSector = 0;
+    /**
+     * Духът от localStorage: {frames, lapTicks} или null.
+     */
+    #loadGhost() {
+        try {
+            const raw = localStorage.getItem(ghostKey(this.track.slug));
+            if (!raw) {
+                return null;
+            }
+            const parsed = JSON.parse(raw);
+            if (parsed.v !== SIM_VERSION) {
+                return null; // стар запис от друга физика — не е честен съперник
+            }
+            const frames = decodeFrames(parsed.frames);
+            return frames ? { frames, lapTicks: parsed.lapTicks } : null;
+        } catch {
+            return null;
+        }
+    }
 
-        // Връщане на пистата + предупреждения.
-        this.recovering = false;
-        this.recoverTicks = 0;
-        this.recoverToStart = false;
-        this.recoverReleaseSpeed = 0;
-        this.recoverResumeSpeed = 0;
-        this.recoverTarget = null;
-        this.offTrackTicks = 0;
-        this.warnings = 0;
-        // Хронометърът чака връщане на скоростта след спасяване (ограничено до
-        // gateDistance метра преоткарване).
-        this.timerGated = false;
-        this.gateDistance = 0;
-        this.safeState = this.#startSafeState(0);
-        // След телепорт рендерът да не интерполира от старото място (иначе колата
-        // „прелита" за един кадър).
-        this.snapRender = false;
+    /**
+     * Пази новия рекорден дух (тихо — квотата на localStorage не е гарантирана).
+     *
+     * @param {Float32Array} frames
+     * @param {number} lapTicks
+     */
+    #saveGhost(frames, lapTicks) {
+        // Духът в паметта се обновява ВИНАГИ — квотата на localStorage може
+        // да провали само персистирането, не тазсесийния съперник.
+        this.ghost = { frames, lapTicks };
+
+        try {
+            localStorage.setItem(
+                ghostKey(this.track.slug),
+                JSON.stringify({ v: SIM_VERSION, lapTicks, frames: encodeFrames(frames) })
+            );
+        } catch {
+            // Пълно/блокирано хранилище — духът просто не се запазва за после.
+        }
     }
 
     #placeCameraBehindCar() {
-        const forwardX = Math.sin(this.state.heading);
-        const forwardZ = Math.cos(this.state.heading);
+        const state = this.sim.state;
+        const forwardX = Math.sin(state.heading);
+        const forwardZ = Math.cos(state.heading);
 
         this.camera.position.set(
-            this.state.x - forwardX * CAMERA.distance,
-            this.surface.height + CAMERA.height,
-            this.state.z - forwardZ * CAMERA.distance
+            state.x - forwardX * CAMERA.distance,
+            this.sim.surface.height + CAMERA.height,
+            state.z - forwardZ * CAMERA.distance
         );
-        this.camera.lookAt(this.state.x, this.surface.height + 0.6, this.state.z);
+        this.camera.lookAt(state.x, this.sim.surface.height + 0.6, state.z);
     }
 
     #bindEvents() {
@@ -670,10 +700,16 @@ export class Game {
                 this.reset(true);
             }
 
-            // C превключва chase ↔ бордова (halo) камера.
-            if (event.code === 'KeyC' && !event.repeat) {
+            // C превключва chase ↔ бордова (halo) камера (не и в ТВ реплей).
+            if (event.code === 'KeyC' && !event.repeat && !this.replay) {
                 this.cameraMode = this.cameraMode === 'chase' ? 'onboard' : 'chase';
+                this.halo.visible = this.cameraMode === 'onboard';
                 this.lookTarget = null; // погледът да не замахне от старата точка
+            }
+
+            // M заглушава/пуска звука.
+            if (event.code === 'KeyM' && !event.repeat) {
+                this.sound.setMuted(!this.sound.muted());
             }
 
             // Ръчна трансмисия: W = нагоре, S = надолу (веднъж на натискане —
@@ -694,15 +730,27 @@ export class Game {
         // Alt-Tab по време на завой оставя клавиша „натиснат" завинаги.
         this.onBlur = () => this.keys.clear();
 
+        // В скрит таб rAF спира, но Web Audio продължава — двигателят би
+        // бучал на замразени обороти до безкрай. Спираме/пускаме със скриването.
+        this.onVisibility = () => {
+            if (document.hidden) {
+                this.sound.stop();
+            } else if (this.running) {
+                this.sound.start();
+            }
+        };
+
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
         window.addEventListener('blur', this.onBlur);
+        document.addEventListener('visibilitychange', this.onVisibility);
     }
 
     #unbindEvents() {
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
         window.removeEventListener('blur', this.onBlur);
+        document.removeEventListener('visibilitychange', this.onVisibility);
     }
 
     #readInput() {
@@ -731,352 +779,31 @@ export class Game {
         this.input.steer = -merged;
     }
 
-    #fixedStep() {
-        // Връщане на пистата: колата стои на респ. точката, брои 3-2-1 — без
-        // физика и без хронометър, докато тече броячът.
-        if (this.recovering) {
-            this.recoverTicks--;
-            if (this.recoverTicks <= 0) {
-                this.#completeRecovery();
-            }
-            return;
-        }
+    /**
+     * Летящата обиколка завърши: духът се обновява при рекорд, кадрите остават
+     * за ТВ реплея, а трейсът тръгва към UI-а (и оттам — към сървъра).
+     *
+     * @param {object} event Събитието от sim.tick
+     */
+    #onLapFinished(event) {
+        if (event.frames) {
+            this.lastLapFrames = event.frames;
 
-        const projection = projectOnTrack(
-            this.track,
-            this.state.x,
-            this.state.z,
-            this.trackIndexHint,
-            this._projection
-        );
-        this.trackIndexHint = projection.index;
-        this.surface.height = projection.height;
-        this.surface.gradient = projection.gradient;
-
-        // Кербовете се броят за трасе (както в реалните track limits): пълно
-        // сцепление + вибрация, без предупреждения. Извън тях повърхността
-        // определя наказанието — чакълът е капан, асфалтовият апрон прощава.
-        const half = this.track.width / 2;
-        const absLateral = Math.abs(projection.lateral);
-        const lateralSide = projection.lateral > 0 ? 1 : -1;
-        const strictlyOn = absLateral < half;
-        const kerbHere = this.kerbSide[projection.index] === lateralSide;
-        const onTrack = strictlyOn || (kerbHere && absLateral < half + 1.15);
-
-        let offRoad = null;
-        if (!onTrack) {
-            const zoneBit = lateralSide > 0 ? 1 : 2;
             if (
-                this.runoffPhysics &&
-                (this.runoffSide[projection.index] & zoneBit) !== 0 &&
-                absLateral < half + 8
+                event.valid &&
+                (this.ghost === null || event.lapTicks < this.ghost.lapTicks)
             ) {
-                offRoad = this.runoffPhysics;
-                this.offSurface = this.circuit.runoff;
-            } else {
-                this.offSurface = 'grass';
-            }
-        } else {
-            this.offSurface = null;
-        }
-        this.onKerb = onTrack && kerbHere && absLateral > half - 0.45;
-
-        if (onTrack) {
-            // Помним последното безопасно състояние — там ни връща спасяването.
-            this.offTrackTicks = 0;
-            this.#rememberSafeState(projection.index);
-        } else {
-            // Устойчиво извън пистата → пускаме връщане (иначе оставаш в тревата).
-            // Не и след финала — там резултатният екран е отгоре, колата само се
-            // търкаля.
-            this.offTrackTicks++;
-            if (this.offTrackTicks > OFFTRACK_GRACE && this.phase !== 'finished') {
-                this.#beginRecovery();
-                return;
+                this.#saveGhost(event.frames, event.lapTicks);
             }
         }
 
-        step(this.state, this.input, FIXED_DT, onTrack, projection.gradient, offRoad);
-
-        this.#updateLapTiming(projection, onTrack);
-    }
-
-    /**
-     * Запомня осевата точка + посоката на трасето + скоростта, докато сме на
-     * пистата — целта за връщане при излизане.
-     *
-     * @param {number} index
-     */
-    #rememberSafeState(index) {
-        // Мутираме постоянен обект — извиква се на всяка стъпка на пистата.
-        const safe = this.safeState ?? (this.safeState = { index: 0, x: 0, z: 0, heading: 0, speed: 0 });
-        safe.index = index;
-        safe.x = this.track.xs[index];
-        safe.z = this.track.zs[index];
-        safe.heading = Math.atan2(this.track.tx[index], this.track.tz[index]);
-        safe.speed = this.state.vForward;
-    }
-
-    /**
-     * Безопасно състояние на осева точка `index` (по трасето, изправено).
-     *
-     * @param {number} index
-     * @param {number} speed
-     * @returns {{index: number, x: number, z: number, heading: number, speed: number}}
-     */
-    #safeStateAt(index, speed = 0) {
-        return {
-            index,
-            x: this.track.xs[index],
-            z: this.track.zs[index],
-            heading: Math.atan2(this.track.tx[index], this.track.tz[index]),
-            speed,
-        };
-    }
-
-    /**
-     * Безопасно състояние на стартовата линия (за рестарт на квалификационната).
-     *
-     * @param {number} speed
-     */
-    #startSafeState(speed = 0) {
-        return this.#safeStateAt(0, speed);
-    }
-
-    /**
-     * Пуска връщането на пистата (брояч 3-2-1). В квалификационната брои
-     * предупрежденията; на третото трие времето и рестартира от старта.
-     */
-    #beginRecovery() {
-        let toStart = false;
-
-        if (this.phase === 'flying') {
-            this.warnings++;
-            if (this.warnings >= MAX_WARNINGS) {
-                toStart = true;
-            }
-        }
-
-        const preOffSpeed = this.safeState.speed; // скоростта преди излитането
-
-        let target;
-        if (toStart) {
-            // Трето предупреждение → нова квалификационна от старта, летящ старт.
-            target = this.#startSafeState(preOffSpeed);
-            this.recoverReleaseSpeed = preOffSpeed;
-        } else {
-            // Връщаме ПРЕДИ мястото на излизане (не в средата на завоя), с
-            // намалена скорост, за да има място да се насочи и да не излети пак.
-            const offset = Math.round(RECOVER_LOOKBACK / this.track.spacing);
-            const count = this.track.count;
-            const index = (((this.safeState.index - offset) % count) + count) % count;
-            target = this.#safeStateAt(index, preOffSpeed);
-            this.recoverReleaseSpeed = preOffSpeed * RECOVER_SPEED_FACTOR;
-        }
-
-        this.recovering = true;
-        this.recoverTicks = RECOVER_TICKS;
-        this.recoverToStart = toStart;
-        // Хронометърът тръгва чак като си върнеш скоростта отпреди излитането.
-        this.recoverResumeSpeed = preOffSpeed;
-        this.offTrackTicks = 0;
-
-        // Позиционираме колата веднага на респ. точката (играчът вижда къде ще
-        // продължи), замразена докато тече броячът.
-        this.#placeCarAt(target);
-    }
-
-    /**
-     * Телепортира колата на дадено безопасно състояние и я замразява.
-     *
-     * @param {{index: number, x: number, z: number, heading: number}} target
-     */
-    #placeCarAt(target) {
-        this.state.x = target.x;
-        this.state.z = target.z;
-        this.state.heading = target.heading;
-        this.state.vForward = 0;
-        this.state.vLateral = 0;
-        this.state.yawRate = 0;
-        this.state.steer = 0;
-        this.state.slip = 0;
-
-        this.trackIndexHint = target.index;
-        this.surface.height = this.track.ys[target.index];
-        this.surface.gradient = this.track.gradient[target.index];
-        this.recoverTarget = target;
-        this.snapRender = true;
-
-        // Повърхността отпреди излитането да не разтресе камерата на пуска —
-        // респ. точката е на осевата линия, върху чист асфалт.
-        this.offSurface = null;
-        this.onKerb = false;
-        this.cameraShakeOffset = 0;
-
-        // Камерата да не помете през картата — залепяме я зад колата на новото
-        // място и пресъздаваме look-таргета.
-        this.lookTarget = null;
-        this.#placeCameraBehindCar();
-    }
-
-    /**
-     * Край на брояча: пуска колата на записаната скорост, изправена по трасето.
-     * При рестарт (трето предупреждение) започва нова квалификационна от старта.
-     */
-    #completeRecovery() {
-        this.recovering = false;
-
-        // Пускаме на (намалената) скорост, изправени по трасето.
-        this.state.vForward = this.recoverReleaseSpeed;
-        this.state.vLateral = 0;
-        this.state.yawRate = 0;
-
-        const target = this.recoverTarget;
-        this.lastProgress = target.index / this.track.count;
-
-        if (this.recoverToStart) {
-            // Чиста нова квалификационна от старта — брои се веднага (летящ старт).
-            // Стартовата линия е сектор 0 (target.index е 0); подаваме сектора
-            // изрично, за да не се бърка индекс на трасето със сектор.
-            this.phase = 'flying';
-            this.warnings = 0;
-            this.#armFlyingLap(0);
-            this.timerGated = false;
-        } else {
-            // Хронометърът чака да върнеш скоростта отпреди излитането — но най-
-            // много колкото преоткарването назад (RECOVER_LOOKBACK), за да е
-            // ограничено и предвидимо.
-            this.timerGated = true;
-            this.gateDistance = RECOVER_LOOKBACK;
-        }
-
-        this.recoverToStart = false;
-    }
-
-    /**
-     * @param {{lateral: number, distance: number}} projection
-     * @param {boolean} onTrack
-     */
-    #updateLapTiming(projection, onTrack) {
-        const progress = clamp01(projection.distance / this.track.length);
-
-        // След финала хронометърът е спрян — само пазим прогреса за коректен wrap.
-        if (this.phase === 'finished') {
-            this.lastProgress = progress;
-            return;
-        }
-
-        const sector = Math.min(SECTORS - 1, Math.floor(progress * SECTORS));
-
-        if (this.phase === 'flying') {
-            if (this.timerGated) {
-                // След връщане не наказваме преоткарването назад: „безплатни" са
-                // само метрите до мястото на излизане (RECOVER_LOOKBACK). Гейтът
-                // се клиърва и щом върнеш скоростта отпреди (ако е по-рано). Така
-                // нехронометрираната отсечка е ограничена и НЕ може да пресече
-                // финала → без невъзможно бързи обиколки в класацията.
-                this.gateDistance -= Math.max(0, this.state.vForward) * FIXED_DT;
-                if (this.state.vForward >= this.recoverResumeSpeed || this.gateDistance <= 0) {
-                    this.timerGated = false;
-                }
-            }
-            // Излизането вече не анулира обиколката — поема го системата с
-            // предупреждения (3 → изтриване + нова квалификационна).
-            if (!this.timerGated) {
-                this.lapTicks++;
-            }
-        }
-
-        this.sectorsVisited[sector] = true;
-
-        if (sector !== this.currentSector) {
-            // Записваме сплита при ПЪРВО прекосяване напред (ако още е null) — така
-            // не се презаписва при преоткарване назад след връщане, нито остава
-            // null, ако границата е минала докато таймерът е чакал.
-            if (
-                this.phase === 'flying' &&
-                sector === this.currentSector + 1 &&
-                this.sectorTicks[this.currentSector] === null
-            ) {
-                this.sectorTicks[this.currentSector] = this.lapTicks;
-            }
-            this.currentSector = sector;
-        }
-
-        // Пресичане на стартовата линия напред: прогресът пада от ~1 към ~0.
-        const wrappedForward = this.lastProgress > 0.85 && progress < 0.15;
-        const wrappedBackward = this.lastProgress < 0.15 && progress > 0.85;
-
-        if (wrappedForward) {
-            // Гейтът никога не пресича стартовата линия — иначе финалът би
-            // банкирал по-кратко време от реално каране.
-            this.timerGated = false;
-
-            if (this.phase === 'formation') {
-                // Край на загряващата → започва хронометрираната обиколка.
-                this.phase = 'flying';
-                this.warnings = 0;
-                this.#armFlyingLap(sector);
-            } else if (this.phase === 'flying' && this.sectorsVisited.every(Boolean)) {
-                // Пълна квалификационна обиколка → кариран флаг + резултат.
-                this.#finishLap();
-            } else {
-                // Непълна обиколка (напр. отрязан път) — започваме хронометрирането
-                // отначало, за да броим само истинска пълна обиколка.
-                this.#armFlyingLap(sector);
-            }
-        } else if (wrappedBackward && this.phase === 'flying') {
-            // Мина линията на заден ход — обиколката вече не е чиста; връщаме към
-            // загряваща, следващото чисто пресичане пуска нова хронометрирана.
-            this.phase = 'formation';
-            this.lapTicks = 0;
-        }
-
-        this.lastProgress = progress;
-    }
-
-    /**
-     * Нулира хронометъра за нова хронометрирана обиколка от текущия сектор.
-     *
-     * @param {number} sector
-     */
-    #armFlyingLap(sector) {
-        this.lapTicks = 0;
-        this.lapValid = true;
-        this.sectorsVisited = new Array(SECTORS).fill(false);
-        this.sectorsVisited[sector] = true;
-        this.sectorTicks = new Array(SECTORS).fill(null);
-        this.currentSector = sector;
-        this.timerGated = false;
-    }
-
-    /**
-     * Затваря квалификационната обиколка: пази времето, изчислява секторите и
-     * подава резултата за карирания флаг + записа в класацията.
-     */
-    #finishLap() {
-        const [s1End, s2End] = this.sectorTicks;
-        const sectorTicks =
-            s1End !== null && s2End !== null
-                ? [s1End, s2End - s1End, this.lapTicks - s2End]
-                : [null, null, null];
-
-        this.lastLapTicks = this.lapTicks;
-        this.lastSectors = sectorTicks;
-
-        if (this.lapValid && (this.bestLapTicks === null || this.lapTicks < this.bestLapTicks)) {
-            this.bestLapTicks = this.lapTicks;
-        }
-
-        this.phase = 'finished';
-
-        const toMs = (ticks) => (ticks === null ? null : Math.round(ticks * FIXED_DT * 1000));
-
-        // Веднъж — UI-ът показва резултата и (ако е валиден) го праща в класацията.
         this.onFinish({
-            lapMs: toMs(this.lapTicks),
-            sectorsMs: sectorTicks.map(toMs),
-            valid: this.lapValid,
+            lapMs: event.lapMs,
+            sectorsMs: event.sectorsMs,
+            valid: event.valid,
+            // Записът на входа — доказателството на обиколката за сървъра.
+            trace: event.trace ? encodeTrace(event.trace) : null,
+            simVersion: SIM_VERSION,
         });
     }
 
@@ -1094,15 +821,16 @@ export class Game {
         if (this.cameraMode === 'onboard') {
             this.camera.position.set(
                 state.x + forwardX * CAMERA.onboardForward,
-                this.surface.height + CAMERA.onboardHeight,
+                this.sim.surface.height + CAMERA.onboardHeight,
                 state.z + forwardZ * CAMERA.onboardForward
             );
 
             const { ys, spacing, count } = this.track;
+            const hint = this.sim.trackIndexHint;
             const aheadIndex =
-                this.trackIndexHint === null
+                hint === null
                     ? 0
-                    : (this.trackIndexHint + Math.round(CAMERA.onboardLookAhead / spacing)) % count;
+                    : (hint + Math.round(CAMERA.onboardLookAhead / spacing)) % count;
 
             const lookX = state.x + forwardX * CAMERA.onboardLookAhead;
             const lookY = ys[aheadIndex] + 1.0;
@@ -1118,6 +846,11 @@ export class Game {
             }
             this.camera.lookAt(this.lookTarget);
 
+            // G-force: спирачката навежда носа, завоят накланя главата. Малки
+            // ъгли (до ~3°), но продават претоварването по-добре от всичко.
+            this.camera.rotateX(this.gLong * 0.0012);
+            this.camera.rotateZ(-this.gLat * 0.0022);
+
             this.#updateFov(dt, state);
             return;
         }
@@ -1127,7 +860,7 @@ export class Game {
 
         // Камерата виси над асфалта, не над абсолютната нула — иначе на Спа
         // потъва в хълма при изкачването и увисва в небето при спускането.
-        const targetY = this.surface.height + CAMERA.height;
+        const targetY = this.sim.surface.height + CAMERA.height;
 
         // Експоненциално изглаждане — не зависи от честотата на кадрите,
         // за разлика от наивния lerp с константен коефициент.
@@ -1140,10 +873,11 @@ export class Game {
         // Погледът се насочва към височината на трасето НАПРЕД, не към тази
         // под колата: на билото това открива какво идва, вместо да опира в небе.
         const { ys, spacing, count } = this.track;
+        const hint = this.sim.trackIndexHint;
         const aheadIndex =
-            this.trackIndexHint === null
+            hint === null
                 ? 0
-                : (this.trackIndexHint + Math.round(CAMERA.lookAhead / spacing)) % count;
+                : (hint + Math.round(CAMERA.lookAhead / spacing)) % count;
 
         const lookX = state.x + forwardX * CAMERA.lookAhead;
         const lookY = ys[aheadIndex] + 0.9;
@@ -1195,51 +929,82 @@ export class Game {
         const dt = Math.min((now - this.lastFrame) / 1000, MAX_FRAME_TIME);
         this.lastFrame = now;
 
+        // ── ТВ реплей: симулацията е замразена, кадрите се превъртат ────────
+        if (this.replay) {
+            this.#replayFrame(dt);
+            return;
+        }
+
         this.#readInput();
 
         this.accumulator += dt;
 
+        const sim = this.sim;
+        const state = sim.state;
+
         // Снапшот ПРЕДИ стъпките от този кадър. Ако не се завърти стъпка (висок
         // FPS), prev == state и рендерът стои неподвижен — без трептене.
-        let prevX = this.state.x;
-        let prevZ = this.state.z;
-        let prevHeading = this.state.heading;
+        let prevX = state.x;
+        let prevZ = state.z;
+        let prevHeading = state.heading;
 
         while (this.accumulator >= FIXED_DT) {
-            prevX = this.state.x;
-            prevZ = this.state.z;
-            prevHeading = this.state.heading;
-            this.#fixedStep();
+            prevX = state.x;
+            prevZ = state.z;
+            prevHeading = state.heading;
+
+            const event = sim.tick(this.input);
+            if (event?.type === 'finished') {
+                this.#onLapFinished(event);
+            }
+
             this.accumulator -= FIXED_DT;
         }
 
         // След телепорт (връщане на пистата) не интерполираме от старото място —
-        // иначе колата „прелита" през картата за един кадър.
-        if (this.snapRender) {
-            prevX = this.state.x;
-            prevZ = this.state.z;
-            prevHeading = this.state.heading;
-            this.snapRender = false;
+        // иначе колата „прелита" през картата за един кадър. Камерата се залепя
+        // наново, шейкът от старото място се нулира.
+        if (sim.snapRender) {
+            prevX = state.x;
+            prevZ = state.z;
+            prevHeading = state.heading;
+            sim.snapRender = false;
+            this.cameraShakeOffset = 0;
+            this.lookTarget = null;
+            this.#placeCameraBehindCar();
         }
 
         // Интерполация между последните две стъпки. Физиката тиктака на 120 Hz,
         // но кадрите идват на променлива честота — без това колата и камерата
         // подскачат/дърпат, особено щом FPS-ът се разклати. alpha е остатъкът от
         // акумулатора: 0 = точно на стъпка, →1 = почти на следващата.
-        const alpha = this.accumulator / FIXED_DT;
-        let dHeading = this.state.heading - prevHeading;
+        let dHeading = state.heading - prevHeading;
         // Пази срещу евентуален wrap на heading в [-π, π].
         if (dHeading > Math.PI) dHeading -= 2 * Math.PI;
         else if (dHeading < -Math.PI) dHeading += 2 * Math.PI;
 
         // Преизползван обект вместо spread на всеки кадър — нула алокации.
+        const alpha = this.accumulator / FIXED_DT;
         const render = this._render;
-        Object.assign(render, this.state);
-        render.x = prevX + (this.state.x - prevX) * alpha;
-        render.z = prevZ + (this.state.z - prevZ) * alpha;
+        Object.assign(render, state);
+        render.x = prevX + (state.x - prevX) * alpha;
+        render.z = prevZ + (state.z - prevZ) * alpha;
         render.heading = prevHeading + dHeading * alpha;
 
-        updateCarRig(this.carRig, render, this.surface, dt);
+        updateCarRig(this.carRig, render, sim.surface, dt);
+
+        // Духът: полупрозрачният съперник повтаря рекордната обиколка, тик
+        // по тик срещу твоя хронометър — вижда се само на летящата обиколка.
+        this.#updateGhost();
+
+        // Изгладени ускорения за G-force наклоните на бордовата камера.
+        const renderV = state.vForward;
+        const rawLong = dt > 0 ? Math.max(-50, Math.min(50, (renderV - this.prevRenderV) / dt)) : 0;
+        this.prevRenderV = renderV;
+        const rawLat = Math.max(-40, Math.min(40, state.yawRate * renderV));
+        const kg = 1 - Math.exp(-6 * dt);
+        this.gLong += (rawLong - this.gLong) * kg;
+        this.gLat += (rawLat - this.gLat) * kg;
 
         // Шейкът от миналия кадър се маха ПРЕДИ изглаждането — chase камерата
         // интегрира от текущата си позиция и иначе офсетът се наслагва с
@@ -1251,11 +1016,11 @@ export class Game {
         // Чисто визуални — физиката вече е сметната в стъпката.
         this.effectTime += dt;
         let shake = 0;
-        if (this.offSurface === 'gravel' && Math.abs(this.state.vForward) > 4) {
+        if (sim.offSurface === 'gravel' && Math.abs(state.vForward) > 4) {
             shake = Math.sin(this.effectTime * 43) * 0.035 + Math.sin(this.effectTime * 61) * 0.02;
         }
         let rumble = 0;
-        if (this.onKerb && Math.abs(this.state.vForward) > 8) {
+        if (sim.onKerb && Math.abs(state.vForward) > 8) {
             rumble = Math.sin(this.effectTime * 85) * 0.014;
         }
         this.carRig.body.position.y = rumble;
@@ -1265,7 +1030,7 @@ export class Game {
 
         // Маршалът вее карирания флаг само на летящата (финалната) обиколка.
         if (this.marshalFlag) {
-            if (this.phase === 'flying') {
+            if (sim.phase === 'flying') {
                 this.flagWave += dt * FLAG_WAVE_SPEED;
                 this.marshalFlag.rotation.z = Math.sin(this.flagWave) * FLAG_WAVE_AMP;
             } else if (this.marshalFlag.rotation.z !== 0) {
@@ -1278,24 +1043,56 @@ export class Game {
             animate(dt);
         }
 
+        // Жълт флаг: най-близкият маршалски пост вее, докато тече връщането.
+        if (sim.recovering) {
+            if (!this.activeYellowPost && this.marshalPosts.length > 0) {
+                const target = sim.safeState.index;
+                const count = this.track.count;
+                let best = null;
+                let bestDistance = Infinity;
+                for (const post of this.marshalPosts) {
+                    const forward = (((post.index - target) % count) + count) % count;
+                    const distance = Math.min(forward, count - forward);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = post;
+                    }
+                }
+                this.activeYellowPost = best;
+            }
+            if (this.activeYellowPost) {
+                this.activeYellowPost.pivot.rotation.z = 0.15 + Math.sin(this.effectTime * 7) * 0.45;
+            }
+        } else if (this.activeYellowPost) {
+            this.activeYellowPost.pivot.rotation.z = 1.25; // прибран
+            this.activeYellowPost = null;
+        }
+
         // Петте светлини на гантрито: червени по време на загряващата обиколка,
         // угасват щом пресечеш линията — „lights out and away we go".
         if (this.startLights) {
-            const target = this.phase === 'formation' ? 3.2 : 0;
+            const target = sim.phase === 'formation' ? 3.2 : 0;
             if (this.startLights.emissiveIntensity !== target) {
                 this.startLights.emissiveIntensity = target;
             }
         }
 
         // Трансмисия (обороти/предавка за HUD) — гладко, всеки кадър.
-        updateDrivetrain(this.drivetrain, this.state.vForward, this.input.throttle);
+        updateDrivetrain(this.drivetrain, state.vForward, this.input.throttle);
+
+        // Звукът следва реалните обороти + повърхността под колата.
+        this.sound.update(this.drivetrain.rpm, this.input.throttle, {
+            kerb: sim.onKerb,
+            gravel: sim.offSurface === 'gravel',
+            speed: Math.abs(state.vForward),
+        });
 
         // Сенчестата камера следва колата: посоката на слънцето е фиксирана,
         // движим само центъра, за да е острата сянка около играча.
-        this.sun.target.position.set(render.x, this.surface.height, render.z);
+        this.sun.target.position.set(render.x, sim.surface.height, render.z);
         this.sun.position.set(
             render.x + this.sunDir.x * 300,
-            this.surface.height + this.sunDir.y * 300,
+            sim.surface.height + this.sunDir.y * 300,
             render.z + this.sunDir.z * 300
         );
 
@@ -1311,25 +1108,218 @@ export class Game {
         this.telemetryAccum = 0;
 
         this.onTelemetry({
-            speed: Math.round(speedKmh(this.state)),
+            speed: Math.round(speedKmh(state)),
             rpm: Math.round(this.drivetrain.rpm),
             gear: this.drivetrain.gear,
-            lapTime: this.phase === 'flying' ? this.lapTicks * FIXED_DT : null,
-            lastLap: this.lastLapTicks === null ? null : this.lastLapTicks * FIXED_DT,
-            bestLap: this.bestLapTicks === null ? null : this.bestLapTicks * FIXED_DT,
-            sector: this.currentSector + 1,
-            sectors: this.lastSectors.map((t) => (t === null ? null : t * FIXED_DT)),
-            lapValid: this.lapValid,
-            started: this.phase === 'flying',
-            phase: this.phase,
-            recovering: this.recovering,
-            recoverCount: this.recovering ? Math.ceil(this.recoverTicks / 120) : 0,
-            recoverRestart: this.recovering && this.recoverToStart,
-            gated: this.phase === 'flying' && this.timerGated,
-            warnings: this.warnings,
+            lapTime: sim.phase === 'flying' ? sim.lapTicks * FIXED_DT : null,
+            lastLap: sim.lastLapTicks === null ? null : sim.lastLapTicks * FIXED_DT,
+            bestLap: sim.bestLapTicks === null ? null : sim.bestLapTicks * FIXED_DT,
+            sector: sim.currentSector + 1,
+            sectors: sim.lastSectors.map((t) => (t === null ? null : t * FIXED_DT)),
+            lapValid: sim.lapValid,
+            started: sim.phase === 'flying',
+            phase: sim.phase,
+            recovering: sim.recovering,
+            recoverCount: sim.recovering ? Math.ceil(sim.recoverTicks / 120) : 0,
+            recoverRestart: sim.recovering && sim.recoverToStart,
+            gated: sim.phase === 'flying' && sim.timerGated,
+            warnings: sim.warnings,
             maxWarnings: MAX_WARNINGS,
         });
     };
+
+    /**
+     * Духът: интерполира кадрите на рекордната обиколка спрямо ТЕКУЩИЯ
+     * хронометър — истинска задочна битка, паузите (гейт) спират и двамата.
+     */
+    #updateGhost() {
+        const sim = this.sim;
+        const ghost = this.ghost;
+
+        if (!ghost || sim.phase !== 'flying') {
+            this.ghostRig.root.visible = false;
+            return;
+        }
+
+        const frames = ghost.frames;
+        const frameCount = Math.floor(frames.length / 3);
+        // -1 кадър: frames[k] е състоянието СЛЕД отброен тик 2(k+1) — без
+        // корекцията духът върви ~17 ms пред реалната си позиция и „бие"
+        // играч, който точно изравнява рекорда.
+        const position = Math.max(0, sim.lapTicks / FRAME_EVERY - 1);
+        const base = Math.floor(position);
+
+        if (base >= frameCount - 1) {
+            // Духът вече е финиширал — прибира се.
+            this.ghostRig.root.visible = false;
+            return;
+        }
+
+        const t = position - base;
+        const i0 = base * 3;
+        const i1 = i0 + 3;
+
+        const x = frames[i0] + (frames[i1] - frames[i0]) * t;
+        const z = frames[i0 + 2] + (frames[i1 + 2] - frames[i0 + 2]) * t;
+        let dH = frames[i1 + 1] - frames[i0 + 1];
+        if (dH > Math.PI) dH -= 2 * Math.PI;
+        else if (dH < -Math.PI) dH += 2 * Math.PI;
+        const heading = frames[i0 + 1] + dH * t;
+
+        const root = this.ghostRig.root;
+        root.visible = true;
+        root.position.set(x, this.#ghostHeight(x, z), z);
+        root.rotation.y = heading;
+    }
+
+    /**
+     * Височината на асфалта под духа (собствена проекция, без да пипа
+     * кеша на играча).
+     *
+     * @param {number} x
+     * @param {number} z
+     * @returns {number}
+     */
+    #ghostHeight(x, z) {
+        const t = this.track;
+        let best = 0;
+        let bestDistSq = Infinity;
+
+        // Груб скан на всяка 4-та точка — духът е визуален, сантиметри не личат.
+        for (let i = 0; i < t.count; i += 4) {
+            const dx = x - t.xs[i];
+            const dz = z - t.zs[i];
+            const d = dx * dx + dz * dz;
+            if (d < bestDistSq) {
+                bestDistSq = d;
+                best = i;
+            }
+        }
+
+        const lat = (x - t.xs[best]) * t.nx[best] + (z - t.zs[best]) * t.nz[best];
+
+        return t.ys[best] - lat * t.bankSlope[best];
+    }
+
+    /**
+     * Кадър от ТВ реплея: колата повтаря записа, камерата снима от крайпътни
+     * постове с телевизионна режисура (задръж докато отмине, режи напред).
+     *
+     * @param {number} dt
+     */
+    #replayFrame(dt) {
+        const replay = this.replay;
+        const frames = replay.frames;
+        const frameCount = Math.floor(frames.length / 3);
+
+        // 60 кадъра/секунда реално време.
+        replay.t += dt * (120 / FRAME_EVERY);
+        if (replay.t >= frameCount - 1) {
+            replay.t = 0; // цикли — играчът спира с бутона
+        }
+
+        const base = Math.floor(replay.t);
+        const t = replay.t - base;
+        const i0 = base * 3;
+        const i1 = i0 + 3;
+
+        const x = frames[i0] + (frames[i1] - frames[i0]) * t;
+        const z = frames[i0 + 2] + (frames[i1 + 2] - frames[i0 + 2]) * t;
+        let dH = frames[i1 + 1] - frames[i0 + 1];
+        if (dH > Math.PI) dH -= 2 * Math.PI;
+        else if (dH < -Math.PI) dH += 2 * Math.PI;
+        const heading = frames[i0 + 1] + dH * t;
+
+        const y = this.#ghostHeight(x, z);
+        const render = this._render;
+        Object.assign(render, this.sim.state);
+        render.x = x;
+        render.z = z;
+        render.heading = heading;
+        render.vForward = 40; // колелата да се въртят правдоподобно
+        render.vLateral = 0;
+        render.yawRate = 0;
+
+        this.carRig.root.position.set(x, y, z);
+        this.carRig.root.rotation.y = heading;
+        // Кренът/пичът от последния жив кадър гаснат — ТВ колата се търкаля
+        // равно, вместо да носи замразен наклон от финалната права.
+        this.carRig.root.rotation.x *= 0.92;
+        this.carRig.body.rotation.z *= 0.92;
+        this.carRig.body.rotation.x *= 0.92;
+        this.carRig.body.position.y = 0;
+        const spin = 40 * dt * 2.2;
+        for (const wheel of this.carRig.allWheels) {
+            wheel.rotation.x += spin;
+        }
+
+        // Сянката следва реплей колата, не замразената жива позиция.
+        this.sun.target.position.set(x, y, z);
+        this.sun.position.set(
+            x + this.sunDir.x * 300,
+            y + this.sunDir.y * 300,
+            z + this.sunDir.z * 300
+        );
+
+        // ТВ пост: държим текущия, докато колата не се отдалечи твърде много —
+        // тогава режем към най-близкия напред (хистерезисът маха трептенето).
+        const posts = this.#tvPosts();
+        let current = replay.camIndex >= 0 ? posts[replay.camIndex] : null;
+        const distTo = (post) => Math.hypot(x - post.x, z - post.z);
+
+        if (!current || distTo(current) > 170) {
+            let bestIdx = 0;
+            let bestDist = Infinity;
+            for (let i = 0; i < posts.length; i++) {
+                const d = distTo(posts[i]);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestIdx = i;
+                }
+            }
+            replay.camIndex = bestIdx;
+            current = posts[bestIdx];
+        }
+
+        this.camera.position.set(current.x, current.y, current.z);
+        this.camera.lookAt(x, y + 0.8, z);
+
+        if (Math.abs(this.camera.fov - 48) > 0.5) {
+            this.camera.fov = 48; // телеобектив — истинската ТВ картина
+            this.camera.updateProjectionMatrix();
+        }
+
+        this.composer.render();
+    }
+
+    /**
+     * Крайпътните ТВ постове: на всеки ~180 m, отместени встрани и нагоре.
+     * Строят се веднъж при първия реплей.
+     */
+    #tvPosts() {
+        if (this._tvPosts) {
+            return this._tvPosts;
+        }
+
+        const t = this.track;
+        const every = Math.max(1, Math.round(180 / t.spacing));
+        const posts = [];
+
+        for (let i = 0; i < t.count; i += every) {
+            // Редуваме страната — ТВ режисурата не стои все отляво.
+            const side = posts.length % 2 === 0 ? 1 : -1;
+            const offset = side * (t.halfWidths[i] + 16);
+            posts.push({
+                x: t.xs[i] + t.nx[i] * offset,
+                y: t.ys[i] + 7 - offset * t.bankSlope[i],
+                z: t.zs[i] + t.nz[i] * offset,
+            });
+        }
+
+        this._tvPosts = posts;
+
+        return posts;
+    }
 }
 
 const INTERESTING_KEYS = new Set([
@@ -1343,6 +1333,62 @@ const INTERESTING_KEYS = new Set([
     'KeyD',
     'Space',
 ]);
+
+/**
+ * Духът: процедурният болид, полупрозрачен и без сянка — рекордната обиколка,
+ * каращa редом. Външният GLB не се клонира нарочно: духът се чете по-ясно
+ * като силует.
+ *
+ * @returns {ReturnType<typeof buildCar>}
+ */
+function buildGhostRig() {
+    const rig = buildCar();
+    const ghostTint = new THREE.Color(0x9fc8ff);
+
+    rig.root.traverse((object) => {
+        if (object.isMesh) {
+            const material = object.material.clone();
+            material.transparent = true;
+            material.opacity = 0.35;
+            material.depthWrite = false;
+            // Призрачно-син тон — да не се бърка с истинската кола.
+            material.color?.lerp?.(ghostTint, 0.7);
+            object.material = material;
+            object.castShadow = false;
+        }
+    });
+
+    return rig;
+}
+
+/**
+ * Halo силуетът + ръбът на кокпита за бордовата камера. Дете на камерата —
+ * MeshBasic черно, като сянка срещу светлината (както го вижда пилотът).
+ *
+ * @returns {THREE.Group}
+ */
+function buildHaloOverlay() {
+    const group = new THREE.Group();
+    const material = new THREE.MeshBasicMaterial({ color: 0x0c0d0f });
+
+    // Обръчът на halo-то — горната дъга пред погледа.
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.024, 8, 28, Math.PI), material);
+    hoop.position.set(0, 0.1, -0.62);
+    group.add(hoop);
+
+    // Централната стойка.
+    const pylon = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.2, 0.05), material);
+    pylon.position.set(0, 0.0, -0.6);
+    group.add(pylon);
+
+    // Ръбът на кокпита — долната дъга.
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.08, 6, 24, Math.PI), material);
+    rim.rotation.z = Math.PI;
+    rim.position.set(0, -0.36, -0.78);
+    group.add(rim);
+
+    return group;
+}
 
 /**
  * @param {number} v

@@ -40,6 +40,11 @@ class StoreGameLapRequest extends FormRequest
             'sectors.0' => ['required', 'integer', 'min:1', 'max:1200000'],
             'sectors.1' => ['required', 'integer', 'min:1', 'max:1200000'],
             'sectors.2' => ['required', 'integer', 'min:1', 'max:1200000'],
+            // Записът на входа за сървърно преиграване е ЗАДЪЛЖИТЕЛЕН — без
+            // него валидацията е по желание, т.е. никаква. Таванът покрива
+            // 20-минутната обиколка (2 байта/тик × 120 Hz, base64).
+            'trace' => ['required', 'string', 'max:620000'],
+            'sim_version' => ['required', 'integer', 'min:1', 'max:1000'],
         ];
     }
 

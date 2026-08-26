@@ -12,6 +12,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { curvatureRanges } from './sim.js';
 
 // Синхронизирани с mesh.js — теренът и банкетите трябва да се снаждат.
 const RUNOFF_DROP = 0.035;
@@ -136,11 +137,23 @@ export function buildCircuitDecor(track, circuit, sampler) {
         animations.push(flags.animate);
     }
 
+    // Тунелът на Монако — галерия над сегмента от конфига (from/to в метри).
+    if (circuit.tunnel) {
+        group.add(buildTunnel(track, circuit.tunnel));
+    }
+
+    // Маршалски постове на тежките завои — Game развява жълтия флаг на
+    // най-близкия пост, докато тече връщането на пистата.
+    const marshals = buildMarshalPosts(track);
+    group.add(marshals.group);
+    const marshalPosts = marshals.posts;
+
     return {
         group,
         startLights: gantry.lights,
         animations,
         gravelMaterial,
+        marshalPosts,
         // Диапазонът на пит комплекса (редове спрямо ред 0 + страна) — mesh.js
         // го ползва, за да не слага стълбчета/трибуни върху питлейна.
         pitRange: { from: pit.from, to: pit.to, sign: pit.sign },
@@ -148,19 +161,167 @@ export function buildCircuitDecor(track, circuit, sampler) {
 }
 
 /**
- * Диапазоните на run-off зоните (същите като buildRunoffZones строи) — Game
- * ги ползва, за да знае дали колата е в ЧАКЪЛА (тежко дърпане), или в тревата.
+ * Тунелът (Монако): бетонни стени, таван със светеща лента и портални рамки.
+ * Таванът хвърля сянка → интериорът реално потъмнява, а топлата лента дава
+ * прочутото оранжево сияние.
  *
  * @param {import('./track.js').Track} track
- * @returns {Array<{from: number, to: number, side: number}>} side: страната на
- *          завоя; зоната е от СРЕЩУПОЛОЖНАТА (-side) страна на трасето
+ * @param {{from: number, to: number}} cfg Метри по обиколката
+ * @returns {THREE.Group}
  */
-export function runoffRanges(track) {
-    return curvatureRanges(track, 0.014, 4).map((r) => ({
-        from: r.from - 14,
-        to: r.to + 6,
-        side: r.side,
-    }));
+function buildTunnel(track, cfg) {
+    const group = new THREE.Group();
+    const rowFrom = Math.round(cfg.from / track.spacing);
+    const rowTo = Math.round(cfg.to / track.spacing);
+
+    // Стените стоят на най-широкото място в диапазона — галерията е права.
+    let half = 0;
+    for (let r = rowFrom; r <= rowTo; r++) {
+        half = Math.max(half, track.halfWidths[((r % track.count) + track.count) % track.count]);
+    }
+    const wallOffset = half + 1.6;
+    const height = 4.6;
+
+    const concrete = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        metalness: 0.05,
+        roughness: 0.85,
+        side: THREE.DoubleSide,
+    });
+
+    for (const s of [-1, 1]) {
+        const wall = new THREE.Mesh(
+            wallGeometry(track, rowFrom, rowTo, s * wallOffset, height, 0xb3ada0, 0x8f8a7e),
+            concrete
+        );
+        wall.frustumCulled = false;
+        wall.castShadow = true;
+        group.add(wall);
+    }
+
+    const ceiling = new THREE.Mesh(
+        stripGeometry(track, rowFrom, rowTo, -(wallOffset + 0.2), wallOffset + 0.2, height, {
+            color: 0x9b968a,
+            variation: 0.06,
+        }),
+        concrete
+    );
+    ceiling.frustumCulled = false;
+    ceiling.castShadow = true;
+    group.add(ceiling);
+
+    // Светещата лента по тавана — MeshBasic „свети" без истинска лампа.
+    const glow = new THREE.Mesh(
+        stripGeometry(track, rowFrom + 1, rowTo - 1, -0.4, 0.4, height - 0.08, { color: 0xffffff }),
+        new THREE.MeshBasicMaterial({ color: 0xffb45e, side: THREE.DoubleSide })
+    );
+    glow.frustumCulled = false;
+    group.add(glow);
+
+    // Портални рамки на двата края.
+    for (const row of [rowFrom, rowTo]) {
+        const i = ((row % track.count) + track.count) % track.count;
+        const header = new THREE.Mesh(
+            new THREE.BoxGeometry(wallOffset * 2 + 1.6, 1.4, 1.0),
+            new THREE.MeshStandardMaterial({ color: 0x7d786d, roughness: 0.8 })
+        );
+        header.position.set(track.xs[i], track.ys[i] + height + 0.5, track.zs[i]);
+        header.rotation.y = Math.atan2(track.tx[i], track.tz[i]);
+        header.castShadow = true;
+        group.add(header);
+    }
+
+    return group;
+}
+
+/**
+ * Маршалски постове на входа на тежките завои: фигура в оранжев елек с
+ * прибран жълт флаг. Game вдига флага на най-близкия пост при излитане.
+ *
+ * @param {import('./track.js').Track} track
+ * @returns {{group: THREE.Group, posts: Array<{index: number, pivot: THREE.Group}>}}
+ */
+function buildMarshalPosts(track) {
+    const group = new THREE.Group();
+    const posts = [];
+
+    // Същите спирачни събития като табелите, слети през шикан.
+    const raw = curvatureRanges(track, 0.02, 3);
+    const events = [];
+    for (const range of raw) {
+        const last = events[events.length - 1];
+        if (last && range.from - last.to < 12) {
+            last.to = range.to;
+        } else {
+            events.push({ from: range.from, to: range.to, side: range.side });
+        }
+    }
+
+    // Обща геометрия на фигурата (крака/елек/глава в един меш).
+    const legs = new THREE.BoxGeometry(0.32, 0.75, 0.24);
+    legs.translate(0, 0.38, 0);
+    paintGeometryFlat(legs, 0x24272c);
+    const vest = new THREE.BoxGeometry(0.4, 0.55, 0.26);
+    vest.translate(0, 1.02, 0);
+    paintGeometryFlat(vest, 0xff7a1a);
+    const head = new THREE.IcosahedronGeometry(0.12, 0);
+    head.translate(0, 1.45, 0);
+    paintGeometryFlat(head, 0xe0a884);
+
+    const legsFlat = legs.toNonIndexed();
+    legs.dispose();
+    const vestFlat = vest.toNonIndexed();
+    vest.dispose();
+
+    const figure = mergeGeometries([legsFlat, vestFlat, head], false);
+    legsFlat.dispose();
+    vestFlat.dispose();
+    head.dispose();
+
+    const figureMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
+    const flagMaterial = new THREE.MeshBasicMaterial({ color: 0xf5d020, side: THREE.DoubleSide });
+    const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x2c2f34, roughness: 0.7 });
+
+    for (const event of events) {
+        const row = event.from - Math.round(18 / track.spacing);
+        const i = ((row % track.count) + track.count) % track.count;
+        const offset = -event.side * (track.halfWidths[i] + 2.4);
+
+        const post = new THREE.Group();
+        post.position.set(
+            track.xs[i] + track.nx[i] * offset,
+            track.ys[i] - Math.abs(offset) * RUNOFF_DROP - offset * track.bankSlope[i],
+            track.zs[i] + track.nz[i] * offset
+        );
+        post.rotation.y = Math.atan2(-track.nx[i] * Math.sign(offset), -track.nz[i] * Math.sign(offset));
+
+        if (figure) {
+            post.add(new THREE.Mesh(figure, figureMaterial));
+        }
+
+        // Флагът виси на пръта; pivot-ът при дланта се върти при „веене".
+        const pivot = new THREE.Group();
+        pivot.position.set(0.3, 1.35, 0);
+
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.8, 5), poleMaterial);
+        pole.position.y = 0.3;
+        pivot.add(pole);
+
+        const cloth = new THREE.PlaneGeometry(0.6, 0.4);
+        cloth.translate(0.3, 0, 0);
+        const flag = new THREE.Mesh(cloth, flagMaterial);
+        flag.position.y = 0.55;
+        pivot.add(flag);
+
+        // В покой флагът е спуснат (прибран до тялото).
+        pivot.rotation.z = 1.25;
+        post.add(pivot);
+
+        group.add(post);
+        posts.push({ index: i, pivot });
+    }
+
+    return { group, posts };
 }
 
 // ── Геометрични помощници ────────────────────────────────────────────────
@@ -206,7 +367,7 @@ function pointAt(track, meters) {
  * @returns {THREE.BufferGeometry}
  */
 function stripGeometry(track, rowFrom, rowTo, offsetA, offsetB, y, options) {
-    const { xs, ys, zs, nx, nz, count, spacing, curvature } = track;
+    const { xs, ys, zs, nx, nz, count, spacing, curvature, bankSlope } = track;
 
     const rows = rowTo - rowFrom + 1;
     const positions = new Float32Array(rows * 2 * 3);
@@ -248,7 +409,8 @@ function stripGeometry(track, rowFrom, rowTo, offsetA, offsetB, y, options) {
 
             const vi = (r * 2 + side) * 3;
             positions[vi] = xs[i] + nx[i] * offset;
-            positions[vi + 1] = ys[i] + y - Math.abs(offset) * drop;
+            // Банкингът накланя лентата напречно, като платното.
+            positions[vi + 1] = ys[i] + y - Math.abs(offset) * drop - offset * bankSlope[i];
             positions[vi + 2] = zs[i] + nz[i] * offset;
 
             const uvi = (r * 2 + side) * 2;
@@ -307,7 +469,7 @@ function stripGeometry(track, rowFrom, rowTo, offsetA, offsetB, y, options) {
  * @returns {THREE.BufferGeometry}
  */
 function wallGeometry(track, rowFrom, rowTo, offsetFn, height, colorTop, colorBottom, bottom = -0.35) {
-    const { xs, ys, zs, nx, nz, count } = track;
+    const { xs, ys, zs, nx, nz, count, bankSlope } = track;
 
     const rows = rowTo - rowFrom + 1;
     const positions = new Float32Array(rows * 2 * 3);
@@ -328,14 +490,15 @@ function wallGeometry(track, rowFrom, rowTo, offsetFn, height, colorTop, colorBo
 
         const bx = xs[i] + nx[i] * offset;
         const bz = zs[i] + nz[i] * offset;
+        const baseY = ys[i] - offset * bankSlope[i];
 
         // Долният ръб е леко вкопан (по подразбиране) — теренът не е равен.
         const vi = r * 6;
         positions[vi] = bx;
-        positions[vi + 1] = ys[i] + bottom;
+        positions[vi + 1] = baseY + bottom;
         positions[vi + 2] = bz;
         positions[vi + 3] = bx;
-        positions[vi + 4] = ys[i] + height;
+        positions[vi + 4] = baseY + height;
         positions[vi + 5] = bz;
 
         colors[vi] = low.r;
@@ -374,49 +537,8 @@ function wallGeometry(track, rowFrom, rowTo, offsetFn, height, colorTop, colorBo
     return geometry;
 }
 
-/**
- * Диапазони, в които |кривината| надхвърля праг — суровината за чакъл, табели
- * и купчини гуми. Не слива диапазони с различен знак (шикан = два диапазона).
- *
- * @param {import('./track.js').Track} track
- * @param {number} minCurv
- * @param {number} minLen Минимална дължина в редове
- * @returns {Array<{from: number, to: number, side: number, peak: number}>}
- */
-function curvatureRanges(track, minCurv, minLen) {
-    const { curvature, count } = track;
-    const ranges = [];
-    let current = null;
-
-    for (let i = 0; i < count; i++) {
-        const k = curvature[i];
-        const side = k > minCurv ? 1 : k < -minCurv ? -1 : 0;
-
-        if (side === 0) {
-            if (current) {
-                ranges.push(current);
-                current = null;
-            }
-            continue;
-        }
-
-        if (current && current.side === side) {
-            current.to = i;
-            current.peak = Math.max(current.peak, Math.abs(k));
-        } else {
-            if (current) {
-                ranges.push(current);
-            }
-            current = { from: i, to: i, side, peak: Math.abs(k) };
-        }
-    }
-
-    if (current) {
-        ranges.push(current);
-    }
-
-    return ranges.filter((r) => r.to - r.from >= minLen);
-}
+// curvatureRanges живее в sim.js — суровина и за декора, и за run-off
+// физиката, без three.js по веригата на сървърното повторение.
 
 // ── Стартова права: питлейн, решетка, гантри ─────────────────────────────
 
@@ -454,12 +576,18 @@ function findStartStraight(track) {
  */
 function buildPitComplex(track, circuit, straight) {
     const group = new THREE.Group();
-    const half = track.width / 2;
     const sign = circuit.pitSide === 'right' ? 1 : -1;
 
     const from = -straight.back + 3;
     const to = straight.forward - 3;
     const span = to - from;
+
+    // Комплексът е прав: ползва най-широката точка в диапазона си (фунията
+    // на Монца Т1 попада в края на стартовата права).
+    let half = track.halfWidths[0];
+    for (let r = from; r <= to; r++) {
+        half = Math.max(half, track.halfWidths[((r % track.count) + track.count) % track.count]);
+    }
 
     // Няма права — няма питлейн (не би трябвало да се случва на реална писта).
     if (span < 30) {
@@ -585,7 +713,7 @@ function buildGridSlots(track, straight) {
 
     for (let j = 0; j < slots; j++) {
         const dist = -(10 + j * 8);
-        const lateral = (j % 2 === 0 ? 1 : -1) * Math.min(3.2, track.width * 0.23);
+        const lateral = (j % 2 === 0 ? 1 : -1) * Math.min(3.2, track.halfWidths[0] * 0.46);
         const p = pointAt(track, dist);
 
         // Три ленти: предна черта + две странични назад (П-форма).
@@ -628,14 +756,14 @@ function buildGridSlots(track, straight) {
  */
 function buildStartGantry(track) {
     const group = new THREE.Group();
-    const half = track.width / 2;
+    const half = track.halfWidths[Math.round(6 / track.spacing) % track.count];
     const p = pointAt(track, 6);
     const yaw = Math.atan2(p.tx, p.tz);
 
     const frame = new THREE.MeshStandardMaterial({ color: DECOR.gantry, metalness: 0.5, roughness: 0.5 });
 
     const beamY = 7.2;
-    const beamLength = track.width + 5;
+    const beamLength = half * 2 + 5;
 
     const parts = [];
 
@@ -706,7 +834,7 @@ function buildStartGantry(track) {
  * @returns {THREE.Mesh|null}
  */
 function buildRunoffZones(track, circuit) {
-    const half = track.width / 2;
+    const halfAt = (i) => track.halfWidths[i];
     const ranges = curvatureRanges(track, 0.014, 4);
 
     if (ranges.length === 0) {
@@ -727,8 +855,8 @@ function buildRunoffZones(track, circuit) {
                 track,
                 range.from - 14,
                 range.to + 6,
-                out * (half + 1.15),
-                out * (half + RUNOFF_WIDTH - 0.2),
+                (row, i) => out * (halfAt(i) + 1.15),
+                (row, i) => out * (halfAt(i) + RUNOFF_WIDTH - 0.2),
                 Y_GRAVEL,
                 { color, variation, drop: RUNOFF_DROP }
             )
@@ -762,8 +890,7 @@ function buildRunoffZones(track, circuit) {
  * @returns {THREE.InstancedMesh|null}
  */
 function buildTyreStacks(track) {
-    const { xs, ys, zs, nx, nz, count } = track;
-    const half = track.width / 2;
+    const { xs, ys, zs, nx, nz, count, halfWidths, bankSlope } = track;
     const ranges = curvatureRanges(track, 0.022, 4);
 
     if (ranges.length === 0) {
@@ -782,15 +909,15 @@ function buildTyreStacks(track) {
 
     for (const range of ranges) {
         const out = -range.side;
-        const offset = out * (half + 8.9);
 
         for (let r = range.from - 6; r <= range.to + 6 && n < capacity; r += 3) {
             const i = ((r % count) + count) % count;
+            const offset = out * (halfWidths[i] + 8.9);
 
             matrix.makeRotationY(hashNoise(i) * Math.PI);
             matrix.setPosition(
                 xs[i] + nx[i] * offset,
-                ys[i] + 0.5 - Math.abs(offset) * RUNOFF_DROP,
+                ys[i] + 0.5 - Math.abs(offset) * RUNOFF_DROP - offset * bankSlope[i],
                 zs[i] + nz[i] * offset
             );
             mesh.setMatrixAt(n, matrix);
@@ -824,8 +951,7 @@ function buildTyreStacks(track) {
  * @returns {THREE.Object3D[]}
  */
 function buildMarkerBoards(track, pitSign) {
-    const { curvature, count, spacing, width } = track;
-    const half = width / 2;
+    const { curvature, count, spacing, halfWidths, bankSlope } = track;
 
     // Шиканите дават два съседни диапазона — една спирачна зона. Сливаме
     // диапазони с произволен знак на разстояние под 12 реда.
@@ -854,8 +980,8 @@ function buildMarkerBoards(track, pitSign) {
                 continue;
             }
 
-            placements[dist].push({ i, offset: out * (half + 2.7) });
-            poles.push({ i, offset: out * (half + 2.7) });
+            placements[dist].push({ i, offset: out * (halfWidths[i] + 2.7) });
+            poles.push({ i, offset: out * (halfWidths[i] + 2.7) });
         }
     }
 
@@ -864,8 +990,8 @@ function buildMarkerBoards(track, pitSign) {
     const drs = [];
     for (const run of straightRuns(track, 0.004, 90).slice(0, 2)) {
         const i = (run.from + Math.round(run.len * 0.35)) % count;
-        drs.push({ i, offset: -pitSign * (half + 2.7) });
-        poles.push({ i, offset: -pitSign * (half + 2.7) });
+        drs.push({ i, offset: -pitSign * (halfWidths[i] + 2.7) });
+        poles.push({ i, offset: -pitSign * (halfWidths[i] + 2.7) });
     }
 
     const meshes = [];
@@ -888,7 +1014,7 @@ function buildMarkerBoards(track, pitSign) {
             quaternion.setFromAxisAngle(UP, Math.atan2(-track.tx[i], -track.tz[i]));
             position.set(
                 track.xs[i] + track.nx[i] * offset,
-                track.ys[i] + 1.35 - Math.abs(offset) * RUNOFF_DROP,
+                track.ys[i] + 1.35 - Math.abs(offset) * RUNOFF_DROP - offset * bankSlope[i],
                 track.zs[i] + track.nz[i] * offset
             );
             mesh.setMatrixAt(n, matrix.compose(position, quaternion, scale));
@@ -919,7 +1045,7 @@ function buildMarkerBoards(track, pitSign) {
             matrix.identity();
             matrix.setPosition(
                 track.xs[i] + track.nx[i] * offset,
-                track.ys[i] + 0.5 - Math.abs(offset) * RUNOFF_DROP,
+                track.ys[i] + 0.5 - Math.abs(offset) * RUNOFF_DROP - offset * bankSlope[i],
                 track.zs[i] + track.nz[i] * offset
             );
             poleMesh.setMatrixAt(n, matrix);
@@ -990,8 +1116,7 @@ function straightRuns(track, maxCurv, minRows) {
  * @returns {THREE.Mesh|null}
  */
 function buildFootbridge(track, pit) {
-    const { count, width } = track;
-    const half = width / 2;
+    const { count } = track;
 
     let i = null;
     for (const run of straightRuns(track, 0.004, 90)) {
@@ -1007,6 +1132,7 @@ function buildFootbridge(track, pit) {
         return null;
     }
 
+    const half = track.halfWidths[i];
     const span = 2 * (half + 6);
     const deckY = 6.2;
     const parts = [];
@@ -1060,7 +1186,7 @@ function buildFootbridge(track, pit) {
  * @returns {THREE.Object3D[]}
  */
 function buildCrossoverBridges(track) {
-    const { xs, ys, zs, count, width } = track;
+    const { xs, ys, zs, count, halfWidths } = track;
     const out = [];
     const found = [];
 
@@ -1104,16 +1230,15 @@ function buildCrossoverBridges(track) {
         }
     }
 
-    const half = width / 2;
-
     for (const crossing of found) {
         const up = crossing.upper;
         const low = crossing.lower;
+        const upHalf = halfWidths[up];
         const gap = ys[up] - ys[low];
         const parts = [];
 
         // Греда под горното платно, по неговата посока.
-        const girder = new THREE.BoxGeometry(width + 3.5, 1.3, 26);
+        const girder = new THREE.BoxGeometry(upHalf * 2 + 3.5, 1.3, 26);
         girder.translate(0, -0.75, 0);
         paintGeometryFlat(girder, 0x5c6168);
         parts.push(girder);
@@ -1121,7 +1246,7 @@ function buildCrossoverBridges(track) {
         // Странични фасции — четат се като мост от долния път.
         for (const s of [-1, 1]) {
             const fascia = new THREE.BoxGeometry(0.3, 1.7, 26);
-            fascia.translate(s * (half + 1.9), -0.2, 0);
+            fascia.translate(s * (upHalf + 1.9), -0.2, 0);
             paintGeometryFlat(fascia, 0x9aa0a8);
             parts.push(fascia);
         }
@@ -1147,7 +1272,7 @@ function buildCrossoverBridges(track) {
         const pillarGeo = [];
         for (const s of [-1, 1]) {
             const pillar = new THREE.BoxGeometry(1.3, gap - 1.6, 1.3);
-            pillar.translate(s * (half + 2.6), (gap - 1.6) / 2, 0);
+            pillar.translate(s * (halfWidths[low] + 2.6), (gap - 1.6) / 2, 0);
             paintGeometryFlat(pillar, 0x6e747c);
             pillarGeo.push(pillar);
         }
@@ -1202,8 +1327,7 @@ function paintGeometryFlat(geometry, color) {
  * @returns {THREE.InstancedMesh|null}
  */
 function buildSausageKerbs(track) {
-    const { xs, ys, zs, nx, nz, count, width } = track;
-    const half = width / 2;
+    const { xs, ys, zs, nx, nz, count, halfWidths, bankSlope } = track;
 
     // Само много тесните и кратки чупки (шикани), не дългите завои.
     const ranges = curvatureRanges(track, 0.035, 2).filter((r) => r.to - r.from <= 12);
@@ -1224,13 +1348,16 @@ function buildSausageKerbs(track) {
     let n = 0;
 
     for (const range of ranges) {
-        const offset = range.side * (half + 1.1 + 0.75); // зад вътрешния керб
-
         for (let r = range.from; r <= range.to && n < capacity; r += 2) {
             const i = ((r % count) + count) % count;
+            const offset = range.side * (halfWidths[i] + 1.1 + 0.75); // зад вътрешния керб
 
             quaternion.setFromAxisAngle(UP, Math.atan2(track.tx[i], track.tz[i]));
-            position.set(xs[i] + nx[i] * offset, ys[i] + 0.11, zs[i] + nz[i] * offset);
+            position.set(
+                xs[i] + nx[i] * offset,
+                ys[i] + 0.11 - offset * bankSlope[i],
+                zs[i] + nz[i] * offset
+            );
             mesh.setMatrixAt(n, matrix.compose(position, quaternion, scale));
             n++;
         }
@@ -1256,22 +1383,29 @@ function buildSausageKerbs(track) {
  * @returns {THREE.Mesh}
  */
 function buildStreetWalls(track, circuit, pit) {
-    const half = track.width / 2;
-    const base = half + 1.45;
+    const baseAt = (i) => track.halfWidths[i] + 1.45;
 
-    const nonPitSide = wallGeometry(track, 0, track.count, -pit.sign * base, 0.95, DECOR.pitWallTop, DECOR.pitWallBottom);
+    const nonPitSide = wallGeometry(
+        track,
+        0,
+        track.count,
+        (row, i) => -pit.sign * baseAt(i),
+        0.95,
+        DECOR.pitWallTop,
+        DECOR.pitWallBottom
+    );
 
     // Откъм питовете: следва външния ръб на питлейна в неговия диапазон.
     const pitSide = wallGeometry(
         track,
         0,
         track.count,
-        (row) => {
+        (row, i) => {
             const wrapped = row > track.count / 2 ? row - track.count : row;
             if (wrapped > pit.from && wrapped < pit.to) {
                 return pit.outerOffset(wrapped) + pit.sign * 0.9;
             }
-            return pit.sign * base;
+            return pit.sign * baseAt(i);
         },
         0.95,
         DECOR.pitWallTop,
@@ -1301,16 +1435,24 @@ function buildStreetWalls(track, circuit, pit) {
  * @returns {Float32Array}
  */
 function computeRacingLine(track) {
-    const { curvature, count, width } = track;
-    const reach = width / 2 - 1.9;
+    const { curvature, count, halfWidths } = track;
 
     let offsets = new Float32Array(count);
     for (let i = 0; i < count; i++) {
         const k = curvature[i] / 0.012;
-        offsets[i] = reach * Math.max(-1, Math.min(1, k));
+        offsets[i] = (halfWidths[i] - 1.9) * Math.max(-1, Math.min(1, k));
     }
 
-    return smoothCyclicWide(offsets, 4, 24);
+    offsets = smoothCyclicWide(offsets, 4, 24);
+
+    // След изглаждането линията може да прелее в по-тесен участък — клампва
+    // се към локалната ширина.
+    for (let i = 0; i < count; i++) {
+        const limit = halfWidths[i] - 1.7;
+        offsets[i] = Math.max(-limit, Math.min(limit, offsets[i]));
+    }
+
+    return offsets;
 }
 
 /**
@@ -1397,7 +1539,7 @@ function buildBrakeMarks(track, offsets) {
                     const offset = center + side;
                     positions.push(
                         xs[i] + nx[i] * offset,
-                        ys[i] + Y_RACING_LINE + 0.002,
+                        ys[i] + Y_RACING_LINE + 0.002 - offset * track.bankSlope[i],
                         zs[i] + nz[i] * offset
                     );
                     colors.push(0.02, 0.02, 0.025, strength);
@@ -1442,9 +1584,9 @@ function buildBrakeMarks(track, offsets) {
  * @returns {number}
  */
 function rawTerrainHeight(track, circuit, x, z) {
-    const { xs, ys, zs, count } = track;
+    const { xs, ys, zs, nx, nz, count, bankSlope } = track;
 
-    let bestY = 0;
+    let bestI = 0;
     let bestDistSq = Infinity;
 
     for (let i = 0; i < count; i += 8) {
@@ -1454,12 +1596,21 @@ function rawTerrainHeight(track, circuit, x, z) {
 
         if (distSq < bestDistSq) {
             bestDistSq = distSq;
-            bestY = ys[i];
+            bestI = i;
         }
     }
 
     const dist = Math.sqrt(bestDistSq);
     const drop = Math.min(dist, 30) * RUNOFF_DROP;
+
+    // Банкингът накланя и БАНКЕТА: без този член теренът стоеше хоризонтално
+    // около наклоненото платно и зариваше вътрешната му страна с ~1-4 m.
+    // Знаковото странично отместване идва от нормалата на най-близката точка;
+    // ефектът гасне отвъд run-off зоната.
+    const lateral =
+        (x - xs[bestI]) * nx[bestI] + (z - zs[bestI]) * nz[bestI];
+    const bankTerm = -lateral * bankSlope[bestI] * (1 - smoothstep(18, 50, dist));
+
     // Колко далече от трасето започва релефът: дюните на Зандвоорт опират
     // почти до банкета, алпийските хълмове стоят по-назад.
     const ramp = smoothstep(
@@ -1469,7 +1620,7 @@ function rawTerrainHeight(track, circuit, x, z) {
     );
     const relief = (fbm(x, z) - 0.3) * circuit.terrain.amplitude;
 
-    return bestY - drop - 0.35 + relief * ramp;
+    return ys[bestI] - drop - 0.35 + bankTerm + relief * ramp;
 }
 
 /**
@@ -1730,9 +1881,8 @@ function buildHarbor(track, circuit) {
  */
 function buildStartFlags(track, pit) {
     const group = new THREE.Group();
-    const half = track.width / 2;
     const side = -pit.sign;
-    const offset = side * (half + 3.4);
+    const offset = side * (track.halfWidths[0] + 3.4);
 
     const pole = new THREE.CylinderGeometry(0.05, 0.05, 5.2, 6);
     pole.translate(0, 2.6, 0);

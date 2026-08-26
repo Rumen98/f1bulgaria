@@ -49,6 +49,8 @@ class GameLeaderboardController extends Controller
             $data['track'],
             (int) $data['lap_ms'],
             $sectors,
+            $data['trace'] ?? null,
+            isset($data['sim_version']) ? (int) $data['sim_version'] : null,
         );
 
         return response()->json($result);

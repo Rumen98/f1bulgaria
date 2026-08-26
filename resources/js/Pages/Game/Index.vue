@@ -6,6 +6,18 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 
 
 const props = defineProps({
     tracks: { type: Array, default: () => [] },
+    // Slug на „пистата на уикенда" — там, където Ф1 кара в момента.
+    weekTrack: { type: String, default: null },
+});
+
+// Пистата на уикенда изплува първа в списъка.
+const orderedTracks = computed(() => {
+    if (!props.weekTrack) {
+        return props.tracks;
+    }
+    const week = props.tracks.filter((t) => t.slug === props.weekTrack);
+    const rest = props.tracks.filter((t) => t.slug !== props.weekTrack);
+    return [...week, ...rest];
 });
 
 const page = usePage();
@@ -96,32 +108,61 @@ const submitLap = async (res) => {
         return;
     }
 
+    // Пистата може да се смени, докато заявката лети — тогава отговорът се
+    // изхвърля, вместо да пренапише класацията на НОВАТА писта.
+    const submittedSlug = selectedTrack.value.slug;
+
     submitting.value = true;
     submitError.value = null;
 
     try {
         const { data } = await window.axios.post('/game/lap', {
-            track: selectedTrack.value.slug,
+            track: submittedSlug,
             lap_ms: res.lapMs,
             sectors: res.sectorsMs,
+            // Записът на входа — сървърът преиграва обиколката и я потвърждава.
+            trace: res.trace,
+            sim_version: res.simVersion,
         });
+
+        if (selectedTrack.value?.slug !== submittedSlug) {
+            return;
+        }
+
         resultMeta.value = data;
         bests.value = data.bests ?? bests.value; // включва и тази обиколка
         userBests.value = data.user_bests ?? userBests.value;
         leaderboard.value = data.top ?? leaderboard.value;
     } catch (e) {
-        submitError.value =
-            e?.response?.data?.message ?? 'Времето не се записа. Опитай пак.';
+        if (selectedTrack.value?.slug === submittedSlug) {
+            submitError.value =
+                e?.response?.data?.message ?? 'Времето не се записа. Опитай пак.';
+        }
     } finally {
         submitting.value = false;
     }
 };
 
 const newLap = () => {
+    replaying.value = false;
     result.value = null;
     resultMeta.value = null;
     submitError.value = null;
     game.value?.reset(true);
+};
+
+// ── ТВ повторение на завършената обиколка ─────────────────────────────────
+const replaying = ref(false);
+
+const startReplay = () => {
+    if (game.value?.startReplay()) {
+        replaying.value = true;
+    }
+};
+
+const stopReplay = () => {
+    game.value?.stopReplay();
+    replaying.value = false;
 };
 
 // Лилаво = рекорд на пистата. Докато сървърът не отговори, сравняваме локално
@@ -277,6 +318,11 @@ const startGame = async (track) => {
             onFinish
         );
 
+        // Реплеят може да свърши и отвътре (R рестарт) — сваляме си флага.
+        game.value.onReplayEnd = () => {
+            replaying.value = false;
+        };
+
         // Изчакай средата (HDRI + болид + текстури) да се зареди. НЕ стартираме
         // тук — стартът чака бутона „Карай" от pre-start екрана (beginLap), след
         // като играчът избере трансмисия. Ако играчът напусне през това време
@@ -317,6 +363,7 @@ const quit = () => {
     teardown();
     selectedTrack.value = null;
     preStart.value = false;
+    replaying.value = false;
     telemetry.value = emptyTelemetry();
     result.value = null;
     resultMeta.value = null;
@@ -459,13 +506,22 @@ const recenterTilt = () => {
 
             <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <button
-                    v-for="track in tracks"
+                    v-for="track in orderedTracks"
                     :key="track.slug"
                     type="button"
                     :disabled="loading"
-                    class="group relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 text-left transition hover:border-[#e10600]/60 hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-50"
+                    class="group relative overflow-hidden rounded-xl border p-5 text-left transition hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-50"
+                    :class="track.slug === weekTrack
+                        ? 'border-[#e10600]/70 bg-zinc-900/80 hover:border-[#e10600]'
+                        : 'border-zinc-800 bg-zinc-900/60 hover:border-[#e10600]/60'"
                     @click="startGame(track)"
                 >
+                    <div
+                        v-if="track.slug === weekTrack"
+                        class="mb-2 inline-block rounded-full bg-[#e10600]/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#ff5a55]"
+                    >
+                        Пистата на уикенда
+                    </div>
                     <div class="text-lg font-bold text-zinc-100 group-hover:text-white">
                         {{ track.name }}
                     </div>
@@ -748,6 +804,7 @@ const recenterTilt = () => {
                                 </span>
                                 <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">R</kbd> рестарт</span>
                                 <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">C</kbd> камера</span>
+                                <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">M</kbd> звук</span>
                             </div>
                             <p class="mt-2 text-[11px] text-zinc-500">
                                 Мини стартовата линия, за да пуснеш хронометъра.
@@ -765,6 +822,17 @@ const recenterTilt = () => {
                     </div>
                 </div>
 
+                <!-- ── ТВ повторение: единственият контрол на екрана ─────── -->
+                <div v-if="replaying" class="absolute inset-x-0 bottom-6 z-30 flex justify-center">
+                    <button
+                        type="button"
+                        class="rounded-full border border-zinc-600 bg-black/60 px-5 py-2.5 text-sm font-semibold text-zinc-100 backdrop-blur-sm transition hover:bg-black/80"
+                        @click="stopReplay"
+                    >
+                        ■ Спри повторението
+                    </button>
+                </div>
+
                 <!-- ── Връщане на пистата: брояч 3-2-1 ──────────────────── -->
                 <div
                     v-if="telemetry.recovering"
@@ -780,7 +848,7 @@ const recenterTilt = () => {
 
                 <!-- ── Резултат: кариран флаг + времена + класация ─────── -->
                 <div
-                    v-if="result"
+                    v-if="result && !replaying"
                     class="absolute inset-0 z-20 flex items-center justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm"
                 >
                     <div class="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900/95 p-5 shadow-2xl sm:p-6">
@@ -937,6 +1005,13 @@ const recenterTilt = () => {
                                 @click="newLap"
                             >
                                 Нова обиколка
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-800"
+                                @click="startReplay"
+                            >
+                                📺 Повторение
                             </button>
                             <button
                                 type="button"

@@ -26,8 +26,15 @@
  * @property {number} grassTint            Тонира PBR текстурата на тревата
  * @property {number|null} crowdAccent     Доминиращ цвят на публиката (null = пъстра)
  * @property {{amplitude: number, base: number, accent: number}} terrain
- * @property {object} atmosphere           Слънце/мъгла/експозиция
+ * @property {object} atmosphere           Слънце/мъгла/експозиция; hdri избира небето
  * @property {object|null} landmark        Специален обект (виенско колело, пристанище…)
+ * @property {{from: number, to: number}} [tunnel]  Тунелна галерия (метри по обиколката)
+ * @property {Array<{from: number, to: number, width: number}>} [widthProfile]
+ *           Диапазони с различна ширина (метри по обиколката; OSM няма тези
+ *           данни — стойностите са авторски, по реалните писти)
+ * @property {Array<{from: number, to: number, deg: number}>} [banking]
+ *           Банкирани завои: напречен наклон в градуси, посоката се извежда
+ *           от кривината. Влияе на меша, колата И физиката (странична хватка).
  */
 
 /** @type {Record<string, CircuitStyle>} */
@@ -57,6 +64,9 @@ export const CIRCUITS = {
             exposure: 0.98,
         },
         landmark: null,
+        // Спирачната зона на Rettifilo се разширява като фуния — старият път
+        // на Монца е много по-широк от модерното трасе.
+        widthProfile: [{ from: 430, to: 600, width: 18 }],
     },
 
     // Ардените: иглолистни хълмове, хладна светлина с лека мъгла в долината.
@@ -81,6 +91,7 @@ export const CIRCUITS = {
             fogNear: 260,
             fogFar: 900,
             exposure: 0.9,
+            hdri: 'sky_overcast_2k', // Арденско небе — ниска облачност
         },
         landmark: null,
     },
@@ -141,6 +152,8 @@ export const CIRCUITS = {
         // Rascasse), width по нормалата, depth по тангентата. Изчислено от
         // центроида на дъгата шикан→писин в данните.
         landmark: { type: 'harbor', along: 2660, side: 1, dist: 125, width: 160, depth: 210, waterY: -3.0 },
+        // Тунелът под Fairmont: платото след Portier (виж височинния профил).
+        tunnel: { from: 1140, to: 1500 },
     },
 
     // Японска провинция: гористи хребети, чакъл в почти всеки завой и виенското
@@ -168,6 +181,9 @@ export const CIRCUITS = {
             exposure: 0.96,
         },
         landmark: { type: 'ferris_wheel', along: 220, side: 1, dist: 160 },
+        // Сузука е по-тясна от модерните писти през по-голямата част от
+        // обиколката (S-завоите, Degner, Spoon).
+        widthProfile: [{ from: 1500, to: 4300, width: 11.5 }],
     },
 
     // Алпийско пасище в Щирия: ярка трева, смърчови хребети, кристален въздух.
@@ -221,6 +237,13 @@ export const CIRCUITS = {
             exposure: 1.03,
         },
         landmark: null,
+        // Старата школа: тясна лента през дюните, с двата банкирани завоя —
+        // Hugenholtz (T3) и финалният Arie Luyendijk (T14), по ~18°.
+        widthProfile: [{ from: 950, to: 3450, width: 10.8 }],
+        banking: [
+            { from: 720, to: 830, deg: 18 },
+            { from: 3540, to: 3660, deg: 18 },
+        ],
     },
 
     // Амфитеатър в края на Сао Пауло: наситено зелено, тропическа омара,

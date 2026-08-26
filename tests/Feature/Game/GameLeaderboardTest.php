@@ -2,11 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Jobs\ValidateGameLapJob;
 use App\Models\GameLapRecord;
 use App\Models\User;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     config(['features.game' => true]);
+
+    // Трейсът вече е задължителен → всеки POST пуска ValidateGameLapJob.
+    // На sync опашката job-ът би тръгнал ИНЛАЙН и би викал node срещу
+    // фиктивните трейсове — фалшив за тези тестове (e2e го покрива отделно).
+    Queue::fake();
 });
 
 it('връща 404 за класацията когато флагът е изключен', function () {
@@ -102,6 +109,8 @@ it('записва първата обиколка като лилава на п
         'track' => 'monza',
         'lap_ms' => 90000,
         'sectors' => [28000, 31000, 31000],
+        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 1,
     ])->assertOk();
 
     $response->assertJson([
@@ -123,6 +132,8 @@ it('лилаво само за подобрените полета и пази �
         'track' => 'monza',
         'lap_ms' => 90000,
         'sectors' => [30000, 30000, 30000],
+        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 1,
     ])->assertOk();
 
     // По-бърз S1, по-бавен S3, по-добра обиколка общо.
@@ -130,6 +141,8 @@ it('лилаво само за подобрените полета и пази �
         'track' => 'monza',
         'lap_ms' => 89000,
         'sectors' => [28000, 30000, 31000],
+        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 1,
     ])->assertOk();
 
     $response->assertJson([
@@ -170,12 +183,16 @@ it('по-бавна обиколка не е нито лилава, нито л�
         'track' => 'monza',
         'lap_ms' => 88000,
         'sectors' => [29000, 29000, 30000],
+        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 1,
     ])->assertOk();
 
     $response = $this->actingAs($user)->postJson('/game/lap', [
         'track' => 'monza',
         'lap_ms' => 95000,
         'sectors' => [31000, 32000, 32000],
+        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 1,
     ])->assertOk();
 
     $response->assertJson([
@@ -201,4 +218,67 @@ it('нарежда класацията и маркира твоя ред', func
         ->assertJsonPath('top.1.name', 'Боби')
         ->assertJsonPath('top.1.is_you', false)
         ->assertJsonPath('authenticated', true);
+});
+
+it('пази трейса, маркира pending и пуска валидиращия job', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 90000,
+        'sectors' => [30000, 30000, 30000],
+        'trace' => '{"v":1,"start":{},"inputs":"AAA="}',
+        'sim_version' => 1,
+    ])->assertOk();
+
+    $record = GameLapRecord::query()->firstOrFail();
+
+    expect($record->input_trace)->not->toBeNull()
+        ->and($record->verify_status)->toBe('pending')
+        ->and($record->sim_version)->toBe(1);
+
+    Queue::assertPushed(
+        ValidateGameLapJob::class,
+        fn (ValidateGameLapJob $job): bool => $job->recordId === $record->id,
+    );
+});
+
+it('отхвърля запис без трейс — валидацията не е по желание', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 90000,
+        'sectors' => [30000, 30000, 30000],
+    ])->assertJsonValidationErrors(['trace', 'sim_version']);
+
+    expect(GameLapRecord::query()->count())->toBe(0);
+});
+
+it('отхвърлените от преиграването обиколки изчезват от класацията', function () {
+    $honest = User::factory()->create(['name' => 'Честният']);
+    $cheat = User::factory()->create(['name' => 'Хитрецът']);
+
+    GameLapRecord::factory()->for($honest)->create(['lap_ms' => 92000]);
+    GameLapRecord::factory()->for($cheat)->create([
+        'lap_ms' => 60000,
+        'verify_status' => 'rejected',
+    ]);
+
+    $this->getJson('/game/leaderboard/monza')
+        ->assertOk()
+        ->assertJsonPath('bests.lap_ms', 92000)
+        ->assertJsonPath('top.0.name', 'Честният')
+        ->assertJsonMissing(['name' => 'Хитрецът']);
+});
+
+it('pending и error обиколките продължават да се броят', function () {
+    $user = User::factory()->create();
+
+    GameLapRecord::factory()->for($user)->create(['lap_ms' => 91000, 'verify_status' => 'pending']);
+    GameLapRecord::factory()->for($user)->create(['lap_ms' => 93000, 'verify_status' => 'error']);
+
+    $this->getJson('/game/leaderboard/monza')
+        ->assertOk()
+        ->assertJsonPath('bests.lap_ms', 91000);
 });

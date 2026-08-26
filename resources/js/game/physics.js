@@ -187,8 +187,10 @@ export function createCarState(track) {
  *        асфалтовият апрон — почти никак. null = тревата по подразбиране.
  *        Стойностите идват детерминирано от данните на пистата, така че
  *        бъдещият сървърен replay остава възпроизводим.
+ * @param {number} gripBoost Множител на сцеплението НА трасето — банкираният
+ *        завой носи повече хватка (нормалната сила помага). 1 = равно платно.
  */
-export function step(state, input, dt, onTrack, gradient = 0, offRoad = null) {
+export function step(state, input, dt, onTrack, gradient = 0, offRoad = null, gripBoost = 1) {
     const gripFactor = onTrack ? 1 : (offRoad?.gripFactor ?? CAR.offTrackGripFactor);
 
     // ── Волан ────────────────────────────────────────────────────────────
@@ -272,7 +274,9 @@ export function step(state, input, dt, onTrack, gradient = 0, offRoad = null) {
         state.vLateral -= state.vLateral * Math.min(1, 10 * dt);
         state.slip = 0;
     } else {
-        const grip = (CAR.baseGrip + CAR.downforceCoef * absV * absV) * gripFactor;
+        // gripBoost действа само на СТРАНИЧНАТА хватка (банкингът помага на
+        // завиването, не на тягата на двигателя).
+        const grip = (CAR.baseGrip + CAR.downforceCoef * absV * absV) * gripFactor * (onTrack ? gripBoost : 1);
 
         // Геометрия: CG по-близо до задницата (staticFrontLoad = b/L).
         const a = CAR.wheelbase * (1 - CAR.staticFrontLoad); // CG → предна ос

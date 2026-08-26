@@ -308,9 +308,14 @@ export function updateCarRig(rig, state, surface, dt) {
 
     const speed = Math.abs(state.vForward);
 
-    // Крен навън в завоя, пропорционален на страничното ускорение.
+    // Крен навън в завоя, пропорционален на страничното ускорение — плюс
+    // напречния наклон на платното (банкингът на Зандвоорт): колата ляга
+    // с повърхността. Знакът: bank > 0 сваля страната на нормалата (+x при
+    // heading 0), т.е. положителна ротация около +Z за модел по +Z... визуално
+    // изравнено с платното от ribbonMesh (y -= offset·bank).
     const lateralAccel = state.yawRate * state.vForward;
-    const targetRoll = clamp(-lateralAccel / 45, -1, 1) * MAX_ROLL;
+    const bankRoll = Math.atan(surface.bank ?? 0);
+    const targetRoll = clamp(-lateralAccel / 45, -1, 1) * MAX_ROLL + bankRoll;
 
     // Клякане отзад при ускорение, гмуркане отпред при спиране.
     const targetPitch = clamp(-state.vForward * 0.004 + state.slip * 0.2, -1, 1) * MAX_PITCH;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Game;
 
+use App\Jobs\ValidateGameLapJob;
 use App\Models\GameLapRecord;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -26,6 +27,7 @@ class LeaderboardService
     public function bests(string $trackSlug): array
     {
         $row = GameLapRecord::query()
+            ->counted()
             ->where('track_slug', $trackSlug)
             ->selectRaw('MIN(lap_ms) as lap_ms, MIN(sector1_ms) as s1, MIN(sector2_ms) as s2, MIN(sector3_ms) as s3')
             ->first();
@@ -48,6 +50,7 @@ class LeaderboardService
     public function topLaps(string $trackSlug, ?User $viewer = null, int $limit = 10): Collection
     {
         return GameLapRecord::query()
+            ->counted()
             ->where('game_lap_records.track_slug', $trackSlug)
             ->join('users', 'users.id', '=', 'game_lap_records.user_id')
             ->groupBy('game_lap_records.user_id', 'users.name')
@@ -66,6 +69,7 @@ class LeaderboardService
     public function userBestMs(User $user, string $trackSlug): ?int
     {
         $value = GameLapRecord::query()
+            ->counted()
             ->where('track_slug', $trackSlug)
             ->where('user_id', $user->id)
             ->min('lap_ms');
@@ -82,6 +86,7 @@ class LeaderboardService
     public function userBests(User $user, string $trackSlug): array
     {
         $row = GameLapRecord::query()
+            ->counted()
             ->where('track_slug', $trackSlug)
             ->where('user_id', $user->id)
             ->selectRaw('MIN(lap_ms) as lap_ms, MIN(sector1_ms) as s1, MIN(sector2_ms) as s2, MIN(sector3_ms) as s3')
@@ -105,21 +110,35 @@ class LeaderboardService
      * @param  array{0: int, 1: int, 2: int}  $sectorsMs
      * @return array<string, mixed>
      */
-    public function record(User $user, string $trackSlug, int $lapMs, array $sectorsMs): array
-    {
+    public function record(
+        User $user,
+        string $trackSlug,
+        int $lapMs,
+        array $sectorsMs,
+        ?string $trace = null,
+        ?int $simVersion = null,
+    ): array {
         // Рекордите ПРЕДИ тази обиколка — за да знаем кои полета стават лилави
         // (рекорд на всички) и кои зелени (личен рекорд на потребителя).
         $before = $this->bests($trackSlug);
         $userBefore = $this->userBests($user, $trackSlug);
 
-        GameLapRecord::create([
+        $record = GameLapRecord::create([
             'user_id' => $user->id,
             'track_slug' => $trackSlug,
             'lap_ms' => $lapMs,
             'sector1_ms' => $sectorsMs[0],
             'sector2_ms' => $sectorsMs[1],
             'sector3_ms' => $sectorsMs[2],
+            'input_trace' => $trace,
+            'sim_version' => $simVersion,
+            // С трейс → чака преиграване; без (стар клиент) → на доверие.
+            'verify_status' => $trace !== null ? 'pending' : null,
         ]);
+
+        if ($trace !== null) {
+            ValidateGameLapJob::dispatch($record->id)->afterCommit();
+        }
 
         $purpleSectors = [];
         $greenSectors = [];
@@ -152,6 +171,7 @@ class LeaderboardService
         }
 
         $ahead = GameLapRecord::query()
+            ->counted()
             ->where('track_slug', $trackSlug)
             ->where('user_id', '!=', $user->id)
             ->groupBy('user_id')
