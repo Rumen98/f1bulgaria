@@ -52,6 +52,12 @@ const LIVERIES = [0x2563eb, 0xff7a00, 0x00a36c, 0xd7d7de, 0xe6007e, 0xf5c400];
  *  че колите не се блъскат (колизии няма нарочно, виж setOpponents). */
 const RIVAL_FADE_DISTANCE = 9;
 
+/** Стартова процедура (състезание): интервал между светлините и решетката. */
+const LAUNCH_LIGHT_INTERVAL = 0.85; // s между палене на две светлини
+const GRID_ROW_GAP = 7; // m между редовете на решетката
+const GRID_FIRST_ROW = 6; // m от стартовата линия до първия ред
+const GRID_LATERAL = 1.6; // m шахматно отместване от осевата линия
+
 /** Веене на карирания флаг на маршала — скорост (rad/s) и амплитуда (rad). */
 const FLAG_WAVE_SPEED = 8;
 const FLAG_WAVE_AMP = 0.6;
@@ -249,9 +255,14 @@ export class Game {
         // AI съперници („състезание"): всеки със собствена детерминирана
         // симулация + автопилот. НЕ пипат физиката на играча — виж setOpponents.
         this.opponents = [];
-        // Изминат път от зеления старт (за позицията П1..Пn): цели обиколки +
-        // прогрес − стартов прогрес, следи се и за играча.
-        this.playerRace = { laps: 0, lastProgress: 0, startProgress: 0 };
+        // Място в „състезанието" (позиция П1..Пn): цели обиколки + прогрес,
+        // следи се и за играча.
+        this.playerRace = { laps: 0, lastProgress: 0 };
+        // Стартова процедура: {elapsed, hold} докато тече отброяването със
+        // светлините — симулацията е замразена, никой не потегля преди гасене.
+        this.launch = null;
+        // Vue-то показва светлините през този callback (брой светнали, null = край).
+        this.onLaunch = () => {};
 
         this.accumulator = 0;
         this.lastFrame = 0;
@@ -286,12 +297,9 @@ export class Game {
         this.running = true;
         this.started = true;
         this.lastFrame = performance.now();
-        this.playerRace = {
-            laps: 0,
-            lastProgress: this.sim.lastProgress,
-            startProgress: this.sim.lastProgress,
-        };
+        this.playerRace = { laps: 0, lastProgress: this.sim.lastProgress };
         this.sound.start();
+        this.onLaunch(this.launch ? 0 : null);
         this.rafId = requestAnimationFrame(this.#frame);
     }
 
@@ -314,9 +322,11 @@ export class Game {
         this.stopReplay();
         this.sim.reset(keepRecords);
         this.accumulator = 0;
-        // Нова обиколка = нов старт на сесията: полето се престроява.
-        this.playerRace = { laps: 0, lastProgress: 0, startProgress: 0 };
+        // Нова обиколка = ново състезание: решетка + светлини отначало.
         this.#gridOpponents();
+        this.#gridPlayer();
+        this.#armLaunch();
+        this.playerRace = { laps: 0, lastProgress: this.sim.lastProgress };
         this.#placeCameraBehindCar();
     }
 
@@ -386,7 +396,6 @@ export class Game {
                 slotJitter: rand() * 0.5,
                 laps: 0,
                 lastProgress: 0,
-                startProgress: 0,
                 prevX: 0,
                 prevZ: 0,
                 prevHeading: 0,
@@ -396,6 +405,8 @@ export class Game {
         }
 
         this.#gridOpponents();
+        this.#gridPlayer();
+        this.#armLaunch();
     }
 
     /**
@@ -1059,6 +1070,12 @@ export class Game {
             return;
         }
 
+        // ── Стартова процедура: решетката чака светлините да угаснат ───────
+        if (this.launch) {
+            this.#launchFrame(dt);
+            return;
+        }
+
         this.#readInput();
 
         this.accumulator += dt;
@@ -1219,12 +1236,15 @@ export class Game {
             this.activeYellowPost = null;
         }
 
-        // Петте светлини на гантрито: червени по време на загряващата обиколка,
-        // угасват щом пресечеш линията — „lights out and away we go".
+        // Петте светлини на гантрито: в соло — червени през загряващата,
+        // гаснат на летящата. В състезание ги командва #launchFrame, а след
+        // потеглянето стоят угаснали („lights out and away we go").
         if (this.startLights) {
-            const target = sim.phase === 'formation' ? 3.2 : 0;
-            if (this.startLights.emissiveIntensity !== target) {
-                this.startLights.emissiveIntensity = target;
+            const target = sim.phase === 'formation' && this.opponents.length === 0 ? 3.2 : 0;
+            for (const material of this.startLights) {
+                if (material.emissiveIntensity !== target) {
+                    material.emissiveIntensity = target;
+                }
             }
         }
 
@@ -1259,13 +1279,15 @@ export class Game {
         }
         this.telemetryAccum = 0;
 
-        // Позиция в „състезанието": по изминат път от зеления старт.
+        // Позиция в „състезанието": по МЯСТО на пистата (обиколки + прогрес).
+        // Гридът стартира пред теб → тръгваш последен и гониш; изпревариш ли
+        // кола физически, позицията пада веднага.
         let position = 1;
         if (this.opponents.length > 0) {
             const race = this.playerRace;
-            const covered = race.laps + race.lastProgress - race.startProgress;
+            const covered = race.laps + race.lastProgress;
             for (const opp of this.opponents) {
-                if (opp.laps + opp.lastProgress - opp.startProgress > covered) {
+                if (opp.laps + opp.lastProgress > covered) {
                     position++;
                 }
             }
@@ -1316,9 +1338,9 @@ export class Game {
     }
 
     /**
-     * Престроява полето: съперниците се пръскат равномерно по трасето
-     * (встрани от стартовата линия на играча) с летящ старт — сесия в ход,
-     * в която се включваш, не редичка коли, през които минаваш на грида.
+     * Нарежда решетката: съперниците стоят НЕПОДВИЖНИ зад стартовата линия,
+     * шахматно като истински грид — бот 0 най-отпред, играчът последен (виж
+     * #gridPlayer). Всички потеглят заедно при гаснене на светлините.
      */
     #gridOpponents() {
         const t = this.track;
@@ -1326,25 +1348,22 @@ export class Game {
 
         for (let i = 0; i < n; i++) {
             const opp = this.opponents[i];
-            // Слотове в [0.08, 0.92] от обиколката + детерминиран джитър.
-            const f = 0.08 + (0.84 * (i + opp.slotJitter)) / Math.max(1, n);
-            const index = Math.min(t.count - 1, Math.floor(f * t.count));
+            const slot = this.#gridSlot(i);
 
             opp.sim.reset(false);
             const s = opp.sim.state;
-            s.x = t.xs[index];
-            s.z = t.zs[index];
-            s.heading = Math.atan2(t.tx[index], t.tz[index]);
-            s.vForward = 24; // летящ старт — сесията вече тече
-            opp.sim.trackIndexHint = index;
-            opp.sim.lastProgress = f;
-            opp.sim.surface.height = t.ys[index];
-            opp.sim.surface.gradient = t.gradient[index];
-            opp.sim.surface.bank = t.bankSlope[index];
+            s.x = slot.x;
+            s.z = slot.z;
+            s.heading = slot.heading;
+            s.vForward = 0; // стоящ старт — чака светлините
+            opp.sim.trackIndexHint = slot.index;
+            opp.sim.lastProgress = slot.progress;
+            opp.sim.surface.height = slot.height;
+            opp.sim.surface.gradient = t.gradient[slot.index];
+            opp.sim.surface.bank = t.bankSlope[slot.index];
 
             opp.laps = 0;
-            opp.lastProgress = f;
-            opp.startProgress = f;
+            opp.lastProgress = slot.progress;
             opp.prevX = s.x;
             opp.prevZ = s.z;
             opp.prevHeading = s.heading;
@@ -1356,6 +1375,121 @@ export class Game {
             opp.rig.root.visible = true;
             updateCarRig(opp.rig, s, opp.sim.surface, 1);
         }
+    }
+
+    /**
+     * Слот i на решетката (0 = най-отпред, до линията), шахматно ляво/дясно.
+     *
+     * @param {number} i
+     * @returns {{index: number, x: number, z: number, heading: number,
+     *           progress: number, height: number}}
+     */
+    #gridSlot(i) {
+        const t = this.track;
+        const backMeters = GRID_FIRST_ROW + i * GRID_ROW_GAP;
+        const back = Math.round(backMeters / t.spacing) % t.count;
+        const index = (t.count - back) % t.count;
+        const lateral = (i % 2 === 0 ? 1 : -1) * GRID_LATERAL;
+
+        return {
+            index,
+            x: t.xs[index] + t.nx[index] * lateral,
+            z: t.zs[index] + t.nz[index] * lateral,
+            heading: Math.atan2(t.tx[index], t.tz[index]),
+            progress: index / t.count,
+            height: t.ys[index] - lateral * t.bankSlope[index],
+        };
+    }
+
+    /**
+     * Играчът на последния ред на решетката (стоящ, зад линията). Първото
+     * пресичане е потеглянето (gridCrossingsToSkip) — обиколка 1 е бойна,
+     * хронометърът тръгва при следващото минаване на линията, на скорост,
+     * за да са времената сравними с класацията.
+     */
+    #gridPlayer() {
+        if (this.opponents.length === 0) {
+            return;
+        }
+
+        const t = this.track;
+        const sim = this.sim;
+        const slot = this.#gridSlot(this.opponents.length);
+        const s = sim.state;
+
+        s.x = slot.x;
+        s.z = slot.z;
+        s.heading = slot.heading;
+        s.vForward = 0;
+        sim.trackIndexHint = slot.index;
+        sim.lastProgress = slot.progress;
+        sim.surface.height = slot.height;
+        sim.surface.gradient = t.gradient[slot.index];
+        sim.surface.bank = t.bankSlope[slot.index];
+        sim.gridCrossingsToSkip = 1;
+        sim.snapRender = true;
+        this.lookTarget = null;
+        this.#placeCameraBehindCar();
+    }
+
+    /** Въоръжава стартовата процедура (само в състезание). */
+    #armLaunch() {
+        this.launch =
+            this.opponents.length > 0
+                ? { elapsed: 0, hold: 0.6 + Math.random() * 0.9 }
+                : null;
+        this.onLaunch(this.launch ? 0 : null);
+    }
+
+    /**
+     * Кадър от стартовата процедура: света е замръзнал, петте светлини се
+     * палят една по една, произволна пауза — и гаснат: старт. Двигателят
+     * реве все по-високо с всяка светлина.
+     *
+     * @param {number} dt
+     */
+    #launchFrame(dt) {
+        const launch = this.launch;
+        launch.elapsed += dt;
+
+        const lit = Math.min(5, Math.floor(launch.elapsed / LAUNCH_LIGHT_INTERVAL) + 1);
+        const outAt = 4 * LAUNCH_LIGHT_INTERVAL + launch.hold;
+
+        if (launch.elapsed >= outAt) {
+            // Гаснат — и потегляме.
+            if (this.startLights) {
+                for (const material of this.startLights) {
+                    material.emissiveIntensity = 0;
+                }
+            }
+            this.launch = null;
+            this.accumulator = 0;
+            this.onLaunch(null);
+            return;
+        }
+
+        if (this.startLights) {
+            for (let i = 0; i < this.startLights.length; i++) {
+                const target = i < lit ? 3.2 : 0;
+                if (this.startLights[i].emissiveIntensity !== target) {
+                    this.startLights[i].emissiveIntensity = target;
+                }
+            }
+        }
+
+        // Ревът на решетката се вдига с всяка светлина.
+        this.sound.update(4500 + lit * 1900, lit >= 5 ? 0.5 : 0.25, {
+            kerb: false,
+            gravel: false,
+            speed: 0,
+        });
+
+        for (const animate of this.decorAnimations) {
+            animate(dt);
+        }
+
+        this.onLaunch(lit);
+        this.composer.render();
     }
 
     /**

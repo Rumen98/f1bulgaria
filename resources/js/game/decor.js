@@ -47,7 +47,7 @@ const Y_GRAVEL = -0.1;
  * @param {import('./track.js').Track} track
  * @param {import('./circuits.js').CircuitStyle} circuit
  * @param {TerrainSampler & object} sampler Общият терен (createTerrainSampler)
- * @returns {{group: THREE.Group, startLights: THREE.MeshStandardMaterial|null, animations: Array<(dt: number) => void>}}
+ * @returns {{group: THREE.Group, startLights: THREE.MeshStandardMaterial[], animations: Array<(dt: number) => void>}}
  */
 export function buildCircuitDecor(track, circuit, sampler) {
     const group = new THREE.Group();
@@ -797,25 +797,22 @@ function buildStartGantry(track) {
     banner.rotation.y = Math.PI;
     group.add(banner);
 
-    // Петте светлинни модула под гредата — общ емисивен материал, Game го
-    // пали (загряваща) и гаси (летяща обиколка).
-    const lights = new THREE.MeshStandardMaterial({
-        color: 0x17090b,
-        emissive: 0xff1f1f,
-        emissiveIntensity: 0,
-        roughness: 0.55,
-    });
-    const pods = [];
+    // Петте светлинни модула под гредата — ОТДЕЛЕН емисивен материал на
+    // всеки, за да може стартовата процедура да ги пали един по един
+    // (Game.#launchFrame); в соло режим Game ги пали/гаси заедно.
+    const lights = [];
     for (let i = 0; i < 5; i++) {
-        const pod = new THREE.BoxGeometry(0.6, 1.15, 0.4);
-        pod.translate((i - 2) * 1.05, beamY - 1.1, -0.4);
-        pods.push(pod);
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x17090b,
+            emissive: 0xff1f1f,
+            emissiveIntensity: 0,
+            roughness: 0.55,
+        });
+        const pod = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.15, 0.4), material);
+        pod.position.set((i - 2) * 1.05, beamY - 1.1, -0.4);
+        group.add(pod);
+        lights.push(material);
     }
-    const podGeo = mergeGeometries(pods, false);
-    for (const g of pods) {
-        g.dispose();
-    }
-    group.add(new THREE.Mesh(podGeo, lights));
 
     group.position.set(p.x, p.y, p.z);
     group.rotation.y = yaw;

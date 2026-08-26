@@ -136,6 +136,12 @@ class Simulation {
         // пред очите на играча + надут брояч на обиколките му — изключва се.
         this.recoverToStartEnabled = true;
 
+        // Старт от решетката (състезание): колата стои ЗАД линията и първото
+        // пресичане е потеглянето, не начало на летяща обиколка — прескача се,
+        // за да е обиколка 1 бойна, а хронометрираната да тръгва на скорост
+        // (сравнима с класацията). Game го сеща след нареждане на решетката.
+        this.gridCrossingsToSkip = 0;
+
         // Преизползвани обекти — нула алокации на тик.
         this._projection = {};
         this._input = { steer: 0, throttle: 0, brake: 0 };
@@ -287,6 +293,7 @@ class Simulation {
         this.sectorTicks = new Array(SECTORS).fill(null);
         this.currentSector = 0;
 
+        this.gridCrossingsToSkip = 0;
         this.recovering = false;
         this.recoverTicks = 0;
         this.recoverToStart = false;
@@ -521,7 +528,10 @@ class Simulation {
         if (wrappedForward) {
             this.timerGated = false;
 
-            if (this.phase === 'formation') {
+            if (this.gridCrossingsToSkip > 0) {
+                // Потеглянето от решетката — не е нито летяща, нито завършена.
+                this.gridCrossingsToSkip--;
+            } else if (this.phase === 'formation') {
                 this.phase = 'flying';
                 this.warnings = 0;
                 this.#armFlyingLap(sector);

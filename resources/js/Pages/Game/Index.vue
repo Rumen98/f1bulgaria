@@ -158,6 +158,9 @@ const newLap = () => {
 // ── ТВ повторение на завършената обиколка ─────────────────────────────────
 const replaying = ref(false);
 
+// ── Стартова процедура (състезание): брой светнали лампи, null = няма ─────
+const launchLights = ref(null);
+
 const startReplay = () => {
     if (game.value?.startReplay()) {
         replaying.value = true;
@@ -327,6 +330,11 @@ const startGame = async (track) => {
             replaying.value = false;
         };
 
+        // Светлините на стартовата процедура (само в състезание).
+        game.value.onLaunch = (lights) => {
+            launchLights.value = lights;
+        };
+
         // Изчакай средата (HDRI + болид + текстури) да се зареди. НЕ стартираме
         // тук — стартът чака бутона „Карай" от pre-start екрана (beginLap), след
         // като играчът избере трансмисия. Ако играчът напусне през това време
@@ -371,6 +379,7 @@ const quit = () => {
     selectedTrack.value = null;
     preStart.value = false;
     replaying.value = false;
+    launchLights.value = null;
     telemetry.value = emptyTelemetry();
     result.value = null;
     resultMeta.value = null;
@@ -798,8 +807,9 @@ const recenterTilt = () => {
                                 </button>
                             </div>
                             <p v-if="rivals === 'race'" class="mt-1.5 text-[11px] text-zinc-500">
-                                Съперниците не се блъскат с теб — хронометърът ти остава чист,
-                                а позицията П1–П{{ RIVAL_COUNT + 1 }} се брои от старта.
+                                Стартирате заедно от решетката (ти си П{{ RIVAL_COUNT + 1 }}) —
+                                светлините гаснат и потегляте. Обиколка 1 е бойна; хронометърът
+                                тръгва на линията. Съперниците не се блъскат с теб.
                             </p>
                         </div>
 
@@ -861,6 +871,23 @@ const recenterTilt = () => {
                         >
                             {{ loading ? 'Зареждане…' : 'Карай' }}
                         </button>
+                    </div>
+                </div>
+
+                <!-- ── Стартова процедура: петте светлини (състезание) ───── -->
+                <div
+                    v-if="launchLights !== null"
+                    class="pointer-events-none absolute inset-x-0 top-16 z-30 flex justify-center"
+                >
+                    <div class="flex gap-2.5 rounded-xl bg-black/70 px-5 py-3.5 backdrop-blur-sm">
+                        <span
+                            v-for="n in 5"
+                            :key="n"
+                            class="h-5 w-5 rounded-full transition-colors duration-150"
+                            :class="n <= launchLights
+                                ? 'bg-red-500 shadow-[0_0_14px_rgba(239,68,68,0.9)]'
+                                : 'bg-zinc-800'"
+                        ></span>
                     </div>
                 </div>
 
