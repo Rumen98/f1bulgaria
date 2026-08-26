@@ -108,7 +108,7 @@ Route::middleware('feature:rivalries')->group(function () {
 Route::middleware('feature:quiz')->group(function () {
     Route::get('/quiz', [QuizController::class, 'index'])->name('quiz');
     Route::post('/quiz', [QuizController::class, 'score'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,quiz')
         ->name('quiz.score');
 });
 
@@ -119,12 +119,12 @@ Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [NewsController::class, 'show'])->name('news.show');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/news/{slug}/comments', [CommentsController::class, 'store'])
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:5,1,comments')
         ->name('news.comments.store');
     Route::delete('/comments/{comment}', [CommentsController::class, 'destroy'])->name('comments.destroy');
 });
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
-    ->middleware('throttle:5,1')
+    ->middleware('throttle:5,1,newsletter')
     ->name('newsletter.subscribe');
 // Legacy: линкове от стари потвърждаващи имейли (double opt-in е премахнат).
 Route::get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm'])->name('newsletter.confirm');
