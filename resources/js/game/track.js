@@ -52,6 +52,13 @@ const CURVATURE_SMOOTHING_PASSES = 4;
  *                                     (вътрешният ръб на банкиран завой е
  *                                     по-ниско). Ненулев само в banking
  *                                     диапазоните от конфига.
+ * @property {Float32Array} raceOffset Състезателната линия: страничен офсет
+ *                                     от осевата линия (по нормалата) за
+ *                                     всяка точка — широк вход, апекс, широк
+ *                                     изход. Ползват я ботовете и декорът.
+ * @property {Float32Array} raceCurv   Кривина НА линията (не на осевата) —
+ *                                     по нея ботовете мерят колко бързо се
+ *                                     минава завоят.
  * @property {number} count
  * @property {number} elevationRange
  */
@@ -134,6 +141,12 @@ export function prepareTrack(data, style = null) {
     const halfWidths = buildHalfWidths(count, spacing, data.width / 2, style?.widthProfile ?? []);
     const bankSlope = buildBankSlope(count, spacing, curvature, style?.banking ?? []);
 
+    // Състезателната линия: широк вход → апекс → широк изход. Смята се ТУК
+    // (не офлайн), за да е една и съща за браузъра, ботовете и Node скриптовете
+    // без допълнителна pipeline стъпка. ~1M евтини операции — под 50 ms.
+    const raceOffset = buildRacingLineOffsets(count, xs, zs, nx, nz, halfWidths, curvature);
+    const raceCurv = buildRaceCurvature(count, xs, zs, nx, nz, raceOffset);
+
     return {
         slug: data.slug,
         name: data.name,
@@ -152,6 +165,8 @@ export function prepareTrack(data, style = null) {
         curvature,
         halfWidths,
         bankSlope,
+        raceOffset,
+        raceCurv,
         count,
         elevationRange: maxY - minY,
         // Реални контури от OpenStreetMap (ODbL) — виж game:fetch-landmarks.
@@ -254,6 +269,155 @@ function buildBankSlope(count, spacing, curvature, banking) {
     }
 
     return slope;
+}
+
+/**
+ * Състезателната линия като страничен офсет за всяка точка: „еластична лента"
+ * в коридора на трасето — всяка точка се тегли към хордата между съседите си
+ * (локално нулева кривина), ограничена от ширината. Резултатът е класиката:
+ * широк вход, апекс от вътрешната, широк изход.
+ *
+ * Двустепенно: грубо решение върху подизвадка (информацията по дългите прави
+ * пътува по 1 точка на итерация — на пълна резолюция не би стигнала), после
+ * фино доизглаждане на пълната. Чисто детерминирано.
+ *
+ * @param {number} count
+ * @param {Float32Array} xs
+ * @param {Float32Array} zs
+ * @param {Float32Array} nx
+ * @param {Float32Array} nz
+ * @param {Float32Array} halfWidths
+ * @param {Float32Array} curvature Кривина на осевата — за маржа в острите завои
+ * @returns {Float32Array}
+ */
+function buildRacingLineOffsets(count, xs, zs, nx, nz, halfWidths, curvature) {
+    // Половин болид + резерв; кербовете отвъд ръба са допустими и реално.
+    // В острите завои маржът расте: на хеърпин апекс до самия ръб кара
+    // pursuit контролера на ботовете през вътрешната трева.
+    const MARGIN = 1.35;
+    const marginAt = (i) => MARGIN + Math.min(1.1, Math.abs(curvature[i]) * 14);
+
+    // Релаксация на офсети e[] върху дадени опорни точки/нормали/граници.
+    const relax = (n, px, pz, pnx, pnz, bounds, e, iterations) => {
+        for (let iter = 0; iter < iterations; iter++) {
+            for (let i = 0; i < n; i++) {
+                const prev = (i - 1 + n) % n;
+                const next = (i + 1) % n;
+
+                const qpx = px[prev] + e[prev] * pnx[prev];
+                const qpz = pz[prev] + e[prev] * pnz[prev];
+                const qnx = px[next] + e[next] * pnx[next];
+                const qnz = pz[next] + e[next] * pnz[next];
+
+                // Проекция на средата на хордата върху нормалата в i.
+                const desired =
+                    ((qpx + qnx) / 2 - px[i]) * pnx[i] + ((qpz + qnz) / 2 - pz[i]) * pnz[i];
+
+                let v = e[i] + (desired - e[i]) * 0.5;
+                const b = bounds[i];
+                e[i] = v < -b ? -b : v > b ? b : v;
+            }
+        }
+    };
+
+    // ── Грубо ниво: ~700 опорни точки ────────────────────────────────────
+    const stride = Math.max(1, Math.ceil(count / 700));
+    const cn = Math.ceil(count / stride);
+    const cx = new Float32Array(cn);
+    const cz = new Float32Array(cn);
+    const cnx = new Float32Array(cn);
+    const cnz = new Float32Array(cn);
+    const cb = new Float32Array(cn);
+    const ce = new Float32Array(cn);
+
+    for (let ci = 0; ci < cn; ci++) {
+        const i = ci * stride;
+        cx[ci] = xs[i];
+        cz[ci] = zs[i];
+        cnx[ci] = nx[i];
+        cnz[ci] = nz[i];
+        // Границата е МИНИМУМЪТ в прозореца — иначе линията прелива в стеснение.
+        let bound = Infinity;
+        for (let k = i; k < Math.min(i + stride, count); k++) {
+            bound = Math.min(bound, halfWidths[k] - marginAt(k));
+        }
+        cb[ci] = Math.max(0.3, bound);
+    }
+
+    relax(cn, cx, cz, cnx, cnz, cb, ce, 900);
+
+    // ── Пълна резолюция: интерполация + фино доизглаждане ────────────────
+    const offsets = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+        const pos = i / stride;
+        const base = Math.floor(pos) % cn;
+        const t = pos - Math.floor(pos);
+        offsets[i] = ce[base] + (ce[(base + 1) % cn] - ce[base]) * t;
+    }
+
+    const bounds = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+        bounds[i] = Math.max(0.3, halfWidths[i] - marginAt(i));
+    }
+
+    relax(count, xs, zs, nx, nz, bounds, offsets, 80);
+
+    // Финално изглаждане срещу зъбци от интерполацията + повторен клامп.
+    let smoothed = smoothCyclic(smoothCyclic(offsets));
+    for (let i = 0; i < count; i++) {
+        const b = bounds[i];
+        smoothed[i] = smoothed[i] < -b ? -b : smoothed[i] > b ? b : smoothed[i];
+    }
+
+    return smoothed;
+}
+
+/**
+ * Знакова кривина на състезателната линия (описана окръжност през три
+ * съседни точки — устойчива на неравното разстояние по офсетнатия път).
+ *
+ * @param {number} count
+ * @param {Float32Array} xs
+ * @param {Float32Array} zs
+ * @param {Float32Array} nx
+ * @param {Float32Array} nz
+ * @param {Float32Array} raceOffset
+ * @returns {Float32Array}
+ */
+function buildRaceCurvature(count, xs, zs, nx, nz, raceOffset) {
+    const qx = new Float32Array(count);
+    const qz = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+        qx[i] = xs[i] + raceOffset[i] * nx[i];
+        qz[i] = zs[i] + raceOffset[i] * nz[i];
+    }
+
+    let curv = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+        const p = (i - 1 + count) % count;
+        const n = (i + 1) % count;
+
+        const abx = qx[i] - qx[p];
+        const abz = qz[i] - qz[p];
+        const bcx = qx[n] - qx[i];
+        const bcz = qz[n] - qz[i];
+        const acx = qx[n] - qx[p];
+        const acz = qz[n] - qz[p];
+
+        const cross = abx * bcz - abz * bcx; // 2·площ със знак
+        const denom =
+            Math.hypot(abx, abz) * Math.hypot(bcx, bcz) * Math.hypot(acx, acz) || 1e-9;
+
+        curv[i] = (2 * cross) / denom;
+    }
+
+    // Само 2 паса (не 4-те на осевата): повече изглаждане затъпява пика на
+    // хеърпина и ботовете влизат в него с излишна скорост.
+    for (let pass = 0; pass < 2; pass++) {
+        curv = smoothCyclic(curv);
+    }
+
+    return curv;
 }
 
 /** Плавна S-крива върху [0,1]. */

@@ -242,10 +242,15 @@ export class Game {
 
         // Духът: най-бързата обиколка на това устройство, полупрозрачен болид,
         // каращ редом с теб на летящата обиколка. Реплеят ползва същите кадри.
+        // Без личен рекорд се зарежда ОФИЦИАЛНИЯТ дух на Падок (златист) —
+        // и първият играч на пистата има срещу кого да кара.
         this.ghost = this.#loadGhost();
         this.ghostRig = buildGhostRig();
         this.ghostRig.root.visible = false;
         this.scene.add(this.ghostRig.root);
+        if (!this.ghost) {
+            this.#loadOfficialGhost();
+        }
         this.lastLapFrames = null; // кадрите на току-що завършената обиколка
         this.replay = null; // {frames, t, camIndex} — активен ТВ реплей
 
@@ -389,7 +394,8 @@ export class Game {
                 pace: 0.9 + rand() * 0.22,
                 steerGain: 2.65 + rand() * 0.35,
                 lookBias: (rand() - 0.5) * 6,
-                lineOffset: (rand() - 0.5) * 3.6,
+                // Малка лична вариация ВЪРХУ състезателната линия (raceOffset).
+                lineOffset: (rand() - 0.5) * 1.6,
                 slotJitter: rand() * 0.5,
                 laps: 0,
                 lastProgress: 0,
@@ -782,6 +788,32 @@ export class Game {
     }
 
     /**
+     * Официалният дух на Падок (public/game-ghosts, scripts/game/build-ghosts.mjs):
+     * еталонна обиколка на автопилота — показва се, докато нямаш собствена.
+     */
+    async #loadOfficialGhost() {
+        try {
+            const response = await fetch(`/game-ghosts/${this.track.slug}.json`);
+            if (!response.ok) {
+                return;
+            }
+            const parsed = await response.json();
+            // Междувременно играчът може да е направил своя обиколка — тя печели.
+            if (parsed.v !== SIM_VERSION || this.disposed || this.ghost) {
+                return;
+            }
+            const frames = decodeFrames(parsed.frames);
+            if (!frames) {
+                return;
+            }
+            this.ghost = { frames, lapTicks: parsed.lapTicks, official: true };
+            tintGhostRig(this.ghostRig, 0xf2c14e); // златист = официалният
+        } catch {
+            // Няма официален дух за тази писта — нищо страшно.
+        }
+    }
+
+    /**
      * Пази новия рекорден дух (тихо — квотата на localStorage не е гарантирана).
      *
      * @param {Float32Array} frames
@@ -790,6 +822,9 @@ export class Game {
     #saveGhost(frames, lapTicks) {
         // Духът в паметта се обновява ВИНАГИ — квотата на localStorage може
         // да провали само персистирането, не тазсесийния съперник.
+        if (this.ghost?.official) {
+            tintGhostRig(this.ghostRig, 0x9fc8ff); // вече е личният, син
+        }
         this.ghost = { frames, lapTicks };
 
         try {
@@ -932,11 +967,14 @@ export class Game {
             this.lastLapFrames = event.frames;
 
             // Духът е еталонът за СОЛО атака — обиколка, „подпомогната" от
-            // удари/драфт в състезание, не бива да го замърсява.
+            // удари/драфт в състезание, не бива да го замърсява. Официалният
+            // дух е само заместител: ПЪРВАТА ти валидна обиколка го измества,
+            // дори да е по-бавна — иначе личният рекорд изобщо не се записва,
+            // докато не биеш автопилота.
             if (
                 event.valid &&
                 this.opponents.length === 0 &&
-                (this.ghost === null || event.lapTicks < this.ghost.lapTicks)
+                (this.ghost === null || this.ghost.official || event.lapTicks < this.ghost.lapTicks)
             ) {
                 this.#saveGhost(event.frames, event.lapTicks);
             }
@@ -1595,7 +1633,10 @@ export class Game {
         const sim = this.sim;
         const ghost = this.ghost;
 
-        if (!ghost || sim.phase !== 'flying') {
+        // Духът е СОЛО фийчър: в състезание позлатеният официален дух би
+        // карал „през" полето като седми, недосегаем съперник — объркващо,
+        // при това в цвят близък до жълтата ливрея.
+        if (!ghost || sim.phase !== 'flying' || this.opponents.length > 0) {
             this.ghostRig.root.visible = false;
             return;
         }
@@ -1802,7 +1843,7 @@ const INTERESTING_KEYS = new Set([
  */
 function buildGhostRig() {
     const rig = buildCar();
-    const ghostTint = new THREE.Color(0x9fc8ff);
+    rig.tintables = [];
 
     rig.root.traverse((object) => {
         if (object.isMesh) {
@@ -1810,14 +1851,32 @@ function buildGhostRig() {
             material.transparent = true;
             material.opacity = 0.35;
             material.depthWrite = false;
-            // Призрачно-син тон — да не се бърка с истинската кола.
-            material.color?.lerp?.(ghostTint, 0.7);
+            if (material.color) {
+                // Базовият цвят се пази — тонът се сменя (личен син ↔
+                // официален златист) без да се наслагват lerp-ове.
+                rig.tintables.push({ material, base: material.color.clone() });
+            }
             object.material = material;
             object.castShadow = false;
         }
     });
 
+    tintGhostRig(rig, 0x9fc8ff); // призрачно-син = личният рекорд
+
     return rig;
+}
+
+/**
+ * Тонира духа: личен (син) или официалният на Падок (златист).
+ *
+ * @param {ReturnType<typeof buildGhostRig>} rig
+ * @param {number} tint
+ */
+function tintGhostRig(rig, tint) {
+    const color = new THREE.Color(tint);
+    for (const { material, base } of rig.tintables) {
+        material.color.copy(base).lerp(color, 0.7);
+    }
 }
 
 /**

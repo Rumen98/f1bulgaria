@@ -1424,26 +1424,19 @@ function buildStreetWalls(track, circuit, pit) {
 }
 
 /**
- * Страничното отместване на идеалната линия за всяка осева точка: клони към
- * вътрешността на завоя и е силно изгладено, за да се получат плавните
- * излизания навън преди и след върха (out-in-out).
+ * Страничното отместване на боядисаната идеална линия: копие на
+ * оптимизираната състезателна линия от prepareTrack (същата, която карат
+ * ботовете), клампнато 0.35 m по-навътре, за да не опира лентата в ръба.
  *
  * @param {import('./track.js').Track} track
  * @returns {Float32Array}
  */
 function computeRacingLine(track) {
-    const { curvature, count, halfWidths } = track;
+    const { count, halfWidths, raceOffset } = track;
 
-    let offsets = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-        const k = curvature[i] / 0.012;
-        offsets[i] = (halfWidths[i] - 1.9) * Math.max(-1, Math.min(1, k));
-    }
-
-    offsets = smoothCyclicWide(offsets, 4, 24);
-
-    // След изглаждането линията може да прелее в по-тесен участък — клампва
-    // се към локалната ширина.
+    // Истинската линия от prepareTrack (същата, която карат ботовете) —
+    // копие, клампнато малко по-навътре, за да не опира лентата в ръба.
+    const offsets = new Float32Array(raceOffset);
     for (let i = 0; i < count; i++) {
         const limit = halfWidths[i] - 1.7;
         offsets[i] = Math.max(-limit, Math.min(limit, offsets[i]));
@@ -2285,41 +2278,6 @@ function makeBannerTexture() {
 // ── Дребни числови помощници ─────────────────────────────────────────────
 
 const UP = new THREE.Vector3(0, 1, 0);
-
-/**
- * Широко циклично изглаждане: плъзгащ прозорец с радиус `radius`, `passes`
- * пъти. Кумулативна сума на всяко минаване → O(n) на минаване.
- *
- * @param {Float32Array} values
- * @param {number} radius
- * @param {number} passes
- * @returns {Float32Array}
- */
-function smoothCyclicWide(values, radius, passes) {
-    const n = values.length;
-    let current = values;
-    const window = radius * 2 + 1;
-
-    for (let pass = 0; pass < passes; pass++) {
-        const out = new Float32Array(n);
-        let sum = 0;
-
-        for (let i = -radius; i <= radius; i++) {
-            sum += current[((i % n) + n) % n];
-        }
-
-        for (let i = 0; i < n; i++) {
-            out[i] = sum / window;
-            const drop = ((i - radius) % n + n) % n;
-            const add = ((i + radius + 1) % n + n) % n;
-            sum += current[add] - current[drop];
-        }
-
-        current = out;
-    }
-
-    return current;
-}
 
 /**
  * Детерминиран шум в [0,1) от число (същият като в mesh.js).

@@ -78,14 +78,21 @@ export function driveAutopilot(sim, input, opts = {}) {
         }
     }
 
-    // Lookahead по скоростта: фибата на Монако не се взима с далечна цел.
-    const target = ahead(10 + lookBias + Math.max(0, state.vForward) * 0.4);
+    // Lookahead по скоростта, СВИТ при висока кривина: на хеърпин далечната
+    // цел е „през" завоя и pursuit контролерът реже вътрешния ръб.
+    const hereCurv = Math.abs(t.raceCurv[hint]);
+    const lookScale = 1 / (1 + hereCurv * 6);
+    const target = ahead((10 + lookBias + Math.max(0, state.vForward) * 0.4) * lookScale);
 
-    // Собствената състезателна линия + отклонението за трафика — целта се
-    // мести странично по нормалата, клампната по ШИРИНАТА на пистата там
-    // (на тясното Монако широка линия = стена/невалидност).
-    const maxOffset = Math.max(0.6, t.halfWidths[target] - 2.9);
-    const offset = clamp((opts.lineOffset ?? 0) + avoidShift, -maxOffset, maxOffset);
+    // Целта е върху СЪСТЕЗАТЕЛНАТА линия (широк вход/апекс/широк изход от
+    // prepareTrack) + личната вариация + отклонението за трафика; клампнато
+    // по ширината там (на тясното Монако широка цел = стена/невалидност).
+    const maxOffset = Math.max(0.6, t.halfWidths[target] - 1.2);
+    const offset = clamp(
+        t.raceOffset[target] + (opts.lineOffset ?? 0) + avoidShift,
+        -maxOffset,
+        maxOffset
+    );
     const dx = t.xs[target] + t.nx[target] * offset - state.x;
     const dz = t.zs[target] + t.nz[target] * offset - state.z;
     const desired = Math.atan2(dx, dz);
@@ -97,20 +104,22 @@ export function driveAutopilot(sim, input, opts = {}) {
     // Волан: физическият знак е обратен на екранния (виж Game.#readInput).
     input.steer = Math.max(-1, Math.min(1, dH * steerGain));
 
-    // Газ/спирачка според най-острото в следващите 90 метра — консервативно:
-    // ботът няма фина спирачка, по-добре бавен, отколкото в жив-цикъл на
-    // фибата на Монако.
+    // Газ/спирачка според най-острото в следващите 90 метра — по кривината
+    // на ЛИНИЯТА, не на осевата: апексът разгъва завоя и позволява реално
+    // по-висока скорост (както при истински пилот).
     let peak = 0;
     for (let m = 0; m <= 90; m += t.spacing) {
-        peak = Math.max(peak, Math.abs(t.curvature[ahead(m)]));
+        peak = Math.max(peak, Math.abs(t.raceCurv[ahead(m)]));
     }
     // Освен сцеплението има и ГЕОМЕТРИЧЕН таван: ъгълът на волана пада със
     // скоростта (steerSpeedFalloff), а фибата на Монако иска пълен ъгъл —
     // достижим само под ~4-5 m/s. Решаваме за v от радиуса на завоя.
     const needAngle = Math.atan(3.6 * Math.max(peak, 1e-4) * 1.2);
     const vGeo = Math.max(4, (0.58 / needAngle - 1) / 0.075);
+    // Страничният бюджет 18 m/s² е под реалния грип на болида (baseGrip 27 +
+    // downforce) — резервът покрива грешката на P-контролера при вход.
     const safeSpeed =
-        Math.max(4.5, Math.min(70, Math.min(Math.sqrt(15 / Math.max(peak, 1e-4)), vGeo))) * pace;
+        Math.max(4.5, Math.min(76, Math.min(Math.sqrt(18 / Math.max(peak, 1e-4)), vGeo))) * pace;
     input.throttle = state.vForward < safeSpeed && !liftForTraffic && !brakeForTraffic ? 1 : 0;
     input.brake = state.vForward > safeSpeed + 3 || brakeForTraffic ? 1 : 0;
 
