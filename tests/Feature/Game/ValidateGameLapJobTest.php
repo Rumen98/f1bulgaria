@@ -30,7 +30,7 @@ it('потвърждава истинска обиколка чрез преиг
         'sector2_ms' => $this->fixture['sectors_ms'][1],
         'sector3_ms' => $this->fixture['sectors_ms'][2],
         'input_trace' => $this->fixture['trace'],
-        'sim_version' => 1,
+        'sim_version' => $this->fixture['sim_version'],
         'verify_status' => 'pending',
     ]);
 
@@ -56,7 +56,7 @@ it('отхвърля обиколка с подправено (по-бързо) 
         'sector2_ms' => 30000,
         'sector3_ms' => $this->fixture['lap_ms'] - 90000,
         'input_trace' => $this->fixture['trace'],
-        'sim_version' => 1,
+        'sim_version' => $this->fixture['sim_version'],
         'verify_status' => 'pending',
     ]);
 

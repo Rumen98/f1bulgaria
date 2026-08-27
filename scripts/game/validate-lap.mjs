@@ -68,13 +68,25 @@ sim.recordEnabled = false;
     if (!numbers.every((v) => Number.isFinite(v)) || !Number.isInteger(s.hint) || !Number.isInteger(s.sector)) {
         fail('bad_trace');
     }
+    // Track-limits снапшотът (v2): броячите пътуват с трейса, за да е
+    // lapValid идентичен на живото — но клиентът ги контролира, затова
+    // граници. cut > CUT_COOLDOWN или отрицателен offTrack са фалшификат.
+    if (
+        !Number.isInteger(s.offTrack) || s.offTrack < 0 || s.offTrack > 200000 ||
+        !Number.isInteger(s.cut) || s.cut < 0 || s.cut > 600
+    ) {
+        fail('bad_trace');
+    }
     if (Math.abs(s.vForward) > 97 || Math.abs(s.vLateral) > 105 || Math.abs(s.steer) > 1) {
         fail('bad_trace');
     }
 
     const projection = projectOnTrack(sim.track, s.x, s.z, null, {});
     const progress = projection.distance / sim.track.length;
-    const nearLine = progress > 0.85 || progress < 0.15;
+    // Честното въоръжаване става на ТИКА на пресичане: най-много ~0.8 м след
+    // линията (една стъпка при пълна скорост). Старият праг 0.15 подаряваше
+    // цели 15% от обиколката на кован старт.
+    const nearLine = progress > 0.995 || progress < 0.01;
     const onSurface = Math.abs(projection.lateral) < sim.track.halfWidths[projection.index] + 2.5;
 
     if (!nearLine || !onSurface) {

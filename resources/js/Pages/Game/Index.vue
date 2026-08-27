@@ -31,6 +31,8 @@ const error = ref(null);
 const transmission = ref('auto'); // 'auto' | 'manual' (ръчна: W нагоре, S надолу)
 const rivals = ref('race'); // 'race' (AI съперници на пистата) | 'solo' (чиста обиколка)
 const RIVAL_COUNT = 5;
+// Мобилно управление: накланяне на телефона или екранни бутони ◀ ▶.
+const controlMode = ref('tilt'); // 'tilt' | 'buttons'
 const preStart = ref(false); // pre-start екран (избор трансмисия + управление) преди обиколката
 const isMobile = ref(false); // телефон/тъч → tilt завиване + авто-газ, скрити ръчни
 const tiltError = ref(false); // накланянето не е достъпно/разрешено
@@ -62,7 +64,6 @@ const emptyTelemetry = () => ({
     phase: 'formation',
     recovering: false,
     recoverCount: 0,
-    recoverRestart: false,
     gated: false,
     warnings: 0,
     maxWarnings: 3,
@@ -102,7 +103,9 @@ const onFinish = (res) => {
     resultMeta.value = null;
     submitError.value = null;
 
-    if (res.valid && authUser.value) {
+    // Състезателните обиколки не се записват: контактите с ботовете ги
+    // правят невъзпроизводими за сървърната валидация. Класацията е соло.
+    if (res.valid && !res.competition && res.trace && authUser.value) {
         submitLap(res);
     }
 };
@@ -175,7 +178,8 @@ const stopReplay = () => {
 // Лилаво = рекорд на пистата. Докато сървърът не отговори, сравняваме локално
 // спрямо рекордите отпреди обиколката; после ползваме авторитетния отговор.
 const lapIsPurple = computed(() => {
-    if (!result.value || !result.value.valid) {
+    // Състезателно време не се сравнява с рекордите — те са соло територия.
+    if (!result.value || !result.value.valid || result.value.competition) {
         return false;
     }
     if (resultMeta.value) {
@@ -186,7 +190,7 @@ const lapIsPurple = computed(() => {
 });
 
 const sectorIsPurple = (i) => {
-    if (!result.value || !result.value.valid || result.value.sectorsMs[i] === null) {
+    if (!result.value || !result.value.valid || result.value.competition || result.value.sectorsMs[i] === null) {
         return false;
     }
     if (resultMeta.value) {
@@ -199,7 +203,7 @@ const sectorIsPurple = (i) => {
 // Цвят на сектор/обиколка (F1): лилаво = рекорд на всички (има предимство),
 // зелено = личен рекорд, жълто = по-бавно от личния рекорд.
 const sectorState = (i) => {
-    if (!result.value || !result.value.valid || result.value.sectorsMs[i] === null) {
+    if (!result.value || !result.value.valid || result.value.competition || result.value.sectorsMs[i] === null) {
         return 'none';
     }
     if (sectorIsPurple(i)) {
@@ -213,7 +217,7 @@ const sectorState = (i) => {
 };
 
 const lapState = computed(() => {
-    if (!result.value || !result.value.valid) {
+    if (!result.value || !result.value.valid || result.value.competition) {
         return 'none';
     }
     if (lapIsPurple.value) {
@@ -363,11 +367,14 @@ const beginLap = () => {
     // с трафик. Виж Game.setOpponents за „защо без колизии".
     game.value.setOpponents(rivals.value === 'race' ? RIVAL_COUNT : 0);
 
-    // Телефон: авто-газ + завиване с накланяне. Разрешението за жироскоп (iOS)
-    // се иска ТУК, защото тапът на „Карай" е потребителски жест.
+    // Телефон: авто-газ + завиване с накланяне ИЛИ екранни бутони (по избор
+    // от pre-start екрана). Разрешението за жироскоп (iOS) се иска ТУК,
+    // защото тапът на „Карай" е потребителски жест.
     if (isMobile.value) {
         game.value.autoThrottle = true;
-        enableTilt();
+        if (controlMode.value === 'tilt') {
+            enableTilt();
+        }
     }
 
     preStart.value = false;
@@ -405,6 +412,20 @@ onBeforeUnmount(teardown);
 const setInput = (values) => game.value?.setTouchInput(values);
 const holdBrake = () => setInput({ brake: 1 });
 const releaseBrake = () => setInput({ brake: 0 });
+// Екранни бутони за завиване (controlMode === 'buttons'). Пазим състоянието
+// на ВСЕКИ бутон: при едновременно натискане пускането на единия не бива да
+// нулира другия (мулти-тъч).
+const steerHeld = { left: false, right: false };
+const applySteer = () =>
+    setInput({ steer: (steerHeld.right ? 1 : 0) - (steerHeld.left ? 1 : 0) });
+const holdSteer = (direction) => {
+    steerHeld[direction < 0 ? 'left' : 'right'] = true;
+    applySteer();
+};
+const releaseSteer = (direction) => {
+    steerHeld[direction < 0 ? 'left' : 'right'] = false;
+    applySteer();
+};
 
 // Аналогов волан от накланянето, устойчив на портрет/пейзаж. Проектираме наклона
 // върху ХОРИЗОНТАЛНАТА ОС НА ЕКРАНА (не на устройството): в портрет това е gamma,
@@ -467,7 +488,7 @@ const enableTilt = async () => {
         ) {
             const res = await DeviceOrientationEvent.requestPermission();
             if (res !== 'granted') {
-                tiltError.value = true;
+                fallBackToButtons();
 
                 return;
             }
@@ -475,8 +496,15 @@ const enableTilt = async () => {
         window.addEventListener('deviceorientation', onTilt);
         window.addEventListener('orientationchange', onOrientationChange);
     } catch {
-        tiltError.value = true;
+        fallBackToButtons();
     }
+};
+
+// Отказано/недостъпно накланяне НЕ бива да остави колата без волан насред
+// обиколката — бутоните се включват веднага.
+const fallBackToButtons = () => {
+    tiltError.value = true;
+    controlMode.value = 'buttons';
 };
 
 const disableTilt = () => {
@@ -645,6 +673,12 @@ const recenterTilt = () => {
                         <div v-if="!telemetry.started" class="mt-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                             Мини старта за хронометрирана обиколка
                         </div>
+                        <div
+                            v-else-if="!telemetry.lapValid && telemetry.fieldSize === 1"
+                            class="mt-2 text-[10px] font-semibold uppercase tracking-wider text-red-400"
+                        >
+                            Невалидна — излизане от пистата
+                        </div>
                         <div v-else class="mt-2 flex items-center gap-1.5">
                             <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Излизания</span>
                             <span
@@ -743,17 +777,43 @@ const recenterTilt = () => {
                     </button>
                 </div>
 
-                <!-- Управление на телефон: накланяне = волан, газта е авто, само
-                     бутон „Спирачка". Показва се само на тъч устройства. -->
-                <div v-if="isMobile" class="pointer-events-none absolute inset-x-0 bottom-0 select-none p-4">
+                <!-- Управление на телефон: накланяне ИЛИ бутони ◀ ▶ (по избор),
+                     газта е авто, бутон „Спирачка". Само на тъч устройства;
+                     крие се по време на ТВ реплей (там колата кара сама). -->
+                <div v-if="isMobile && !replaying" class="pointer-events-none absolute inset-x-0 bottom-0 select-none p-4">
                     <div class="flex items-end justify-between gap-3">
+                        <!-- Накланяне: рекалибриране на центъра. -->
                         <button
+                            v-if="controlMode === 'tilt'"
                             type="button"
                             class="pointer-events-auto rounded-lg bg-black/50 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-200 backdrop-blur-sm active:bg-black/70"
                             @pointerdown.prevent="recenterTilt"
                         >
                             Центрирай волана
                         </button>
+                        <!-- Бутони: ляво/дясно под левия палец. -->
+                        <div v-else class="flex gap-2">
+                            <button
+                                type="button"
+                                class="pointer-events-auto h-20 w-24 rounded-2xl bg-white/15 text-2xl font-black text-white backdrop-blur-sm active:bg-white/30"
+                                @pointerdown.prevent="holdSteer(-1)"
+                                @pointerup="releaseSteer(-1)"
+                                @pointerleave="releaseSteer(-1)"
+                                @pointercancel="releaseSteer(-1)"
+                            >
+                                ◀
+                            </button>
+                            <button
+                                type="button"
+                                class="pointer-events-auto h-20 w-24 rounded-2xl bg-white/15 text-2xl font-black text-white backdrop-blur-sm active:bg-white/30"
+                                @pointerdown.prevent="holdSteer(1)"
+                                @pointerup="releaseSteer(1)"
+                                @pointerleave="releaseSteer(1)"
+                                @pointercancel="releaseSteer(1)"
+                            >
+                                ▶
+                            </button>
+                        </div>
                         <button
                             type="button"
                             class="pointer-events-auto h-20 w-40 rounded-2xl bg-white/15 text-base font-bold uppercase tracking-wider text-white backdrop-blur-sm active:bg-white/30"
@@ -766,7 +826,7 @@ const recenterTilt = () => {
                         </button>
                     </div>
                     <p v-if="tiltError" class="mt-2 text-center text-[11px] font-semibold text-amber-400">
-                        Накланянето не е достъпно на това устройство.
+                        Накланянето не е достъпно — включихме екранните бутони.
                     </p>
                 </div>
 
@@ -808,9 +868,32 @@ const recenterTilt = () => {
                             </div>
                             <p v-if="rivals === 'race'" class="mt-1.5 text-[11px] text-zinc-500">
                                 Стартирате заедно от решетката (ти си П{{ RIVAL_COUNT + 1 }}) —
-                                светлините гаснат и потегляте. Обиколка 1 е бойна; хронометърът
-                                тръгва на линията. Съперниците не се блъскат с теб.
+                                светлините гаснат и потегляте, с истински контакт между колите.
+                                Затова времето не влиза в класацията — за рекорд карай „Сам на пистата".
                             </p>
+                        </div>
+
+                        <!-- Телефон: избор как се завива. -->
+                        <div v-if="isMobile" class="mt-4">
+                            <div class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+                                Управление
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button
+                                    v-for="opt in [
+                                        { v: 'tilt', l: 'Накланяне', h: 'Върти телефона като волан' },
+                                        { v: 'buttons', l: 'Бутони', h: '◀ ▶ на екрана' },
+                                    ]"
+                                    :key="opt.v"
+                                    type="button"
+                                    class="rounded-lg border p-3 text-left transition"
+                                    :class="controlMode === opt.v ? 'border-[#e10600] bg-[#e10600]/10' : 'border-zinc-700 hover:border-zinc-500'"
+                                    @click="controlMode = opt.v"
+                                >
+                                    <div class="text-sm font-bold text-zinc-100">{{ opt.l }}</div>
+                                    <div class="mt-0.5 text-[11px] text-zinc-400">{{ opt.h }}</div>
+                                </button>
+                            </div>
                         </div>
 
                         <div v-if="!isMobile" class="mt-4">
@@ -839,9 +922,14 @@ const recenterTilt = () => {
                             <div class="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
                                 Управление
                             </div>
-                            <!-- Телефон: накланяне + авто-газ + спирачка -->
+                            <!-- Телефон: накланяне/бутони + авто-газ + спирачка -->
                             <div v-if="isMobile" class="space-y-1.5 text-xs text-zinc-300">
-                                <div>📱 <span class="font-semibold">Накланяй телефона</span> наляво/надясно, за да завиваш</div>
+                                <div v-if="controlMode === 'tilt'">
+                                    📱 <span class="font-semibold">Накланяй телефона</span> наляво/надясно, за да завиваш
+                                </div>
+                                <div v-else>
+                                    🕹️ Завивай с бутоните <span class="font-semibold">◀ ▶</span> в долния ляв ъгъл
+                                </div>
                                 <div>🏎️ Газта е <span class="font-semibold">автоматична</span> — само насочваш и спираш</div>
                                 <div>🛑 Задръж <span class="font-semibold">Спирачка</span>, за да намалиш за завоите</div>
                             </div>
@@ -903,12 +991,14 @@ const recenterTilt = () => {
                 </div>
 
                 <!-- ── Връщане на пистата: брояч 3-2-1 ──────────────────── -->
+                <!-- Скрит по време на стартовата процедура: телеметрията
+                     замръзва при отброяването и старият флаг би висял отгоре. -->
                 <div
-                    v-if="telemetry.recovering"
+                    v-if="telemetry.recovering && launchLights === null"
                     class="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/45"
                 >
                     <div class="text-xs font-bold uppercase tracking-[0.3em] text-amber-300">
-                        {{ telemetry.recoverRestart ? 'Времето изтрито · нова обиколка' : 'Връщане на пистата' }}
+                        Връщане на пистата
                     </div>
                     <div class="font-mono text-8xl font-black tabular-nums text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
                         {{ telemetry.recoverCount }}
@@ -1036,6 +1126,13 @@ const recenterTilt = () => {
                             class="mt-3 rounded-lg border border-amber-900/50 bg-amber-950/30 px-3 py-2 text-center text-xs text-amber-300"
                         >
                             Невалидна обиколка (излизане извън трасето) — не влиза в класацията.
+                        </div>
+                        <div
+                            v-else-if="result.competition"
+                            class="mt-3 rounded-lg border border-zinc-700 bg-zinc-800/40 px-3 py-2 text-center text-xs text-zinc-300"
+                        >
+                            Състезателен режим — времето не влиза в класацията.
+                            За рекорд карай <span class="font-semibold">Сам на пистата</span>.
                         </div>
                         <div
                             v-else-if="!authUser"

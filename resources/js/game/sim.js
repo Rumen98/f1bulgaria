@@ -19,8 +19,10 @@ import { CAR, FIXED_DT, createCarState, step } from './physics.js';
 import { bankAt, findKerbRanges, prepareTrack, projectOnTrack } from './track.js';
 
 /** Версия на симулацията — записва се в трейса; при промяна в физиката или
- *  повърхностите се вдига и сървърът знае, че стари трейсове не се повтарят. */
-export const SIM_VERSION = 1;
+ *  повърхностите се вдига и сървърът знае, че стари трейсове не се повтарят.
+ *  v2: излизането от пистата вече не пуска автоматично връщане (времето
+ *  тече, обиколката се инвалидира); наказателният рестарт от старта отпадна. */
+export const SIM_VERSION = 2;
 
 /** Брой сектори на обиколка, както в истинската Формула 1. */
 export const SECTORS = 3;
@@ -28,10 +30,20 @@ export const SECTORS = 3;
 /** Продължителност на връщането на пистата (брояч 3-2-1), в тикове. */
 const RECOVER_TICKS = 360; // 3 s при 120 Hz
 
-/** Колко дълго извън пистата, преди да пуснем връщане. */
+/** Колко дълго извън пистата, преди излизането да „брои" (инвалидира). */
 const OFFTRACK_GRACE = 48; // 0.4 s
 
-/** Позволени излизания в квалификационната, преди времето да се изтрие. */
+/** Закъсал: толкова дълго извън пистата под STUCK_SPEED → връщане. Играч,
+ *  който се измъква сам, никога не го вижда — времето просто си тече. */
+const STUCK_TICKS = 210; // 1.75 s
+const STUCK_SPEED = 3.5; // m/s
+
+/** След излизане: толкова тика "охлаждане", преди пресичане на линията да
+ *  може да въоръжи ВАЛИДНА обиколка. Спира срязването на последния шикан
+ *  в загряващата — иначе то носи безплатна скорост на стартовата права. */
+const CUT_COOLDOWN = 600; // 5 s
+
+/** Таван на точките „излизания" в HUD-а (само индикатор, без наказание). */
 export const MAX_WARNINGS = 3;
 
 /** Метри ПРЕДИ мястото на излизане, на които връщаме колата. */
@@ -131,11 +143,6 @@ class Simulation {
         // никого не интересуват — флагът спира записа им (памет за нищо).
         this.recordEnabled = true;
 
-        // Наказателното връщане на старта (3-то предупреждение) е заради
-        // хронометъра на ИГРАЧА. За бот то е телепорт през половината писта
-        // пред очите на играча + надут брояч на обиколките му — изключва се.
-        this.recoverToStartEnabled = true;
-
         // Старт от решетката (състезание): колата стои ЗАД линията и първото
         // пресичане е потеглянето, не начало на летяща обиколка — прескача се,
         // за да е обиколка 1 бойна, а хронометрираната да тръгва на скорост
@@ -159,8 +166,13 @@ class Simulation {
      * @param {boolean} keepRecords Дали рекордът да се запази
      */
     reset(keepRecords = true) {
-        this.state = createCarState(this.track);
-        this.surface = { height: this.track.ys[0], gradient: this.track.gradient[0], bank: 0 };
+        // Мутира се НА МЯСТО: Game държи живи референции към state/surface
+        // (avoidance списъци, контакти, рендер) — подмяна на обекта ги
+        // превръща в замразени „фантоми".
+        Object.assign(this.state, createCarState(this.track));
+        this.surface.height = this.track.ys[0];
+        this.surface.gradient = this.track.gradient[0];
+        this.surface.bank = 0;
         this.trackIndexHint = null;
         this.offSurface = null;
         this.onKerb = false;
@@ -264,10 +276,35 @@ class Simulation {
 
         if (onTrack) {
             this.offTrackTicks = 0;
+            if (this.cutCooldown > 0) {
+                this.cutCooldown--;
+            }
             this.#rememberSafeState(projection.index);
         } else {
             this.offTrackTicks++;
-            if (this.offTrackTicks > OFFTRACK_GRACE && this.phase !== 'finished') {
+
+            // Реални track limits: излизането НЕ прекъсва карането — времето
+            // си тече, но летящата обиколка става невалидна (иначе срязването
+            // на шикан е безплатно предимство за класацията). Проверката е по
+            // НИВО (>), не по ръб (===): обиколка, въоръжена по средата на
+            // излизане, се инвалидира на следващия тик, а не никога.
+            if (this.offTrackTicks > OFFTRACK_GRACE) {
+                if (this.phase === 'flying' && this.lapValid) {
+                    this.lapValid = false;
+                    this.warnings++;
+                }
+                // Прясното срязване отравя и СЛЕДВАЩОТО въоръжаване (виж
+                // #armFlyingLap) — вкл. срязан последен шикан в загряващата.
+                this.cutCooldown = CUT_COOLDOWN;
+            }
+
+            // Връщане на пистата САМО при закъсване (заровен в чакъла, опрян
+            // в стена) — който може, се измъква сам.
+            if (
+                this.offTrackTicks > STUCK_TICKS &&
+                Math.abs(this.state.vForward) < STUCK_SPEED &&
+                this.phase !== 'finished'
+            ) {
                 this.#beginRecovery();
                 return null;
             }
@@ -296,11 +333,11 @@ class Simulation {
         this.gridCrossingsToSkip = 0;
         this.recovering = false;
         this.recoverTicks = 0;
-        this.recoverToStart = false;
         this.recoverReleaseSpeed = 0;
         this.recoverResumeSpeed = 0;
         this.recoverTarget = null;
         this.offTrackTicks = 0;
+        this.cutCooldown = 0;
         this.warnings = 0;
         this.timerGated = false;
         this.gateDistance = 0;
@@ -323,7 +360,10 @@ class Simulation {
      */
     #armFlyingLap(sector) {
         this.lapTicks = 0;
-        this.lapValid = true;
+        // Обиколка, тръгнала след прясно срязване (вкл. срязан последен
+        // шикан в предишната), е невалидна от раждането си — иначе изходната
+        // скорост от срязването е подарък за класацията.
+        this.lapValid = this.cutCooldown === 0;
         this.sectorsVisited = new Array(SECTORS).fill(false);
         this.sectorsVisited[sector] = true;
         this.sectorTicks = new Array(SECTORS).fill(null);
@@ -346,6 +386,11 @@ class Simulation {
             hint: this.trackIndexHint,
             lastProgress: this.lastProgress,
             sector,
+            // Track-limits състоянието влиза в снапшота — иначе живото и
+            // преиграването се разминават по lapValid (обиколка, въоръжена по
+            // средата на излизане или след прясно срязване).
+            offTrack: this.offTrackTicks,
+            cut: this.cutCooldown,
         };
     }
 
@@ -371,6 +416,9 @@ class Simulation {
         this.lastProgress = start.lastProgress;
         this.phase = 'flying';
         this.warnings = 0;
+        // Преди въоръжаването — #armFlyingLap чете cutCooldown за lapValid.
+        this.offTrackTicks = start.offTrack ?? 0;
+        this.cutCooldown = start.cut ?? 0;
         this.#armFlyingLap(start.sector);
         // Повторението не записва повторно.
         this.recording = false;
@@ -396,32 +444,15 @@ class Simulation {
     }
 
     #beginRecovery() {
-        let toStart = false;
-
-        if (this.phase === 'flying') {
-            this.warnings++;
-            if (this.warnings >= MAX_WARNINGS && this.recoverToStartEnabled) {
-                toStart = true;
-            }
-        }
-
         const preOffSpeed = this.safeState.speed;
+        const offset = Math.round(RECOVER_LOOKBACK / this.track.spacing);
+        const count = this.track.count;
+        const index = (((this.safeState.index - offset) % count) + count) % count;
+        const target = this.#safeStateAt(index, preOffSpeed);
 
-        let target;
-        if (toStart) {
-            target = this.#safeStateAt(0, preOffSpeed);
-            this.recoverReleaseSpeed = preOffSpeed;
-        } else {
-            const offset = Math.round(RECOVER_LOOKBACK / this.track.spacing);
-            const count = this.track.count;
-            const index = (((this.safeState.index - offset) % count) + count) % count;
-            target = this.#safeStateAt(index, preOffSpeed);
-            this.recoverReleaseSpeed = preOffSpeed * RECOVER_SPEED_FACTOR;
-        }
-
+        this.recoverReleaseSpeed = preOffSpeed * RECOVER_SPEED_FACTOR;
         this.recovering = true;
         this.recoverTicks = RECOVER_TICKS;
-        this.recoverToStart = toStart;
         this.recoverResumeSpeed = preOffSpeed;
         this.offTrackTicks = 0;
 
@@ -460,18 +491,9 @@ class Simulation {
         const target = this.recoverTarget;
         this.lastProgress = target.index / this.track.count;
 
-        if (this.recoverToStart) {
-            // Трето предупреждение → нова квалификационна от старта.
-            this.phase = 'flying';
-            this.warnings = 0;
-            this.#armFlyingLap(0);
-            this.timerGated = false;
-        } else {
-            this.timerGated = true;
-            this.gateDistance = RECOVER_LOOKBACK;
-        }
-
-        this.recoverToStart = false;
+        // „Безплатни" са само метрите назад до мястото на излизане.
+        this.timerGated = true;
+        this.gateDistance = RECOVER_LOOKBACK;
     }
 
     /**

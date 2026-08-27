@@ -18,6 +18,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { driveAutopilot } from './autopilot.js';
 import { buildCar, updateCarRig, attachCarModel } from './car.js';
 import { circuitFor } from './circuits.js';
+import { resolveCarContacts } from './collisions.js';
 import { buildTrackMeshes, COLORS } from './mesh.js';
 import { CAR, FIXED_DT, speedKmh } from './physics.js';
 import {
@@ -47,10 +48,6 @@ const TELEMETRY_INTERVAL = 1 / 30;
 
 /** Ливреи на AI съперниците — генерични цветове, без реални отбори. */
 const LIVERIES = [0x2563eb, 0xff7a00, 0x00a36c, 0xd7d7de, 0xe6007e, 0xf5c400];
-
-/** Под това разстояние до играча съперникът изсветлява — визуалният сигнал,
- *  че колите не се блъскат (колизии няма нарочно, виж setOpponents). */
-const RIVAL_FADE_DISTANCE = 9;
 
 /** Стартова процедура (състезание): интервал между светлините и решетката. */
 const LAUNCH_LIGHT_INTERVAL = 0.85; // s между палене на две светлини
@@ -275,6 +272,7 @@ export class Game {
 
         // Преизползвани обекти (нула алокации/кадър в hot path) + акумулатори.
         this._render = {};
+        this._contactCars = [];
         this.telemetryAccum = TELEMETRY_INTERVAL; // първи кадър праща телеметрия веднага
         this.flagWave = 0;
 
@@ -333,11 +331,10 @@ export class Game {
     /**
      * Конфигурира AI съперниците (вика се от pre-start екрана, преди start()).
      *
-     * Нарочно БЕЗ колизии: съперник, който може да те избута, би направил
-     * сървърното преиграване на твоята обиколка нечестно (валидаторът не знае
-     * за тях). Твоят хронометър остава чист time trial; „състезанието" е
-     * позицията срещу полето + трафикът на пистата. Близо до теб съперникът
-     * изсветлява — знакът, че минаването един през друг е правило, не бъг.
+     * В състезание колите СЕ БЛЪСКАТ (collisions.js) — и играчът. Именно
+     * затова състезателните времена не отиват в класацията: сървърният
+     * реплей не може да възпроизведе чужди удари. Класацията се кара „Сам
+     * на пистата", където физиката на играча е чиста функция от входа му.
      *
      * @param {number} count 0 = сам на пистата
      */
@@ -363,7 +360,6 @@ export class Game {
             // Обиколките на ботовете не интересуват никого — без запис и без
             // наказателен телепорт на старта (само локалното връщане).
             sim.recordEnabled = false;
-            sim.recoverToStartEnabled = false;
 
             const rig = buildOpponentRig(LIVERIES[i % LIVERIES.length]);
             if (templateGeometries === null) {
@@ -393,15 +389,25 @@ export class Game {
                 pace: 0.9 + rand() * 0.22,
                 steerGain: 2.65 + rand() * 0.35,
                 lookBias: (rand() - 0.5) * 6,
+                lineOffset: (rand() - 0.5) * 3.6,
                 slotJitter: rand() * 0.5,
                 laps: 0,
                 lastProgress: 0,
                 prevX: 0,
                 prevZ: 0,
                 prevHeading: 0,
-                opacity: 1,
                 _render: {},
             });
+        }
+
+        // Кой кого вижда (за избягването): СИМУЛАЦИИТЕ са стабилни обекти
+        // (reset мутира state на място, не го подменя), затова референциите
+        // остават живи и след престрояване; recovering се чете от самата сим.
+        for (const opp of this.opponents) {
+            opp.others = [
+                this.sim,
+                ...this.opponents.filter((o) => o !== opp).map((o) => o.sim),
+            ];
         }
 
         this.#gridOpponents();
@@ -827,8 +833,9 @@ export class Game {
                 this.lookTarget = null; // погледът да не замахне от старата точка
             }
 
-            // M заглушава/пуска звука.
-            if (event.code === 'KeyM' && !event.repeat) {
+            // M заглушава/пуска звука (не и в ТВ реплей — там звукът е спрян
+            // и unmute би пуснал двигателя на замразени обороти за миг).
+            if (event.code === 'KeyM' && !event.repeat && !this.replay) {
                 this.sound.setMuted(!this.sound.muted());
             }
 
@@ -924,8 +931,11 @@ export class Game {
         if (event.frames) {
             this.lastLapFrames = event.frames;
 
+            // Духът е еталонът за СОЛО атака — обиколка, „подпомогната" от
+            // удари/драфт в състезание, не бива да го замърсява.
             if (
                 event.valid &&
+                this.opponents.length === 0 &&
                 (this.ghost === null || event.lapTicks < this.ghost.lapTicks)
             ) {
                 this.#saveGhost(event.frames, event.lapTicks);
@@ -936,6 +946,9 @@ export class Game {
             lapMs: event.lapMs,
             sectorsMs: event.sectorsMs,
             valid: event.valid,
+            // Времето от състезание НЕ влиза в класацията: контактите с
+            // ботовете правят обиколката невъзпроизводима за сървърния реплей.
+            competition: this.opponents.length > 0,
             // Записът на входа — доказателството на обиколката за сървъра.
             trace: event.trace ? encodeTrace(event.trace) : null,
             simVersion: SIM_VERSION,
@@ -1100,7 +1113,7 @@ export class Game {
             }
 
             // Съперниците тиктакат в същия фиксиран ритъм, всеки в своя
-            // симулация — физиката на играча не ги вижда.
+            // симулация.
             for (const opp of this.opponents) {
                 const os = opp.sim.state;
                 opp.prevX = os.x;
@@ -1114,6 +1127,23 @@ export class Game {
                     // обиколка (и recovery мрежата остава активна).
                     opp.sim.phase = 'formation';
                 }
+            }
+
+            // Контактите: всички коли се блъскат (и играчът). Затова времената
+            // от състезание не отиват в класацията — сървърът не може да
+            // преиграе чужди удари. Кола в „Връщане на пистата" е извадена.
+            if (this.opponents.length > 0) {
+                const cars = this._contactCars;
+                cars.length = 0;
+                if (!sim.recovering) {
+                    cars.push(state);
+                }
+                for (const opp of this.opponents) {
+                    if (!opp.sim.recovering) {
+                        cars.push(opp.sim.state);
+                    }
+                }
+                resolveCarContacts(cars);
             }
 
             this.accumulator -= FIXED_DT;
@@ -1162,8 +1192,8 @@ export class Game {
         // по тик срещу твоя хронометър — вижда се само на летящата обиколка.
         this.#updateGhost();
 
-        // Съперниците: интерполация като при играча + изсветляване наблизо.
-        this.#updateOpponents(alpha, dt, render);
+        // Съперниците: интерполация като при играча.
+        this.#updateOpponents(alpha, dt);
 
         // Изгладени ускорения за G-force наклоните на бордовата камера.
         const renderV = state.vForward;
@@ -1309,7 +1339,6 @@ export class Game {
             phase: sim.phase,
             recovering: sim.recovering,
             recoverCount: sim.recovering ? Math.ceil(sim.recoverTicks / 120) : 0,
-            recoverRestart: sim.recovering && sim.recoverToStart,
             gated: sim.phase === 'flying' && sim.timerGated,
             warnings: sim.warnings,
             maxWarnings: MAX_WARNINGS,
@@ -1368,10 +1397,6 @@ export class Game {
             opp.prevZ = s.z;
             opp.prevHeading = s.heading;
 
-            opp.opacity = 1;
-            for (const material of opp.rig.materials) {
-                material.opacity = 1;
-            }
             opp.rig.root.visible = true;
             updateCarRig(opp.rig, s, opp.sim.surface, 1);
         }
@@ -1493,14 +1518,12 @@ export class Game {
     }
 
     /**
-     * Рендер на съперниците: същата интерполация между стъпките като при
-     * играча + изсветляване при близост (сигналът „няма колизии").
+     * Рендер на съперниците: същата интерполация между стъпките като при играча.
      *
      * @param {number} alpha Остатък от акумулатора, [0..1)
      * @param {number} dt
-     * @param {object} playerRender Интерполираното състояние на играча
      */
-    #updateOpponents(alpha, dt, playerRender) {
+    #updateOpponents(alpha, dt) {
         for (const opp of this.opponents) {
             const s = opp.sim.state;
 
@@ -1523,19 +1546,6 @@ export class Game {
             render.heading = opp.prevHeading + dH * alpha;
 
             updateCarRig(opp.rig, render, opp.sim.surface, dt);
-
-            const distance = Math.hypot(render.x - playerRender.x, render.z - playerRender.z);
-            const opacity =
-                distance < RIVAL_FADE_DISTANCE
-                    ? 0.35 + (distance / RIVAL_FADE_DISTANCE) * 0.65
-                    : 1;
-
-            if (Math.abs(opacity - opp.opacity) > 0.01) {
-                opp.opacity = opacity;
-                for (const material of opp.rig.materials) {
-                    material.opacity = opacity;
-                }
-            }
         }
     }
 
@@ -1835,8 +1845,6 @@ function buildOpponentRig(color) {
             if (material.isMeshPhysicalMaterial) {
                 material.color.set(color);
             }
-            // Винаги transparent: превключването on/off рекомпилира шейдъра.
-            material.transparent = true;
             cloned.set(object.material, material);
             materials.push(material);
         }
