@@ -1,9 +1,15 @@
 <script setup>
+import PredictionBreakdown from '@/Components/Predictions/PredictionBreakdown.vue';
 import PredictionForm from '@/Components/PredictionForm.vue';
+import OtherPredictions from '@/Components/Races/OtherPredictions.vue';
+import RacePreview from '@/Components/Races/RacePreview.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { hasRoute } from '@/utils/routes';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+
+const canOpenDriver = computed(() => hasRoute('drivers.show'));
 
 const props = defineProps({
     race: Object,
@@ -13,6 +19,10 @@ const props = defineProps({
     drivers: Array,
     // Класациите от всички сесии на уикенда, в реда на провеждането им.
     classifications: { type: Array, default: () => [] },
+    // История на пистата — само докато няма класация от този уикенд.
+    preview: { type: Object, default: null },
+    neighbours: { type: Object, default: () => ({ prev: null, next: null }) },
+    otherPredictions: { type: Array, default: () => [] },
 });
 
 const user = computed(() => usePage().props.auth?.user);
@@ -52,6 +62,10 @@ const showsTime = computed(() => active.value?.rows.some((r) => r.time));
                     </ul>
                 </section>
 
+                <RacePreview v-if="preview" :preview="preview" :circuit="race.circuit" />
+
+                <OtherPredictions :predictions="otherPredictions" />
+
                 <TableShell v-if="active" class="bg-zinc-900/60">
                     <div class="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-4 py-3">
                         <h2 class="mr-2 font-display text-lg font-bold text-white">Класация</h2>
@@ -82,7 +96,16 @@ const showsTime = computed(() => active.value?.rows.some((r) => r.time));
                                     {{ r.position ?? (r.dnf ? 'DNF' : '—') }}
                                 </td>
                                 <td class="px-4 py-2.5 text-zinc-200">
-                                    {{ r.driver }}
+                                    <!-- Slug-ът вече идва с реда (ползва се и за :key) —
+                                         дотук се харчеше само за него вместо за линк. -->
+                                    <Link
+                                        v-if="canOpenDriver && r.slug"
+                                        :href="route('drivers.show', r.slug)"
+                                        class="transition hover:text-red-400"
+                                    >
+                                        {{ r.driver }}
+                                    </Link>
+                                    <span v-else>{{ r.driver }}</span>
                                     <span v-if="r.team" class="ml-1 text-xs text-zinc-500">{{ r.team }}</span>
                                     <span v-if="r.fastest_lap" title="Най-бърза обиколка">🔥</span>
                                 </td>
@@ -101,18 +124,60 @@ const showsTime = computed(() => active.value?.rows.some((r) => r.time));
                     Заключване: {{ lockDeadline }}
                 </p>
 
+                <!-- Гостът вижда самата форма в заключен вид, вместо един ред
+                     текст: „влез за да подадеш прогноза“ не обяснява какво е
+                     лигата, а формата го показва за секунда. -->
                 <template v-if="!user">
-                    <p class="text-sm text-zinc-400">
+                    <p class="mb-3 text-sm text-zinc-400">
+                        Познай подиума, pole позицията и най-бързата обиколка. Точките се
+                        трупат през целия сезон.
+                    </p>
+
+                    <div class="pointer-events-none select-none opacity-60" aria-hidden="true">
+                        <PredictionForm
+                            :race-id="race.id"
+                            :drivers="drivers"
+                            :prediction="null"
+                            :locked="true"
+                        />
+                    </div>
+
+                    <Link
+                        :href="route('register')"
+                        class="mt-3 block rounded-lg bg-red-600 px-4 py-2.5 text-center font-semibold text-white transition hover:bg-red-500"
+                    >
+                        Регистрирай се и подай прогноза
+                    </Link>
+                    <p class="mt-2 text-center text-xs text-zinc-500">
+                        Вече имаш акаунт?
                         <Link :href="route('login')" class="font-medium text-red-500 hover:text-red-400">Влез</Link>
-                        за да подадеш прогноза.
                     </p>
                 </template>
 
-                <template v-else-if="finished && userPrediction">
+                <!-- `race.finished`, а не голо `finished`: последното не е проп и
+                     Vue го резолвваше до undefined, така че блокът с точките
+                     никога не се рендираше и играчът виждаше „заключени“. -->
+                <template v-else-if="race.finished && userPrediction">
                     <div class="rounded-lg border border-zinc-800 bg-black/40 p-4 text-center">
                         <div class="font-display text-3xl font-black text-red-600">{{ userPrediction.points ?? 0 }}</div>
                         <div class="text-xs uppercase tracking-wide text-zinc-500">точки за това състезание</div>
                     </div>
+
+                    <!-- Разбивката пътуваше до браузъра и не се рендираше никъде.
+                         Тя е наградата: показва кое си познал, не само сбора. -->
+                    <PredictionBreakdown
+                        class="mt-3"
+                        :breakdown="userPrediction.breakdown"
+                        :total="userPrediction.points ?? 0"
+                    />
+
+                    <Link
+                        v-if="hasRoute('leaderboard')"
+                        :href="route('leaderboard')"
+                        class="mt-3 block text-center text-sm font-medium text-red-500 transition hover:text-red-400"
+                    >
+                        Виж класирането →
+                    </Link>
                 </template>
 
                 <template v-else-if="locked">
@@ -130,5 +195,28 @@ const showsTime = computed(() => active.value?.rows.some((r) => r.time));
                 />
             </aside>
         </div>
+
+        <nav
+            v-if="neighbours.prev || neighbours.next"
+            class="mt-8 flex flex-wrap items-stretch gap-3"
+            aria-label="Съседни кръгове"
+        >
+            <Link
+                v-if="neighbours.prev"
+                :href="route('races.show', neighbours.prev.id)"
+                class="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 transition hover:border-red-600/50"
+            >
+                <div class="text-xs uppercase tracking-wide text-zinc-500">← Кръг {{ neighbours.prev.round }}</div>
+                <div class="mt-0.5 truncate font-semibold text-white">{{ neighbours.prev.name }}</div>
+            </Link>
+            <Link
+                v-if="neighbours.next"
+                :href="route('races.show', neighbours.next.id)"
+                class="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-right transition hover:border-red-600/50"
+            >
+                <div class="text-xs uppercase tracking-wide text-zinc-500">Кръг {{ neighbours.next.round }} →</div>
+                <div class="mt-0.5 truncate font-semibold text-white">{{ neighbours.next.name }}</div>
+            </Link>
+        </nav>
     </PublicLayout>
 </template>

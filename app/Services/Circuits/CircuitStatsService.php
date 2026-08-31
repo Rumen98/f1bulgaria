@@ -70,7 +70,7 @@ class CircuitStatsService
     }
 
     /**
-     * @return Collection<int, array{year:int, driver:string, team:?string, color:?string}>
+     * @return Collection<int, array{year:int, driver:string, slug:?string, team:?string, color:?string}>
      */
     public function getLastWinners(string $circuitSlug, int $limit = 10): Collection
     {
@@ -86,6 +86,8 @@ class CircuitStatsService
             ->map(fn (Result $r) => [
                 'year' => $r->race?->season?->year,
                 'driver' => $r->driver === null ? null : DriverName::display($r->driver->slug, $r->driver->fullName()),
+                // Slug-ът прави победителите кликаеми — иначе списъкът е гол текст.
+                'slug' => $r->driver?->slug,
                 'team' => $r->driver?->constructor?->name,
                 'color' => $r->driver?->constructor?->color_hex,
             ]);
