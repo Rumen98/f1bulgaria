@@ -89,12 +89,16 @@ class NewsClassifier
                     'description' => 'ID на конкретен отбор или null. САМО по подадения списък пилот→отбор, не по общи знания.',
                 ],
                 'importance_score' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 5],
+                'is_f1_related' => [
+                    'type' => 'boolean',
+                    'description' => 'true САМО ако новината е за Формула 1, Формула 2/Формула 3 или български автомобилен спорт. MotoGP, Moto2, NASCAR, IndyCar, WEC, Формула E, рали/WRC, DTM и всякакви други серии → false.',
+                ],
                 'duplicate_of_id' => [
                     'type' => ['integer', 'null'],
                     'description' => 'ID на скорошна новина, отразяваща СЪЩАТА история (не просто същата тема), или null.',
                 ],
             ],
-            'required' => ['title_bg', 'summary_bg', 'classification', 'importance_score'],
+            'required' => ['title_bg', 'summary_bg', 'classification', 'importance_score', 'is_f1_related'],
         ];
     }
 
@@ -258,6 +262,10 @@ class NewsClassifier
             throw new LlmException("LLM върна importance_score извън диапазона 1-5: {$importance}");
         }
 
+        // По подразбиране true: липсваща стойност от по-слаб модел не бива
+        // да изтрива легитимна F1 новина.
+        $isF1Related = (bool) ($data['is_f1_related'] ?? true);
+
         // Толерантно: невалиден duplicate_of_id не проваля обогатяването —
         // просто не третираме новината като дубликат.
         $duplicateOfId = $data['duplicate_of_id'] ?? null;
@@ -283,6 +291,7 @@ class NewsClassifier
                 'output_tokens' => $response['output_tokens'],
             ],
             duplicateOfId: $duplicateOfId,
+            isF1Related: $isF1Related,
         );
     }
 }

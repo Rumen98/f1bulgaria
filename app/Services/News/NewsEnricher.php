@@ -30,8 +30,8 @@ class NewsEnricher
 
     /**
      * @param  Closure(TeamNewsItem, string, int, int, ?string): void|null  $onItem  Прогрес след всеки
-     *                                                                               елемент: (елемент, изход published|duplicate|failed, пореден, общо, грешка).
-     * @return array{processed:int, success:int, failed:int, duplicates:int, articles_failed:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
+     *                                                                               елемент: (елемент, изход published|duplicate|off_topic|failed, пореден, общо, грешка).
+     * @return array{processed:int, success:int, failed:int, duplicates:int, off_topic:int, articles_failed:int, input_tokens:int, output_tokens:int, errors:array<int, string>}
      */
     public function enrichPending(int $limit = 50, ?Closure $onItem = null): array
     {
@@ -49,6 +49,7 @@ class NewsEnricher
             'success' => 0,
             'failed' => 0,
             'duplicates' => 0,
+            'off_topic' => 0,
             'articles_failed' => 0,
             'input_tokens' => 0,
             'output_tokens' => 0,
@@ -69,9 +70,23 @@ class NewsEnricher
             try {
                 $result = $this->classifier->classify($item);
 
-                // Крос-източников дубликат (същата история от друг сайт) —
-                // отхвърля се автоматично, за да не излиза два пъти на сайта.
-                if ($result->duplicateOfId !== null) {
+                // Извън темата: глобалните емисии носят и MotoGP, NASCAR, WEC,
+                // рали. Спираме ги преди публикация — не си струва да плащаме
+                // и за пълна статия по тях.
+                if (! $result->isF1Related) {
+                    $item->update([
+                        'title_bg' => $result->titleBg,
+                        'summary_bg' => $result->summaryBg,
+                        'classification' => $result->classification->value,
+                        'status' => NewsStatus::Rejected->value,
+                    ]);
+
+                    Log::info("News item [{$item->id}] отхвърлен като извън темата (не е Ф1).");
+                    $stats['off_topic']++;
+                    $outcome = 'off_topic';
+                } elseif ($result->duplicateOfId !== null) {
+                    // Крос-източников дубликат (същата история от друг сайт) —
+                    // отхвърля се автоматично, за да не излиза два пъти на сайта.
                     $item->update([
                         'title_bg' => $result->titleBg,
                         'summary_bg' => $result->summaryBg,

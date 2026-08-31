@@ -24,5 +24,11 @@ final readonly class NewsClassificationResult
         public array $tokenUsage,
         /** ID на скорошна новина със СЪЩАТА история (крос-източников дубликат). */
         public ?int $duplicateOfId = null,
+        /**
+         * Новината за Формула 1/2/3 или български автомобилен спорт ли е.
+         * false → не влиза на сайта (глобалните RSS емисии носят и MotoGP,
+         * NASCAR, WEC и рали, които не са тема на Падок).
+         */
+        public bool $isF1Related = true,
     ) {}
 }

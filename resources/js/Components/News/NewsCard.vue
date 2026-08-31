@@ -11,8 +11,9 @@ const props = defineProps({
     item: { type: Object, required: true },
 });
 
-// Картата води към собствената ни article страница; към източника се отива
-// само през малката икона долу.
+// Картата води само към собствената ни article страница. Външният линк към
+// източника нарочно го няма — изнасяше трафика още от списъка, преди човек
+// изобщо да е стигнал до нашия текст.
 const hasInternal = computed(() => Boolean(props.item.slug) && hasRoute('news.show'));
 
 const href = computed(() => (hasInternal.value ? route('news.show', props.item.slug) : props.item.url));
@@ -41,6 +42,7 @@ const href = computed(() => (hasInternal.value ? route('news.show', props.item.s
                     :href="href"
                     :target="hasInternal ? undefined : '_blank'"
                     :rel="hasInternal ? undefined : 'noopener'"
+                    :prefetch="hasInternal ? 'hover' : undefined"
                     class="after:absolute after:inset-0"
                 >
                     {{ item.title }}
@@ -51,20 +53,10 @@ const href = computed(() => (hasInternal.value ? route('news.show', props.item.s
                 {{ item.summary }}
             </p>
 
+            <!-- Без линк към източника: картата има една задача — да отведе
+                 до нашата статия. Атрибуцията живее в дъното на самата статия. -->
             <div class="mt-3 flex items-center gap-1 text-xs text-zinc-600">
                 <ImportanceDots :value="item.importance ?? 0" />
-                <a
-                    v-if="item.url"
-                    :href="item.url"
-                    target="_blank"
-                    rel="noopener nofollow"
-                    class="relative z-10 ml-auto inline-flex items-center gap-1 text-zinc-500 transition hover:text-zinc-300"
-                    title="Към оригиналния източник"
-                    aria-label="Към оригиналния източник"
-                    @click.stop
-                >
-                    източник ↗
-                </a>
             </div>
         </div>
     </article>

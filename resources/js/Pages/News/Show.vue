@@ -101,26 +101,23 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                     </div>
                 </div>
 
-                <!-- Източник / attribution -->
+                <!-- Атрибуция. Големият CTA „Прочетете оригинала" е премахнат —
+                     изнасяше читателя точно на мястото с най-високо намерение.
+                     Името на източника остава като дискретен линк: текстът е
+                     наша преработка по чужди факти и атрибуцията е дължима. -->
                 <div class="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
                     <p class="text-sm text-zinc-400">
-                        Резюмето и преводът са изготвени от Падок. Пълната оригинална статия е публикувана от
-                        <span v-if="article.source" class="font-semibold text-zinc-200">{{ article.source }}</span>
+                        Текстът е изготвен от Падок по публикация на
+                        <a
+                            v-if="article.source && article.external_url"
+                            :href="article.external_url"
+                            target="_blank"
+                            rel="noopener nofollow"
+                            class="font-semibold text-zinc-300 underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-100"
+                        >{{ article.source }}<span class="sr-only"> (отваря се в нов раздел)</span></a>
+                        <span v-else-if="article.source" class="font-semibold text-zinc-300">{{ article.source }}</span>
                         <span v-else>първоизточника</span>.
                     </p>
-                    <a
-                        v-if="article.external_url"
-                        :href="article.external_url"
-                        target="_blank"
-                        rel="noopener nofollow"
-                        class="mt-4 inline-block rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-500"
-                    >
-                        <!-- Без flex: всеки текстов възел ставаше отделен flex item
-                             и на телефон се чупеше по средата на израза
-                             („Прочетете / оригинала" до „на The / Race"). -->
-                        Прочетете оригинала<span v-if="article.source" class="whitespace-nowrap"> на {{ article.source }}</span><span aria-hidden="true">&nbsp;→</span>
-                        <span class="sr-only">(отваря се в нов раздел)</span>
-                    </a>
                 </div>
 
                 <!-- Абонамент — тук намерението е най-високо (човекът е дочел статията). -->
@@ -130,6 +127,16 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                         Обобщение на важното от кръга — на български, без спам.
                     </p>
                     <NewsletterForm source="article" class="mt-4" />
+                </section>
+
+                <!-- Свързаните новини втори път, само на телефон: aside-ът
+                     пада най-отдолу и на мобилен е след статия, бюлетин и
+                     коментари — тоест на практика невидим. -->
+                <section v-if="related.length" class="mt-10 lg:hidden">
+                    <h2 class="mb-3 font-display text-lg font-bold text-white">Още по темата</h2>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <NewsCard v-for="(item, i) in related.slice(0, 2)" :key="i" :item="item" />
+                    </div>
                 </section>
 
                 <!-- Коментари -->
@@ -161,13 +168,14 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
 
                     <form v-if="user" class="mt-5" @submit.prevent="submitComment">
                         <label for="comment-body" class="sr-only">Твоят коментар</label>
+                        <!-- text-base на телефон: под 16px iOS зумва при фокус. -->
                         <textarea
                             id="comment-body"
                             v-model="commentForm.body"
                             rows="3"
                             maxlength="2000"
                             placeholder="Кажи си мнението — уважително и по темата."
-                            class="mt-1 block w-full rounded-lg border-zinc-800 bg-zinc-950 text-sm text-white placeholder-zinc-500 transition focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
+                            class="mt-1 block w-full rounded-lg border-zinc-800 bg-zinc-950 text-base text-white placeholder-zinc-500 transition focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600 sm:text-sm"
                         />
                         <p v-if="commentForm.errors.body" class="mt-1 text-sm text-red-400">{{ commentForm.errors.body }}</p>
                         <div class="mt-3 flex items-center justify-between gap-3">
@@ -191,7 +199,7 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
             </article>
 
             <!-- Свързани новини -->
-            <aside v-if="related.length" class="lg:col-span-1">
+            <aside v-if="related.length" class="hidden lg:col-span-1 lg:block">
                 <h2 class="mb-3 font-display text-lg font-bold text-white">Свързани новини</h2>
                 <div class="grid gap-4">
                     <NewsCard v-for="(item, i) in related" :key="i" :item="item" />
