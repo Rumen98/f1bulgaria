@@ -123,6 +123,11 @@ return [
         'chat_id' => env('TELEGRAM_CHAT_ID'),
         'base_url' => env('TELEGRAM_BASE_URL', 'https://api.telegram.org'),
         'timeout' => (int) env('TELEGRAM_TIMEOUT', 15),
+        /*
+        | Линкът към Телеграм, който излиза във всяко бюлетинно писмо.
+        | Празна стойност скрива блока изцяло.
+        */
+        'community_url' => env('TELEGRAM_COMMUNITY_URL'),
     ],
 
     /*

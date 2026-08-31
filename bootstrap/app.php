@@ -32,6 +32,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature' => EnsureFeatureEnabled::class,
         ]);
 
+        // One-click отписване (RFC 8058): POST идва от пощенския доставчик,
+        // без сесия и без начин да носи CSRF токен. Защитата на тези два
+        // маршрута е самият токен, съответно подписаният URL.
+        $middleware->validateCsrfTokens(except: [
+            'newsletter/unsubscribe/*',
+            'newsletter/email-stop/*',
+        ]);
+
         // Скритата врата на /admin трябва да бяга ПРЕДИ auth middleware-а —
         // иначе priority сортирането пуска Authenticate пръв и гостите виждат
         // login redirect вместо 404.

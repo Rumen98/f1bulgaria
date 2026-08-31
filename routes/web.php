@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\BadgeSeenController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CircuitsController;
 use App\Http\Controllers\CommentsController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\F2Controller;
 use App\Http\Controllers\F2DriversController;
 use App\Http\Controllers\F2RaceController;
 use App\Http\Controllers\F2TeamsController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\GameLeaderboardController;
@@ -52,8 +54,10 @@ Route::get('/drivers/{slug}', [DriversController::class, 'show'])->name('drivers
 Route::get('/terminologiya', [TerminologyController::class, 'index'])->name('terminology');
 // Търсене из целия сайт. throttle пази LIKE заявките от скъп scan при
 // автоматизиран трафик — 30/мин е далеч над реалното човешко темпо.
+// Изричен префикс на кофата: голият 'throttle:N,M' се дели с всеки друг
+// гол рут и един бърст изчерпва лимита и на останалите.
 Route::get('/tarsene', SearchController::class)
-    ->middleware('throttle:30,1')
+    ->middleware('throttle:30,1,search')
     ->name('search');
 Route::get('/poveritelnost', [StaticPageController::class, 'privacy'])->name('privacy');
 Route::get('/usloviya', [StaticPageController::class, 'terms'])->name('terms');
@@ -118,24 +122,26 @@ Route::middleware('feature:game')->group(function () {
     // Класация: публична за четене (лилави рекорди за всички), запис само с
     // вход. Throttle-ната е като духа: панелът на всяка карта я вика често,
     // а гост без лимит удря 4 заявки към базата на всяко зареждане.
+    // Изрични префикси на кофите — голият 'throttle:N,M' дели една кофа с
+    // всеки друг гол рут (виж ThrottleBucketsTest).
     Route::get('/game/leaderboard/{track}', [GameLeaderboardController::class, 'show'])
-        ->middleware('throttle:60,1')
+        ->middleware('throttle:60,1,game-leaderboard')
         ->name('game.leaderboard');
     // Духът на потребител за дуел — публичен, както класацията. Границата на
     // id-то е и защита: неограничено [0-9]+ прелива PHP int → 500 за гост.
     Route::get('/game/ghost/{track}/{user}', [GameLeaderboardController::class, 'ghost'])
         ->where('user', '[0-9]{1,10}')
-        ->middleware('throttle:60,1')
+        ->middleware('throttle:60,1,game-ghost')
         ->name('game.ghost');
     Route::post('/game/lap', [GameLeaderboardController::class, 'store'])
-        ->middleware(['auth', 'throttle:30,1'])
+        ->middleware(['auth', 'throttle:30,1,game-lap'])
         ->name('game.lap.store');
 });
 
 Route::middleware('feature:quiz')->group(function () {
     Route::get('/quiz', [QuizController::class, 'index'])->name('quiz');
     Route::post('/quiz', [QuizController::class, 'score'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,quiz')
         ->name('quiz.score');
 });
 
@@ -146,12 +152,12 @@ Route::get('/news', [NewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [NewsController::class, 'show'])->name('news.show');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/news/{slug}/comments', [CommentsController::class, 'store'])
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:5,1,comments')
         ->name('news.comments.store');
     Route::delete('/comments/{comment}', [CommentsController::class, 'destroy'])->name('comments.destroy');
 });
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
-    ->middleware('throttle:5,1')
+    ->middleware('throttle:5,1,newsletter')
     ->name('newsletter.subscribe');
 // Legacy: линкове от стари потвърждаващи имейли (double opt-in е премахнат).
 Route::get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm'])->name('newsletter.confirm');
@@ -160,6 +166,15 @@ Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'uns
 Route::get('/newsletter/email-stop/{user}', [NewsletterController::class, 'userUnsubscribe'])
     ->middleware('signed')
     ->name('newsletter.user-unsubscribe');
+
+// One-click отписване (RFC 8058) — същите URI-та, но POST от пощенския
+// доставчик. List-Unsubscribe хедърът сочи именно тук, затова методите не
+// бива да искат сесия, CSRF токен или потвърждение от човек.
+Route::post('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribeOneClick'])
+    ->name('newsletter.unsubscribe.one-click');
+Route::post('/newsletter/email-stop/{user}', [NewsletterController::class, 'userUnsubscribeOneClick'])
+    ->middleware('signed')
+    ->name('newsletter.user-unsubscribe.one-click');
 Route::get('/profiles/{user}', [PublicProfileController::class, 'show'])->name('profiles.show');
 
 Route::get('/dashboard', [CalendarController::class, 'index'])
@@ -169,11 +184,28 @@ Route::get('/dashboard', [CalendarController::class, 'index'])
 // Изисква вход.
 Route::middleware('auth')->group(function () {
     Route::get('/predictions', [PredictionController::class, 'index'])->name('predictions.index');
+    // Тостът за нова значка маркира видяното. Кофата е широка нарочно:
+    // викането е по едно на затваряне, но нека не блокира при бърз клик.
+    Route::post('/badges/seen', BadgeSeenController::class)
+        ->middleware('throttle:30,1,badges-seen')
+        ->name('badges.seen');
     Route::post('/races/{race}/prediction', [PredictionController::class, 'store'])->name('predictions.store');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Обратна връзка — постоянна страница + карта-подкана в PublicLayout
+    // (SurveyPromptService решава кога се показва). Отговорите се четат във Filament.
+    // Throttle с изричен префикс: голият 'throttle:5,1' ползва ЕДНА кофа на
+    // потребител за всички рутове — спам по формата щеше да блокира и X-а на картата.
+    Route::get('/obratna-vrazka', [FeedbackController::class, 'show'])->name('feedback');
+    Route::post('/obratna-vrazka', [FeedbackController::class, 'store'])
+        ->middleware('throttle:5,1,feedback-store')
+        ->name('feedback.store');
+    Route::post('/obratna-vrazka/dismiss', [FeedbackController::class, 'dismiss'])
+        ->middleware('throttle:5,1,feedback-dismiss')
+        ->name('feedback.dismiss');
 });
 
 require __DIR__.'/auth.php';

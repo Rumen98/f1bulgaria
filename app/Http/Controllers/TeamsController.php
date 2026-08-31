@@ -11,6 +11,7 @@ use App\Models\Driver;
 use App\Models\Race;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
+use App\Services\Races\RaceNameLocalizer;
 use App\Services\Standings\StandingsService;
 use App\Services\Teams\TeamStatsService;
 use App\Support\BulgarianSort;
@@ -170,7 +171,10 @@ class TeamsController extends Controller
             ->limit(5)
             ->get()
             ->map(fn (Race $race) => [
-                'race' => $race->name,
+                'race' => app(RaceNameLocalizer::class)->localize($race->jolpica_id, $race->name),
+                // id и slug пътуват, за да станат редовете линкове — иначе
+                // страницата на отбор е сляпа улица към състезания и пилоти.
+                'race_id' => $race->id,
                 'date' => $race->race_datetime_utc?->copy()->setTimezone('Europe/Sofia')->format('d.m.Y'),
                 'points' => (float) $race->results->sum('points'),
                 'finishes' => $race->results
@@ -180,6 +184,7 @@ class TeamsController extends Controller
                         'driver' => $r->driver
                             ? DriverName::display($r->driver->slug, $r->driver->fullName())
                             : null,
+                        'slug' => $r->driver?->slug,
                         'position' => $r->position,
                     ])->values(),
             ]);

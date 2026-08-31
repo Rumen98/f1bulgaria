@@ -8,9 +8,11 @@ use App\Http\Resources\ConstructorResource;
 use App\Http\Resources\DriverResource;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Badges\BadgeService;
 use App\Services\Game\LeaderboardService as GameLeaderboardService;
 use App\Services\Predictions\LeaderboardService;
 use App\Services\Quiz\QuizProgressService;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -41,19 +43,39 @@ class PublicProfileController extends Controller
                 'favorite_constructor' => $user->favoriteConstructor
                     ? new ConstructorResource($user->favoriteConstructor)
                     : null,
-                'badges' => $user->badges->map(fn ($badge) => [
-                    'name' => $badge->name,
-                    'slug' => $badge->slug,
-                    'description' => $badge->description,
-                    'icon' => $badge->icon,
-                    'awarded_at' => $badge->pivot->awarded_at,
-                ]),
+                // Всички значки, не само спечелените: заключените показват какво
+                // има да се гони. Празният списък иначе не казва нищо.
+                'badges' => $this->badges($user),
             ],
             'stats' => $stats,
             'quiz' => $quiz->statsFor($user),
-            // Хронометърът: карани писти, първи места, най-силни времена.
             'game' => config('features.game') ? $game->profileStats($user) : null,
             'season' => $season?->year,
         ]);
+    }
+
+    /**
+     * Пълният набор значки със състояние „спечелена/заключена".
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function badges(User $user): array
+    {
+        $earned = $user->badges->keyBy('slug');
+
+        return collect(BadgeService::DEFINITIONS)
+            ->map(fn (array $definition, string $slug) => [
+                'slug' => $slug,
+                'name' => $definition['name'],
+                'description' => $definition['description'],
+                'earned' => $earned->has($slug),
+                'awarded_at' => ($at = $earned->get($slug)?->pivot->awarded_at) !== null
+                    ? Carbon::parse($at)->setTimezone('Europe/Sofia')->format('d.m.Y')
+                    : null,
+            ])
+            // Спечелените отпред, после заключените — по реда на дефиницията.
+            ->sortByDesc('earned')
+            ->values()
+            ->all();
     }
 }

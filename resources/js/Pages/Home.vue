@@ -1,19 +1,25 @@
 <script setup>
-import GameTeaserWidget from '@/Components/Homepage/GameTeaserWidget.vue';
 import HeroSection from '@/Components/Hero/HeroSection.vue';
 import ThisDayWidget from '@/Components/Homepage/ThisDayWidget.vue';
 import LiveSessionBanner from '@/Components/LiveSessionBanner.vue';
+import GameTeaserWidget from '@/Components/Homepage/GameTeaserWidget.vue';
+import FeaturedNewsCard from '@/Components/News/FeaturedNewsCard.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
+import MyLeagueStanding from '@/Components/Predictions/MyLeagueStanding.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { hasRoute } from '@/utils/routes';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
-defineProps({
+const props = defineProps({
     hero: { type: Object, required: true },
     liveSession: { type: Object, default: null },
     thisDay: { type: Array, default: () => [] },
     topNews: { type: Array, default: () => [] },
+    // null, ако човекът е гост, вече е прогнозирал или срокът е минал.
+    predictionCta: { type: Object, default: null },
+    // Огледалото му: позицията в лигата на вече прогнозиралия. null за гост.
+    me: { type: Object, default: null },
     gameTeaser: { type: Object, default: null },
 });
 
@@ -27,12 +33,16 @@ const allLinks = [
     { label: 'Пилоти', desc: 'Профили, статистика, head-to-head', route: 'drivers.index' },
     { label: 'Писти', desc: 'История и all-time класирания', route: 'circuits.index', feature: 'circuits' },
     { label: 'Сравни пилоти', desc: 'Двама пилоти един до друг', route: 'compare.index', feature: 'compare' },
-    { label: 'Съперничества', desc: 'Великите дуели в историята', route: 'rivalries.index', feature: 'rivalries' },
-    { label: 'Prediction League', desc: 'Познай и събирай точки', route: 'leaderboard' },
+    { label: 'Дуели', desc: 'Великите съперничества в историята', route: 'rivalries.index', feature: 'rivalries' },
+    { label: 'Прогнози', desc: 'Познай подиума и събирай точки', route: 'leaderboard' },
     { label: 'Куиз', desc: 'Провери познанията си за Формула 1.', route: 'quiz', feature: 'quiz' },
 ];
 
 const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.feature || features.value[l.feature])));
+
+// Първата новина идва най-важна от контролера и се показва като голяма карта.
+const featuredNews = computed(() => props.topNews[0] ?? null);
+const restNews = computed(() => props.topNews.slice(1));
 </script>
 
 <template>
@@ -43,6 +53,48 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
 
         <LiveSessionBanner v-if="features.live_timing" :session="liveSession" />
 
+        <!-- Подсещане за неподадена прогноза. Стои НАД hero-а нарочно: човекът,
+             който се връща, трябва да го види без да скролва. -->
+        <Link
+            v-if="predictionCta"
+            :href="predictionCta.url"
+            class="group mb-6 flex flex-col gap-3 rounded-2xl border border-red-600/40 bg-gradient-to-r from-red-600/15 to-transparent p-5 transition duration-200 hover:border-red-600/70 sm:flex-row sm:items-center sm:justify-between"
+        >
+            <div>
+                <!-- Пулсиращата точка е за подсещане (има срок, който тече).
+                     На гост нищо не му изтича — за него е покана, не аларма. -->
+                <div class="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-red-500">
+                    <span v-if="!predictionCta.guest" aria-hidden="true" class="relative flex h-1.5 w-1.5">
+                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                        <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+                    </span>
+                    {{ predictionCta.guest ? 'Лигата на прогнозите' : 'Не си прогнозирал' }}
+                </div>
+                <p class="mt-1.5 font-display text-lg font-black text-white sm:text-xl">
+                    {{ predictionCta.race }}
+                </p>
+                <p class="mt-0.5 text-sm text-zinc-400">
+                    <template v-if="predictionCta.guest">
+                        Познай подиума и събирай точки срещу останалите в Падок. Стигат три имена.
+                    </template>
+                    <template v-else>
+                        <template v-if="predictionCta.deadline">
+                            Заключва се {{ predictionCta.deadline }}<template v-if="predictionCta.days > 0"> — остават {{ predictionCta.days }} дни</template>.
+                        </template>
+                        Стигат ти три имена за подиума.
+                    </template>
+                </p>
+            </div>
+
+            <span class="shrink-0 rounded-lg bg-red-600 px-5 py-2.5 text-center font-semibold text-white transition group-hover:bg-red-500">
+                {{ predictionCta.guest ? 'Регистрирай се и играй' : 'Дай прогноза' }}
+            </span>
+        </Link>
+
+        <!-- Показва се само когато CTA-то мълчи: двете отговарят на един и същ
+             въпрос („какво е моето положение") от двете му страни. -->
+        <MyLeagueStanding v-if="me && !predictionCta" :me="me" class="mb-6" />
+
         <!-- Банер — визуален header над hero-а със състезанието -->
         <div class="relative mb-6 overflow-hidden rounded-2xl">
             <picture>
@@ -50,11 +102,13 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
                 <source media="(max-width: 767px)" srcset="/images/banners/hero/hero-750x800.jpg" type="image/jpeg" />
                 <source media="(max-width: 1279px)" srcset="/images/banners/hero/hero-1280x500.webp" type="image/webp" />
                 <source media="(max-width: 1279px)" srcset="/images/banners/hero/hero-1280x500.jpg" type="image/jpeg" />
-                <source media="(min-width: 1280px)" srcset="/images/banners/hero/hero-1920x600.webp" type="image/webp" />
+                <!-- Десктоп WebP нарочно го няма: hero-1920x600.webp е 212 KB,
+                     а JPG-ът, който щеше да замести — 193 KB. Другите два
+                     размера остават, там WebP е три пъти по-малък. -->
                 <img
                     src="/images/banners/hero/hero-1920x600.jpg"
                     alt="Падок — Формула 1 на български"
-                    class="block h-auto w-full object-cover"
+                    class="block h-[180px] w-full object-cover sm:h-auto"
                     loading="eager"
                     fetchpriority="high"
                     width="1920"
@@ -80,7 +134,6 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
         <!-- На този ден във Формула 1 (V2) -->
         <ThisDayWidget v-if="features.this_day" :events="thisDay" />
 
-        <!-- Хронометърът: пистата на уикенда + топ 3 времена -->
         <GameTeaserWidget v-if="gameTeaser" :teaser="gameTeaser" />
 
         <!-- Топ новини -->
@@ -91,8 +144,10 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
                     Всички новини →
                 </Link>
             </div>
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <NewsCard v-for="(item, i) in topNews" :key="i" :item="item" />
+            <FeaturedNewsCard v-if="featuredNews" :item="featuredNews" class="mb-4" />
+
+            <div v-if="restNews.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <NewsCard v-for="(item, i) in restNews" :key="i" :item="item" />
             </div>
         </section>
 

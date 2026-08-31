@@ -129,6 +129,16 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                     <NewsletterForm source="article" class="mt-4" />
                 </section>
 
+                <!-- Свързаните новини втори път, само на телефон: aside-ът
+                     пада най-отдолу и на мобилен е след статия, бюлетин и
+                     коментари — тоест на практика невидим. -->
+                <section v-if="related.length" class="mt-10 lg:hidden">
+                    <h2 class="mb-3 font-display text-lg font-bold text-white">Още по темата</h2>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <NewsCard v-for="(item, i) in related.slice(0, 2)" :key="i" :item="item" />
+                    </div>
+                </section>
+
                 <!-- Коментари -->
                 <section class="mt-10">
                     <h2 class="mb-4 font-display text-lg font-bold text-white">
@@ -158,13 +168,14 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
 
                     <form v-if="user" class="mt-5" @submit.prevent="submitComment">
                         <label for="comment-body" class="sr-only">Твоят коментар</label>
+                        <!-- text-base на телефон: под 16px iOS зумва при фокус. -->
                         <textarea
                             id="comment-body"
                             v-model="commentForm.body"
                             rows="3"
                             maxlength="2000"
                             placeholder="Кажи си мнението — уважително и по темата."
-                            class="mt-1 block w-full rounded-lg border-zinc-800 bg-zinc-950 text-sm text-white placeholder-zinc-500 transition focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
+                            class="mt-1 block w-full rounded-lg border-zinc-800 bg-zinc-950 text-base text-white placeholder-zinc-500 transition focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600 sm:text-sm"
                         />
                         <p v-if="commentForm.errors.body" class="mt-1 text-sm text-red-400">{{ commentForm.errors.body }}</p>
                         <div class="mt-3 flex items-center justify-between gap-3">
@@ -188,7 +199,7 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
             </article>
 
             <!-- Свързани новини -->
-            <aside v-if="related.length" class="lg:col-span-1">
+            <aside v-if="related.length" class="hidden lg:col-span-1 lg:block">
                 <h2 class="mb-3 font-display text-lg font-bold text-white">Свързани новини</h2>
                 <div class="grid gap-4">
                     <NewsCard v-for="(item, i) in related" :key="i" :item="item" />

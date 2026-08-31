@@ -8,7 +8,12 @@ import EmptyState from '@/Components/UI/EmptyState.vue';
 import SeasonSelect from '@/Components/UI/SeasonSelect.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { TEAM_COLOR_FALLBACK } from '@/utils/racing';
+import { hasRoute } from '@/utils/routes';
 import { Link, router } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
+const canOpenRace = computed(() => hasRoute('races.show'));
+const canOpenDriver = computed(() => hasRoute('drivers.show'));
 
 const props = defineProps({
     team: Object,
@@ -91,14 +96,30 @@ const goToSeason = (e) => {
                 <div v-else class="space-y-3">
                     <Card v-for="(r, i) in recentResults" :key="i">
                         <div class="flex items-center justify-between">
-                            <div class="font-semibold text-white">{{ r.race }}</div>
+                            <div class="font-semibold text-white">
+                                <Link
+                                    v-if="canOpenRace && r.race_id"
+                                    :href="route('races.show', r.race_id)"
+                                    class="transition hover:text-red-400"
+                                >
+                                    {{ r.race }}
+                                </Link>
+                                <span v-else>{{ r.race }}</span>
+                            </div>
                             <div class="text-sm font-bold tabular-nums text-red-500">{{ r.points }} т.</div>
                         </div>
                         <div class="mt-1 text-xs text-zinc-500">{{ r.date }}</div>
                         <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-300">
                             <span v-for="(f, j) in r.finishes" :key="j">
                                 <span class="font-bold tabular-nums" :class="f.position ? 'text-zinc-200' : 'text-red-500'">{{ f.position ? 'P' + f.position : 'DNF' }}</span>
-                                {{ f.driver }}
+                                <Link
+                                    v-if="canOpenDriver && f.slug"
+                                    :href="route('drivers.show', f.slug)"
+                                    class="transition hover:text-red-400"
+                                >
+                                    {{ f.driver }}
+                                </Link>
+                                <span v-else>{{ f.driver }}</span>
                             </span>
                         </div>
                     </Card>

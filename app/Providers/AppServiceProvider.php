@@ -10,6 +10,7 @@ use App\Support\Seo;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -49,5 +50,14 @@ class AppServiceProvider extends ServiceProvider
 
         // Одит лог на автентикацията (регистрации, влизания, изходи, неуспешни опити).
         Event::subscribe(AuthEventSubscriber::class);
+
+        // Глобален Reply-To на всяко изходящо писмо, включително Breeze
+        // нотификациите (нулиране на парола) — те не минават през Mailable
+        // класовете ни и биха останали без адрес за отговор.
+        $replyTo = (string) config('mail.reply_to.address', '');
+
+        if ($replyTo !== '') {
+            Mail::alwaysReplyTo($replyTo, config('mail.reply_to.name'));
+        }
     }
 }

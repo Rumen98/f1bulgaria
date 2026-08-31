@@ -1,9 +1,14 @@
 <script setup>
 import TableShell from '@/Components/UI/TableShell.vue';
+import { hasRoute } from '@/utils/routes';
+import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 defineProps({
     results: { type: Array, default: () => [] },
 });
+
+const canOpenRace = computed(() => hasRoute('races.show'));
 </script>
 
 <template>
@@ -26,7 +31,14 @@ defineProps({
                 <tbody class="divide-y divide-zinc-800">
                     <tr v-for="(r, i) in results" :key="i" class="bg-zinc-900/40 transition hover:bg-zinc-800/50">
                         <td class="px-4 py-2 text-zinc-200">
-                            {{ r.race }}
+                            <Link
+                                v-if="canOpenRace && r.race_id"
+                                :href="route('races.show', r.race_id)"
+                                class="transition hover:text-red-400"
+                            >
+                                {{ r.race }}
+                            </Link>
+                            <span v-else>{{ r.race }}</span>
                             <span v-if="r.fastest_lap" title="Най-бърза обиколка">🔥</span>
                         </td>
                         <td class="px-4 py-2 text-center font-bold tabular-nums" :class="r.position ? 'text-zinc-200' : 'text-red-500'">

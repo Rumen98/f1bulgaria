@@ -23,15 +23,30 @@
 @endcomponent
 @endif
 
+{{--
+    Получателят без токен е потребител с акаунт — за него единственото
+    действие, което има стойност, е прогнозата. Без обявен следващ кръг няма
+    за какво да се прогнозира, затова тогава падаме към календара.
+--}}
 @if ($unsubscribeToken === null)
+@if ($countdown)
+@component('mail::button', ['url' => route('predictions.index')])
+Дай прогноза за {{ $countdown['race'] }}
+@endcomponent
+
+Отнема по-малко от минута: топ 3, пол позиция, най-бърза обиколка. Прогнозите се заключват 5 минути преди квалификацията.
+@else
 @component('mail::button', ['url' => route('calendar')])
 Виж календара
 @endcomponent
+@endif
 @else
 @component('mail::button', ['url' => url('/register')])
 Включи се в prediction league
 @endcomponent
 @endif
+
+@include('mail.partials.community')
 
 До скоро на пистата!<br>
 Екипът на Падок

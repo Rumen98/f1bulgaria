@@ -1,4 +1,6 @@
 <script setup>
+import BadgeAwardToast from '@/Components/Profile/BadgeAwardToast.vue';
+import SurveyPromptCard from '@/Components/Feedback/SurveyPromptCard.vue';
 import FlagIcon from '@/Components/FlagIcon.vue';
 import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
 import { hasRoute } from '@/utils/routes';
@@ -8,6 +10,11 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
 const flashSuccess = computed(() => page.props.flash?.success);
+// Картата-подкана за обратна връзка (SurveyPromptService решава кога).
+// На /obratna-vrazka не се дублира с формата на самата страница.
+const showSurveyPrompt = computed(
+    () => Boolean(page.props.survey?.shouldPrompt) && !page.url.startsWith('/obratna-vrazka'),
+);
 
 // Основна навигация (винаги видима на десктоп) + справочна (под „Енциклопедия ▾").
 // Елементите с `feature` се показват само ако флагът е включен (config/features.php).
@@ -31,6 +38,7 @@ const secondaryNav = [
     { label: 'Отбори', route: 'teams.index' },
     { label: 'Пилоти', route: 'drivers.index' },
     { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
+    { label: 'Сравни', route: 'compare.index', feature: 'compare' },
     { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'История', route: 'history', feature: 'history' },
     { label: 'Речник', route: 'terminology' },
@@ -67,6 +75,7 @@ const footerColumns = computed(() => [
             { label: 'Пилоти', route: 'drivers.index' },
             { label: 'Отбори', route: 'teams.index' },
             { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
+            { label: 'Сравни', route: 'compare.index', feature: 'compare' },
             { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
             { label: 'История', route: 'history', feature: 'history' },
             { label: 'Речник', route: 'terminology' },
@@ -105,6 +114,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                         v-for="item in primary"
                         :key="item.route"
                         :href="route(item.route)"
+                        prefetch="hover"
                         class="group flex items-center gap-1 whitespace-nowrap text-[13px] font-medium text-zinc-400 transition duration-200 hover:text-white xl:text-sm"
                         :class="{ 'text-white': route().current(item.route) }"
                     >
@@ -185,10 +195,10 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
             </nav>
 
             <div v-show="mobileOpen" class="border-t border-zinc-800/80 lg:hidden">
-                <div class="mx-auto flex max-w-6xl flex-col px-4 py-2">
+                <div class="mx-auto flex max-w-6xl flex-col divide-y divide-zinc-800/50 px-4 py-1">
                     <Link
                         :href="route('search')"
-                        class="flex items-center gap-1.5 py-2 text-sm font-medium text-zinc-300 transition hover:text-white"
+                        class="flex min-h-[44px] items-center gap-1.5 py-3 text-sm font-medium text-zinc-300 transition hover:text-white"
                         @click="mobileOpen = false"
                     >
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -200,12 +210,23 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                         v-for="item in allItems"
                         :key="item.route"
                         :href="route(item.route)"
-                        class="flex items-center gap-1.5 py-2 text-sm font-medium text-zinc-300 transition hover:text-white"
+                        class="flex min-h-[44px] items-center gap-1.5 py-3 text-sm font-medium text-zinc-300 transition hover:text-white"
                         @click="mobileOpen = false"
                     >
                         <span v-if="item.live" class="h-2 w-2 rounded-full bg-red-600" />
                         {{ item.label }}
                         <FlagIcon v-if="item.flag" :code="item.flag" class="text-[11px]" />
+                    </Link>
+
+                    <!-- „Моите прогнози" е скрито под xl: в горната лента (мястото
+                         не стига) — на телефон обаче няма къде другаде да се хване. -->
+                    <Link
+                        v-if="user && hasRoute('predictions.index')"
+                        :href="route('predictions.index')"
+                        class="flex min-h-[44px] items-center gap-1.5 py-3 text-sm font-medium text-zinc-300 transition hover:text-white"
+                        @click="mobileOpen = false"
+                    >
+                        Моите прогнози
                     </Link>
                 </div>
             </div>
@@ -219,107 +240,121 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                 {{ flashSuccess }}
             </div>
 
+            <SurveyPromptCard v-if="showSurveyPrompt" class="mb-6" />
+
             <slot />
         </main>
 
         <footer class="mt-12 border-t border-zinc-800 py-8 text-center text-sm text-zinc-500">
-            <section class="relative mb-8 overflow-hidden rounded-2xl py-10 md:py-14">
-                <picture class="absolute inset-0 z-0">
-                    <source media="(max-width: 767px)" srcset="/images/banners/newsletter/newsletter-750x400.webp" type="image/webp" />
-                    <source media="(max-width: 767px)" srcset="/images/banners/newsletter/newsletter-750x400.jpg" type="image/jpeg" />
-                    <source media="(min-width: 768px)" srcset="/images/banners/newsletter/newsletter-1200x300.webp" type="image/webp" />
-                    <img
-                        src="/images/banners/newsletter/newsletter-1200x300.jpg"
-                        alt=""
-                        class="h-full w-full object-cover"
-                        loading="lazy"
-                        aria-hidden="true"
-                    />
-                </picture>
+            <!-- Същият контейнер като <main>: футърът е извън него и
+                 без този wrapper колоните и банерът лепнат за ръбовете
+                 на екрана на телефон. -->
+            <div class="mx-auto max-w-6xl px-4">
+                <section class="relative mb-8 overflow-hidden rounded-2xl py-10 md:py-14">
+                    <picture class="absolute inset-0 z-0">
+                        <source media="(max-width: 767px)" srcset="/images/banners/newsletter/newsletter-750x400.webp" type="image/webp" />
+                        <source media="(max-width: 767px)" srcset="/images/banners/newsletter/newsletter-750x400.jpg" type="image/jpeg" />
+                        <source media="(min-width: 768px)" srcset="/images/banners/newsletter/newsletter-1200x300.webp" type="image/webp" />
+                        <img
+                            src="/images/banners/newsletter/newsletter-1200x300.jpg"
+                            alt=""
+                            class="h-full w-full object-cover"
+                            loading="lazy"
+                            aria-hidden="true"
+                        />
+                    </picture>
 
-                <!-- Тъмен градиент за четимост на текста -->
-                <div class="absolute inset-0 z-10 bg-gradient-to-r from-black/90 via-black/70 to-black/40" />
+                    <!-- Тъмен градиент за четимост на текста -->
+                    <div class="absolute inset-0 z-10 bg-gradient-to-r from-black/90 via-black/70 to-black/40" />
 
-                <div class="relative z-20 mx-auto max-w-4xl px-6 text-left md:px-8">
-                    <h3 class="mb-2 font-display text-2xl font-bold text-white md:text-3xl">
-                        Не пропускай нито един уикенд от Формула 1
-                    </h3>
-                    <p class="mb-4 text-base text-white/85 md:mb-6 md:text-lg">
-                        Абонирай се за бюлетина — прегледи преди старта, резултати и анализи.
-                    </p>
-                    <NewsletterForm source="footer" />
+                    <div class="relative z-20 mx-auto max-w-4xl px-6 text-left md:px-8">
+                        <h3 class="mb-2 font-display text-2xl font-bold text-white md:text-3xl">
+                            Не пропускай нито един уикенд от Формула 1
+                        </h3>
+                        <p class="mb-4 text-base text-white/85 md:mb-6 md:text-lg">
+                            Абонирай се за бюлетина — прегледи преди старта, резултати и анализи.
+                        </p>
+                        <NewsletterForm source="footer" />
+                    </div>
+                </section>
+                <nav
+                    v-if="footerColumns.length"
+                    aria-label="Карта на сайта"
+                    class="mb-10 flex flex-wrap justify-center gap-x-14 gap-y-8 text-left"
+                >
+                    <div v-for="column in footerColumns" :key="column.heading" class="min-w-[7.5rem]">
+                        <h3 class="mb-3 font-display text-xs font-black uppercase tracking-[0.2em] text-zinc-500">
+                            {{ column.heading }}
+                        </h3>
+                        <ul class="space-y-2">
+                            <li v-for="item in column.items" :key="item.route">
+                                <Link :href="route(item.route)" class="text-sm text-zinc-400 transition hover:text-white">
+                                    {{ item.label }}
+                                </Link>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+
+                <p class="mx-auto max-w-xl">
+                    Падок — независима общност на българските фенове на Формула 1.
+                </p>
+                <p class="mx-auto mt-2 max-w-xl text-xs text-zinc-500">
+                    Падок е независим фен проект и не е свързан с Formula One Group, FIA или отборите.
+                    F1® и FORMULA 1® са търговски марки на Formula One Licensing BV.
+                </p>
+                <div class="mt-5 flex items-center justify-center gap-4">
+                    <a
+                        href="https://www.facebook.com/padokbg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Падок във Facebook"
+                        class="text-zinc-500 transition hover:text-white"
+                    >
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.5-3.92 3.79-3.92 1.1 0 2.24.2 2.24.2v2.47h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.45 2.91h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94Z" />
+                        </svg>
+                    </a>
+                    <a
+                        href="https://www.instagram.com/padokbg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Падок в Instagram"
+                        class="text-zinc-500 transition hover:text-white"
+                    >
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <rect x="3" y="3" width="18" height="18" rx="5" />
+                            <circle cx="12" cy="12" r="4" />
+                            <circle cx="17.2" cy="6.8" r="0.8" fill="currentColor" stroke="none" />
+                        </svg>
+                    </a>
+                    <a
+                        href="https://t.me/padokbg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Падок в Telegram"
+                        class="text-zinc-500 transition hover:text-white"
+                    >
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M12 0a12 12 0 1 0 0 24 12 12 0 0 0 0-24Zm4.906 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212-.07-.062-.174-.041-.249-.024-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635Z" />
+                        </svg>
+                    </a>
                 </div>
-            </section>
-            <nav
-                v-if="footerColumns.length"
-                aria-label="Карта на сайта"
-                class="mx-auto mb-10 grid max-w-3xl grid-cols-2 gap-x-6 gap-y-8 text-left sm:grid-cols-3"
-            >
-                <div v-for="column in footerColumns" :key="column.heading">
-                    <h3 class="mb-3 font-display text-xs font-black uppercase tracking-[0.2em] text-zinc-500">
-                        {{ column.heading }}
-                    </h3>
-                    <ul class="space-y-2">
-                        <li v-for="item in column.items" :key="item.route">
-                            <Link :href="route(item.route)" class="text-sm text-zinc-400 transition hover:text-white">
-                                {{ item.label }}
-                            </Link>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-
-            <p class="mx-auto max-w-xl">
-                Падок — независима общност на българските фенове на Формула 1.
-            </p>
-            <p class="mx-auto mt-2 max-w-xl text-xs text-zinc-500">
-                Падок е независим фен проект и не е свързан с Formula One Group, FIA или отборите.
-                F1® и FORMULA 1® са търговски марки на Formula One Licensing BV.
-            </p>
-            <div class="mt-5 flex items-center justify-center gap-4">
-                <a
-                    href="https://www.facebook.com/padokbg"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Падок във Facebook"
-                    class="text-zinc-500 transition hover:text-white"
-                >
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.5-3.92 3.79-3.92 1.1 0 2.24.2 2.24.2v2.47h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.45 2.91h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94Z" />
-                    </svg>
-                </a>
-                <a
-                    href="https://www.instagram.com/padokbg"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Падок в Instagram"
-                    class="text-zinc-500 transition hover:text-white"
-                >
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                        <rect x="3" y="3" width="18" height="18" rx="5" />
-                        <circle cx="12" cy="12" r="4" />
-                        <circle cx="17.2" cy="6.8" r="0.8" fill="currentColor" stroke="none" />
-                    </svg>
-                </a>
-                <a
-                    href="https://t.me/padokbg"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Падок в Telegram"
-                    class="text-zinc-500 transition hover:text-white"
-                >
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M12 0a12 12 0 1 0 0 24 12 12 0 0 0 0-24Zm4.906 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212-.07-.062-.174-.041-.249-.024-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635Z" />
-                    </svg>
-                </a>
+                <nav class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-zinc-500">
+                    <Link :href="route('privacy')" class="transition hover:text-zinc-300">Поверителност</Link>
+                    <span class="text-zinc-700" aria-hidden="true">·</span>
+                    <Link :href="route('terms')" class="transition hover:text-zinc-300">Условия за ползване</Link>
+                    <span class="text-zinc-700" aria-hidden="true">·</span>
+                    <Link :href="route('contact')" class="transition hover:text-zinc-300">Контакт</Link>
+                    <!-- Само за логнати — формата изисква акаунт, а гост би отскочил в login. -->
+                    <template v-if="user">
+                        <span class="text-zinc-700" aria-hidden="true">·</span>
+                        <Link :href="route('feedback')" class="transition hover:text-zinc-300">Обратна връзка</Link>
+                    </template>
+                </nav>
             </div>
-            <nav class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-zinc-500">
-                <Link :href="route('privacy')" class="transition hover:text-zinc-300">Поверителност</Link>
-                <span class="text-zinc-700" aria-hidden="true">·</span>
-                <Link :href="route('terms')" class="transition hover:text-zinc-300">Условия за ползване</Link>
-                <span class="text-zinc-700" aria-hidden="true">·</span>
-                <Link :href="route('contact')" class="transition hover:text-zinc-300">Контакт</Link>
-            </nav>
         </footer>
+
+        <BadgeAwardToast />
     </div>
 </template>

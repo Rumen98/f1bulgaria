@@ -90,4 +90,35 @@ else
     echo "  Провери: supervisorctl status padok-ssr; tail storage/logs/ssr.log"
 fi
 
+# --- Queue worker -------------------------------------------------------
+# Научено по трудния начин: на 30.07.2026 MySQL мигна за секунда, worker-ът
+# опита 5 рестарта в рамките на 2 секунди, systemd удари StartLimitBurst и се
+# отказа ЗАВИНАГИ. 13 дни всички бюлетини се трупаха в `jobs` — без грешка,
+# без ред в лога, а командите продължаваха да рапортуват „поставено в
+# опашката". Открихме го случайно. Затова се проверява при всеки деплой.
+#
+# Устойчивостта е в drop-in-а (RestartSec + StartLimitIntervalSec=0);
+# тук само крещим, ако все пак е паднал.
+echo "→ Проверка на queue worker-а"
+if systemctl is-active --quiet padok-queue; then
+    echo "  padok-queue работи ✓"
+else
+    echo "  ВНИМАНИЕ: padok-queue НЕ работи — нито едно писмо няма да излезе!"
+    echo "  Причина:  journalctl -u padok-queue -n 50 --no-pager"
+    echo "  Вдигане:  systemctl reset-failed padok-queue && systemctl start padok-queue"
+fi
+
+# „Процесът е жив" не значи „опашката се движи" — точно както при SSR.
+pending=$($ARTISAN tinker --execute 'echo DB::table("jobs")->count();' 2>/dev/null | tr -dc '0-9' || true)
+failed=$($ARTISAN tinker --execute 'echo DB::table("failed_jobs")->count();' 2>/dev/null | tr -dc '0-9' || true)
+echo "  Опашка: ${pending:-?} чакащи, ${failed:-?} провалени"
+
+if [ "${pending:-0}" -gt 50 ]; then
+    echo "  ВНИМАНИЕ: опашката е натрупана — worker-ът вероятно не дренира."
+fi
+
+if [ "${failed:-0}" -gt 0 ]; then
+    echo "  ВНИМАНИЕ: има провалени job-ове — виж ги с: php artisan queue:failed"
+fi
+
 echo "✓ Готово"

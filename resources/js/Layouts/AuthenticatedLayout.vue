@@ -1,4 +1,5 @@
 <script setup>
+import BadgeAwardToast from '@/Components/Profile/BadgeAwardToast.vue';
 import { ref } from 'vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
@@ -111,5 +112,7 @@ const showingNavigationDropdown = ref(false);
                 <slot />
             </main>
         </div>
+        <BadgeAwardToast />
+
     </div>
 </template>

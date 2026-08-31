@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Season;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -47,6 +48,33 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        return redirect($this->landingUrl());
+    }
+
+    /**
+     * Къде отива новорегистрираният.
+     *
+     * Не към `dashboard` (той е публичният календар и не иска нищо от човека),
+     * а към следващия кръг с отворени прогнози — формата е точно там и това е
+     * действието, заради което е дошъл. Ако няма отворен кръг, класирането
+     * поне показва играта.
+     */
+    private function landingUrl(): string
+    {
+        $season = Season::current();
+
+        if ($season !== null) {
+            $race = $season->races()
+                ->whereNotNull('qualifying_datetime_utc')
+                ->where('qualifying_datetime_utc', '>', now())
+                ->orderBy('qualifying_datetime_utc')
+                ->first();
+
+            if ($race !== null) {
+                return route('races.show', $race->id, absolute: false);
+            }
+        }
+
+        return route('leaderboard', absolute: false);
     }
 }

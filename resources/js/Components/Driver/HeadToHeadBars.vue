@@ -1,6 +1,10 @@
 <script setup>
 import { TEAM_COLOR_FALLBACK } from '@/utils/racing';
+import { hasRoute } from '@/utils/routes';
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
+
+const canOpenDriver = computed(() => hasRoute('drivers.show'));
 
 const props = defineProps({
     h2h: { type: Object, required: true },
@@ -22,8 +26,17 @@ const pct = (win, loss) => {
 <template>
     <div>
         <h2 class="mb-1 text-lg font-bold text-white">Срещу съотборника</h2>
-        <p class="mb-3 text-sm text-zinc-500">
-            {{ driverName }} <span class="text-zinc-600">срещу</span> {{ h2h.teammate ?? '—' }}
+        <!-- flex + gap, а не текстови възли: Vue свива празното пространство
+             между елементи с нов ред и имената се слепваха едно за друго. -->
+        <p class="mb-3 flex flex-wrap items-baseline gap-x-1.5 text-sm text-zinc-500">
+            <span>{{ driverName }}</span>
+            <span class="text-zinc-600">срещу</span>
+            <Link
+                v-if="canOpenDriver && h2h.teammate_slug"
+                :href="route('drivers.show', h2h.teammate_slug)"
+                class="text-zinc-300 transition hover:text-red-400"
+            >{{ h2h.teammate }}</Link>
+            <span v-else>{{ h2h.teammate ?? '—' }}</span>
             <span class="text-xs text-zinc-600">(квалификации по стартова позиция)</span>
         </p>
 

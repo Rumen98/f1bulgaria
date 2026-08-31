@@ -15,5 +15,8 @@ test('new users can register', function () {
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard', absolute: false));
+    // Не към `dashboard` (публичния календар), а към мястото с действие —
+    // следващия отворен кръг, или класирането, когато такъв няма.
+    // Пълното покритие на избора е в RegistrationLandingTest.
+    $response->assertRedirect(route('leaderboard', absolute: false));
 });

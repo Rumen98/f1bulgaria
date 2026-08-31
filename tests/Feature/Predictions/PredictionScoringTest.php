@@ -47,29 +47,37 @@ it('дава максимум точки за перфектна прогноз�
 
     $score = $prediction->score()->first();
 
-    // 25 + 18 + 15 + 10 (pole) + 10 (FL) + 10 (dnf) + 10 (SC) = 98
-    expect($score->points)->toBe(98)
-        ->and($score->breakdown_json['p1'])->toBe(25)
-        ->and($score->breakdown_json['pole'])->toBe(10)
-        ->and($score->breakdown_json['safety_car'])->toBe(10);
+    // Стойностите идват от конфига, не са забити: точковата схема се калибрира
+    // (виж ScoringBalanceTest), а този тест проверява логиката, не тегла.
+    $rules = config('predictions.scoring');
+    $max = array_sum($rules['exact'])
+        + $rules['pole'] + $rules['fastest_lap'] + $rules['dnf_exact'] + $rules['safety_car'];
+
+    expect($score->points)->toBe($max)
+        ->and($score->breakdown_json['p1'])->toBe($rules['exact']['p1'])
+        ->and($score->breakdown_json['pole'])->toBe($rules['pole'])
+        ->and($score->breakdown_json['safety_car'])->toBe($rules['safety_car']);
 });
 
 it('дава частични точки за пилот в топ 3 на грешна позиция и близък DNF', function () {
     $prediction = Prediction::factory()->create([
         'user_id' => User::factory(),
         'race_id' => $this->race->id,
-        'p1_driver_id' => $this->b->id,   // в подиума, грешна позиция → 5
-        'p2_driver_id' => $this->a->id,   // в подиума, грешна позиция → 5
+        'p1_driver_id' => $this->b->id,   // в подиума, грешна позиция → частично
+        'p2_driver_id' => $this->a->id,   // в подиума, грешна позиция → частично
         'p3_driver_id' => $this->d->id,   // извън подиума → 0
         'pole_driver_id' => $this->b->id, // грешен → 0
         'fastest_lap_driver_id' => $this->b->id, // грешен → 0
-        'dnf_count' => 2,                 // реално 1 → близо → 5
+        'dnf_count' => 2,                 // реално 1 → разлика 1 → близо
         'safety_car' => false,            // реално да → 0
     ]);
 
     app(PredictionScoringService::class)->scoreRace($this->race);
 
-    expect($prediction->score()->first()->points)->toBe(15);
+    $rules = config('predictions.scoring');
+
+    expect($prediction->score()->first()->points)
+        ->toBe(2 * $rules['podium_partial'] + $rules['dnf_close']);
 });
 
 it('не точкува докато няма резултати', function () {

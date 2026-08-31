@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasUnsubscribeHeaders;
 use App\Models\Race;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -13,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 class WeeklyDigestMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use HasUnsubscribeHeaders, Queueable, SerializesModels;
 
     /**
      * @param  array<int, array<string, mixed>>  $recap  подиум + ключови факти
@@ -23,6 +24,7 @@ class WeeklyDigestMail extends Mailable
      * @param  array<string, mixed>|null  $f2  Ф2 уикендът на Цолов (null скрива секцията)
      * @param  array<int, array{title:string, url:string}>  $news  топ новини от седмицата
      * @param  string|null  $userUnsubscribeUrl  signed линк за спиране на имейлите (само за потребители с акаунт)
+     * @param  array{name:string, url:string, deadline:string|null}|null  $nextRace  следващият кръг (null извън сезона)
      * @param  array{points:int, available:int, remaining:int}|null  $quiz  прогрес в куиза (null скрива секцията)
      */
     public function __construct(
@@ -34,6 +36,7 @@ class WeeklyDigestMail extends Mailable
         public ?array $f2 = null,
         public array $news = [],
         public ?string $userUnsubscribeUrl = null,
+        public ?array $nextRace = null,
         public ?array $quiz = null,
     ) {}
 

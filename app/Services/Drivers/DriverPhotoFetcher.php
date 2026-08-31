@@ -99,8 +99,18 @@ class DriverPhotoFetcher
             return null;
         }
 
-        // Пълен размер, иначе по-малкият thumbnail.
-        return $response->json('originalimage.source')
-            ?? $response->json('thumbnail.source');
+        // Thumbnail с вдигнат размер, а НЕ originalimage: оригиналите от
+        // Wikipedia стигат мегабайти (Verstappen е 3,2 MB) за кутия от 160px.
+        // По-важното — същият файл отива като og:image, а скрейпърите на
+        // Facebook и Viber отхвърлят големи изображения, което чупи
+        // споделянето, а то е основният канал за нови хора.
+        $thumb = $response->json('thumbnail.source');
+
+        if (is_string($thumb) && $thumb !== '') {
+            // Wikipedia кодира ширината в самия път: /320px-Име.jpg
+            return preg_replace('#/\d+px-#', '/640px-', $thumb) ?? $thumb;
+        }
+
+        return $response->json('originalimage.source');
     }
 }

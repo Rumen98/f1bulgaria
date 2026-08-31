@@ -6,6 +6,7 @@ namespace App\Http\Resources;
 
 use App\Models\Race;
 use App\Services\Races\RaceNameLocalizer;
+use App\Support\DriverName;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
@@ -41,6 +42,18 @@ class RaceResource extends JsonResource
             // към час в миналото.
             'held' => $this->race_datetime_utc?->isPast() ?? false,
             'finished' => $this->whenLoaded('results', fn () => $this->results->isNotEmpty()),
+            // Победителят, готов за показване — календарът иначе показваше
+            // само дата и име на кръга за вече минали състезания.
+            'winner' => $this->whenLoaded('results', function () {
+                $first = $this->results->firstWhere('position', 1);
+
+                return $first?->driver === null ? null : [
+                    'name' => DriverName::display($first->driver->slug, $first->driver->fullName()),
+                    'slug' => $first->driver->slug,
+                    'team' => $first->driver->constructor?->name,
+                    'color' => $first->driver->constructor?->color_hex,
+                ];
+            }),
             'sessions' => RaceSessionResource::collection($this->whenLoaded('sessions')),
             'results' => ResultResource::collection($this->whenLoaded('results')),
             'pole_driver' => new DriverResource($this->whenLoaded('poleDriver')),

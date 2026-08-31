@@ -31,6 +31,8 @@
              без "head" ключ → 500. SsrSmokeTest го включва изрично. -->
         <env name="INERTIA_SSR_ENABLED" value="false"/>
         <env name="MAIL_MAILER" value="array"/>
+        <env name="MAIL_FROM_ADDRESS" value="novini@padok.bg"/>
+        <env name="MAIL_REPLY_TO_ADDRESS" value="padokbg@gmail.com"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

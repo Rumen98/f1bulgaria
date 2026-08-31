@@ -16,8 +16,10 @@ use App\Models\TeamNewsItem;
 use App\Models\User;
 use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Predictions\LeaderboardService;
+use App\Services\Predictions\PredictionLockService;
 use App\Services\Quiz\QuizProgressService;
 use App\Support\DriverName;
+use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Mail;
@@ -46,8 +48,15 @@ class WeeklyDigestCommand extends Command
     /** Slug на Цолов в `f2_drivers` — Ф2 секцията следи неговия уикенд. */
     private const TSOLOV_SLUG = 'nikola-tsolov';
 
-    public function handle(LeaderboardService $leaderboard, NewsletterAudience $audience, QuizProgressService $quizProgress): int
-    {
+    /** Съкратени имена на дните, индекс = Carbon dayOfWeek (0 = неделя). */
+    private const WEEKDAYS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+    public function handle(
+        LeaderboardService $leaderboard,
+        NewsletterAudience $audience,
+        PredictionLockService $locks,
+        QuizProgressService $quizProgress,
+    ): int {
         $season = Season::current();
 
         if ($season === null) {
@@ -86,6 +95,7 @@ class WeeklyDigestCommand extends Command
         $board = $fullBoard->take(10)->values()->all();
         $f2 = $this->buildF2Recap();
         $news = $this->buildTopNews();
+        $nextRace = $this->buildNextRace($race, $locks);
 
         $recipients = $audience->users();
 
@@ -100,6 +110,7 @@ class WeeklyDigestCommand extends Command
                 f2: $f2,
                 news: $news,
                 userUnsubscribeUrl: URL::signedRoute('newsletter.user-unsubscribe', ['user' => $user->id]),
+                nextRace: $nextRace,
                 quiz: $this->quizProgress($quizProgress, $user),
             ));
         }
@@ -117,12 +128,51 @@ class WeeklyDigestCommand extends Command
                 unsubscribeToken: $subscriber->unsubscribe_token,
                 f2: $f2,
                 news: $news,
+                nextRace: $nextRace,
             ));
         }
 
         $this->info("Дайджестът е поставен в опашката: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Следващият кръг след рекапирания. Неделя 20:00 е върхът на вниманието
+     * за седмицата — без този блок писмото приключва с класиране, а поканата
+     * за следващата прогноза идва чак в петъчното preview, когато интересът
+     * вече е спаднал.
+     *
+     * @return array{name:string, url:string, deadline:string|null}|null
+     */
+    private function buildNextRace(Race $race, PredictionLockService $locks): ?array
+    {
+        $next = Race::query()
+            ->where('season_id', $race->season_id)
+            ->where('race_datetime_utc', '>', $race->race_datetime_utc)
+            ->orderBy('race_datetime_utc')
+            ->first();
+
+        if ($next === null) {
+            return null;
+        }
+
+        $deadline = $locks->lockDeadline($next);
+
+        return [
+            'name' => $next->name_bg,
+            'url' => route('races.show', $next),
+            // Изминал срок не се показва: спринтов уикенд може да заключи
+            // прогнозите преди неделния пуск на следващия рекап.
+            'deadline' => $deadline?->isFuture() ? $this->sofia($deadline) : null,
+        ];
+    }
+
+    private function sofia(CarbonInterface $utc): string
+    {
+        $sofia = $utc->copy()->setTimezone('Europe/Sofia');
+
+        return self::WEEKDAYS[(int) $sofia->dayOfWeek].', '.$sofia->format('d.m').' — '.$sofia->format('H:i').' ч.';
     }
 
     private function resolveRace(Season $season): ?Race

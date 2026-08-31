@@ -9,6 +9,7 @@ use App\Models\Driver;
 use App\Models\Result;
 use App\Models\Season;
 use App\Services\Drivers\DriverStatsService;
+use App\Services\Races\RaceNameLocalizer;
 use App\Services\Standings\StandingsService;
 use App\Support\CountryFlag;
 use App\Support\DriverName;
@@ -117,12 +118,20 @@ class DriversController extends Controller
                 ->sortByDesc(fn (Result $r) => $r->race?->race_datetime_utc)
                 ->take(10)
                 ->map(fn (Result $r) => [
-                    'race' => $r->race?->name,
+                    // Българското име и id-то на кръга: дотук таблицата
+                    // показваше английско име и не водеше никъде.
+                    'race' => $r->race
+                        ? app(RaceNameLocalizer::class)->localize($r->race->jolpica_id, $r->race->name)
+                        : null,
+                    'race_id' => $r->race?->id,
                     'position' => $r->position,
                     'points' => (float) $r->points,
                     'fastest_lap' => $r->fastest_lap,
                 ])->values()
             : collect();
+
+        // Един и същ набор се подава под две имена — изчисляваме го веднъж.
+        $allTimeStats = $this->stats->getStatsForCanonical($canonical);
 
         return Inertia::render('Drivers/Show', [
             'driver' => [
@@ -144,13 +153,13 @@ class DriversController extends Controller
             'selectedSeason' => $selectedYear,
             'isHistorical' => ! $canonical->is_active,
             'seasonStats' => $driver && $statsSeason ? $this->stats->getSeasonStats($driver, $statsSeason) : null,
-            'allTimeStats' => $this->stats->getStatsForCanonical($canonical),
-            'achievements' => $this->stats->getStatsForCanonical($canonical),
+            'allTimeStats' => $allTimeStats,
+            'achievements' => $allTimeStats,
             'circuitWins' => $this->stats->getCircuitWinsForCanonical($canonical),
             'careerTimeline' => $this->stats->getCareerTimelineForCanonical($canonical),
             'headToHead' => $driver && $statsSeason
                 ? $this->stats->getHeadToHeadVsTeammate($driver, $statsSeason)
-                : ['teammate' => null, 'race_wins' => 0, 'race_losses' => 0, 'quali_wins' => 0, 'quali_losses' => 0],
+                : ['teammate' => null, 'teammate_slug' => null, 'race_wins' => 0, 'race_losses' => 0, 'quali_wins' => 0, 'quali_losses' => 0],
             'recentResults' => $recent,
         ]);
     }

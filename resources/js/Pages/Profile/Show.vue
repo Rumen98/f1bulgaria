@@ -1,15 +1,22 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
+import BadgeCard from '@/Components/Profile/BadgeCard.vue';
+import { hasRoute } from '@/utils/routes';
 import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-defineProps({
+const props = defineProps({
     profile: Object,
     stats: Object,
     quiz: { type: Object, default: () => ({ points: 0, available: 0, attempts: 0 }) },
     game: { type: Object, default: null },
     season: Number,
 });
+
+const canOpenDriver = computed(() => hasRoute('drivers.show'));
+const canOpenTeam = computed(() => hasRoute('teams.show'));
+const earnedBadges = computed(() => (props.profile.badges ?? []).filter((b) => b.earned).length);
 
 const formatLap = (ms) => {
     const minutes = Math.floor(ms / 60000);
@@ -33,11 +40,25 @@ const formatLap = (ms) => {
                     <dl class="mt-4 space-y-1 text-sm text-zinc-400">
                         <div v-if="profile.favorite_driver">
                             <dt class="inline font-medium text-zinc-300">Любим пилот:</dt>
-                            {{ profile.favorite_driver.full_name }}
+                            <Link
+                                v-if="canOpenDriver && profile.favorite_driver.slug"
+                                :href="route('drivers.show', profile.favorite_driver.slug)"
+                                class="transition hover:text-red-400"
+                            >
+                                {{ profile.favorite_driver.full_name }}
+                            </Link>
+                            <span v-else>{{ profile.favorite_driver.full_name }}</span>
                         </div>
                         <div v-if="profile.favorite_constructor">
                             <dt class="inline font-medium text-zinc-300">Любим отбор:</dt>
-                            {{ profile.favorite_constructor.name }}
+                            <Link
+                                v-if="canOpenTeam && profile.favorite_constructor.slug"
+                                :href="route('teams.show', profile.favorite_constructor.slug)"
+                                class="transition hover:text-red-400"
+                            >
+                                {{ profile.favorite_constructor.name }}
+                            </Link>
+                            <span v-else>{{ profile.favorite_constructor.name }}</span>
                         </div>
                     </dl>
                 </div>
@@ -121,22 +142,17 @@ const formatLap = (ms) => {
                 </div>
 
                 <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
-                    <h2 class="mb-4 font-display text-lg font-bold text-white">Значки</h2>
-                    <div v-if="profile.badges.length === 0" class="text-sm text-zinc-500">
-                        Все още няма спечелени значки.
+                    <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                        <h2 class="font-display text-lg font-bold text-white">Значки</h2>
+                        <span class="text-sm tabular-nums text-zinc-500">{{ earnedBadges }} / {{ profile.badges.length }}</span>
                     </div>
-                    <div v-else class="flex flex-wrap gap-3">
-                        <div
-                            v-for="badge in profile.badges"
-                            :key="badge.slug"
-                            class="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-sm"
-                            :title="badge.description"
-                        >
-                            <span aria-hidden="true">🏅</span>
-                            <span class="font-medium text-amber-300">{{ badge.name }}</span>
-                            <span class="sr-only">{{ badge.description }}</span>
-                        </div>
-                    </div>
+
+                    <!-- Карти вместо пилюли: условието за печелене стои видимо
+                         под всяка значка. Дотук беше само в title tooltip, който
+                         на телефон не съществува. -->
+                    <ul class="grid gap-3 sm:grid-cols-2">
+                        <BadgeCard v-for="badge in profile.badges" :key="badge.slug" :badge="badge" />
+                    </ul>
                 </div>
             </div>
         </div>

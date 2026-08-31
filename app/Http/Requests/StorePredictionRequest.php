@@ -27,14 +27,18 @@ class StorePredictionRequest extends FormRequest
         $driverExists = Rule::exists('drivers', 'id')
             ->where('season_id', $race->season_id);
 
+        // Задължителен е само подиумът — него го познава всеки, който гледа
+        // неделя. Pole, най-бърза обиколка, DNF и safety car искат човек, който
+        // следи тренировките; като задължителни те отказваха случайния фен още
+        // преди да е стигнал до бутона.
         return [
             'p1_driver_id' => ['required', 'integer', $driverExists, 'different:p2_driver_id', 'different:p3_driver_id'],
             'p2_driver_id' => ['required', 'integer', $driverExists, 'different:p3_driver_id'],
             'p3_driver_id' => ['required', 'integer', $driverExists],
-            'pole_driver_id' => ['required', 'integer', $driverExists],
-            'fastest_lap_driver_id' => ['required', 'integer', $driverExists],
-            'dnf_count' => ['required', 'integer', 'min:0', 'max:20'],
-            'safety_car' => ['required', 'boolean'],
+            'pole_driver_id' => ['nullable', 'integer', $driverExists],
+            'fastest_lap_driver_id' => ['nullable', 'integer', $driverExists],
+            'dnf_count' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'safety_car' => ['nullable', 'boolean'],
         ];
     }
 

@@ -96,7 +96,32 @@ class User extends Authenticatable implements FilamentUser
     public function badges(): BelongsToMany
     {
         return $this->belongsToMany(Badge::class)
-            ->withPivot('awarded_at')
+            ->withPivot('awarded_at', 'seen_at')
+            ->withTimestamps();
+    }
+
+    /** @return HasMany<SurveyResponse, $this> */
+    public function surveyResponses(): HasMany
+    {
+        return $this->hasMany(SurveyResponse::class);
+    }
+
+    /** @return HasMany<QuizAttempt, $this> */
+    public function quizAttempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class);
+    }
+
+    /**
+     * Въпросите, на които потребителят вече е отговорил вярно поне веднъж.
+     * Броят им е точките му в куиза.
+     *
+     * @return BelongsToMany<QuizQuestion, $this>
+     */
+    public function masteredQuizQuestions(): BelongsToMany
+    {
+        return $this->belongsToMany(QuizQuestion::class, 'quiz_question_user')
+            ->withPivot('first_correct_at')
             ->withTimestamps();
     }
 
