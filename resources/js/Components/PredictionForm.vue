@@ -38,7 +38,9 @@ const podiumComplete = computed(() =>
     Boolean(form.p1_driver_id && form.p2_driver_id && form.p3_driver_id),
 );
 
-const fieldClass = 'mt-1 block w-full rounded-lg border-zinc-800 bg-zinc-950 text-sm text-white placeholder-zinc-500 transition focus:border-red-600 focus:ring-1 focus:ring-red-600 disabled:opacity-50';
+// text-base на телефон: под 16px Safari зумва при фокус и изхвърля
+// потребителя от контекста. От sm: нагоре се връщаме на компактния размер.
+const fieldClass = 'mt-1 block w-full rounded-lg border-zinc-800 bg-zinc-950 text-base text-white placeholder-zinc-500 transition focus:border-red-600 focus:ring-1 focus:ring-red-600 disabled:opacity-50 sm:text-sm';
 
 const submit = () => {
     form.post(route('predictions.store', props.raceId), {

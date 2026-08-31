@@ -77,12 +77,14 @@ it('бърст по забравена парола не изчерпва thrott
     $this->post(route('password.email'), ['email' => 'sedmi@example.bg'])
         ->assertTooManyRequests();
 
+    // Целта на теста е кофата, не дестинацията: регистрацията вече води към
+    // следващия отворен кръг, а без сезон в базата — към класирането.
     $this->post('/register', [
         'name' => 'Нов Фен',
         'email' => 'nov-fen@example.bg',
         'password' => 'password',
         'password_confirmation' => 'password',
-    ])->assertRedirect(route('dashboard', absolute: false));
+    ])->assertRedirect(route('leaderboard', absolute: false));
 
     $this->assertAuthenticated();
 });

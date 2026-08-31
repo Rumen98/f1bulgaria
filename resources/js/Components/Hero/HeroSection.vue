@@ -1,11 +1,24 @@
 <script setup>
 import Card from '@/Components/UI/Card.vue';
 import { useCountdown } from '@/composables/useCountdown';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
     hero: { type: Object, required: true },
+});
+
+// „Вижте детайли" не казва какво следва и е на „вие", а останалият сайт е на
+// „ти". Текстът се сменя според това какво липсва на човека.
+const currentUser = computed(() => usePage().props.auth?.user ?? null);
+const ctaLabel = computed(() => {
+    // Наличен победител значи, че кръгът е приключил — тогава на човека му
+    // трябват резултатите, не форма за прогноза.
+    if (props.hero?.winner) {
+        return 'Виж резултатите →';
+    }
+
+    return currentUser.value ? 'Подай прогноза →' : 'Прогнозирай подиума →';
 });
 
 // Raw SVG-та на пистите (Vite ги inline-ва като стрингове).
@@ -61,12 +74,12 @@ const countdownText = computed(() => {
     <section class="overflow-hidden rounded-2xl bg-[#0a0a0a] text-white shadow-xl">
         <div class="grid lg:grid-cols-2">
             <!-- Писта -->
-            <div class="relative flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-6 lg:p-10">
+            <div class="relative order-2 flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-6 lg:order-1 lg:p-10">
                 <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(225,6,0,0.18),transparent_60%)]" />
                 <div
                     v-if="trackSvg"
                     aria-hidden="true"
-                    class="relative w-full text-zinc-200 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-h-[50vh] [&_svg]:w-auto [&_svg]:max-w-full"
+                    class="relative w-full text-zinc-200 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-h-[24vh] [&_svg]:w-auto [&_svg]:max-w-full lg:[&_svg]:max-h-[50vh]"
                     v-html="trackSvg"
                 />
                 <div v-else class="relative flex h-44 w-full items-center justify-center rounded-lg border border-dashed border-zinc-700 text-zinc-500">
@@ -75,7 +88,7 @@ const countdownText = computed(() => {
             </div>
 
             <!-- Информация -->
-            <div class="flex flex-col justify-center gap-5 p-6 lg:p-12">
+            <div class="order-1 flex flex-col justify-center gap-5 p-6 lg:order-2 lg:p-12">
                 <div>
                     <div class="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">{{ kicker }}</div>
                     <h2 class="mt-2 font-display text-3xl font-black leading-tight sm:text-4xl">
@@ -116,7 +129,7 @@ const countdownText = computed(() => {
                         :href="route('races.show', hero.race.id)"
                         class="inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-500"
                     >
-                        Вижте детайли →
+                        {{ ctaLabel }}
                     </Link>
                 </div>
             </div>

@@ -19,25 +19,49 @@ it('има nullable колона photo_url в drivers', function () {
     expect(Schema::hasColumn('drivers', 'photo_url'))->toBeTrue();
 });
 
-it('връща originalimage source когато заглавието съществува', function () {
+it('предпочита thumbnail пред originalimage', function () {
+    // Оригиналите от Wikipedia стигат мегабайти (Verstappen е 3,2 MB) за кутия
+    // от 160px, а същият файл отива и като og:image — скрейпърите на Facebook
+    // и Viber отхвърлят големи изображения и споделянето се чупи.
     Http::fake(['*/page/summary/*' => Http::response([
         'originalimage' => ['source' => 'https://upload.wikimedia.org/max.jpg'],
-        'thumbnail' => ['source' => 'https://upload.wikimedia.org/max_thumb.jpg'],
+        'thumbnail' => ['source' => 'https://upload.wikimedia.org/320px-max_thumb.jpg'],
     ])]);
 
     $driver = Driver::factory()->create(['first_name' => 'Max', 'last_name' => 'Verstappen']);
 
-    expect(fetcher()->fetch($driver))->toBe('https://upload.wikimedia.org/max.jpg');
+    expect(fetcher()->fetch($driver))->toBe('https://upload.wikimedia.org/640px-max_thumb.jpg');
 });
 
-it('пада към thumbnail когато няма originalimage', function () {
+it('вдига ширината на thumbnail-а до 640px', function () {
     Http::fake(['*/page/summary/*' => Http::response([
-        'thumbnail' => ['source' => 'https://upload.wikimedia.org/thumb.jpg'],
+        'thumbnail' => ['source' => 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/b/Foo.jpg/220px-Foo.jpg'],
     ])]);
 
     $driver = Driver::factory()->create(['first_name' => 'Lando', 'last_name' => 'Norris']);
 
+    expect(fetcher()->fetch($driver))
+        ->toBe('https://upload.wikimedia.org/wikipedia/commons/thumb/a/b/Foo.jpg/640px-Foo.jpg');
+});
+
+it('оставя thumbnail без ширина в пътя непокътнат', function () {
+    Http::fake(['*/page/summary/*' => Http::response([
+        'thumbnail' => ['source' => 'https://upload.wikimedia.org/thumb.jpg'],
+    ])]);
+
+    $driver = Driver::factory()->create(['first_name' => 'Charles', 'last_name' => 'Leclerc']);
+
     expect(fetcher()->fetch($driver))->toBe('https://upload.wikimedia.org/thumb.jpg');
+});
+
+it('пада към originalimage когато няма thumbnail', function () {
+    Http::fake(['*/page/summary/*' => Http::response([
+        'originalimage' => ['source' => 'https://upload.wikimedia.org/only-original.jpg'],
+    ])]);
+
+    $driver = Driver::factory()->create(['first_name' => 'George', 'last_name' => 'Russell']);
+
+    expect(fetcher()->fetch($driver))->toBe('https://upload.wikimedia.org/only-original.jpg');
 });
 
 it('връща null когато статията не съществува', function () {

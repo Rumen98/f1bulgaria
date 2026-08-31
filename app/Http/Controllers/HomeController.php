@@ -6,12 +6,14 @@ namespace App\Http\Controllers;
 
 use App\Enums\NewsStatus;
 use App\Models\RaceSession;
+use App\Models\Season;
 use App\Models\TeamNewsItem;
 use App\Services\Hero\HeroRaceContext;
 use App\Services\Hero\NextRaceResolver;
 use App\Services\Homepage\ThisDayInF1Service;
 use App\Services\LiveTiming\OpenF1Client;
 use App\Services\LiveTiming\OpenF1TokenManager;
+use App\Services\Predictions\LeaderboardService;
 use App\Services\Predictions\PredictionLockService;
 use App\Services\Races\RaceNameLocalizer;
 use App\Support\DriverName;
@@ -28,6 +30,7 @@ class HomeController extends Controller
         OpenF1Client $openF1,
         OpenF1TokenManager $tokens,
         PredictionLockService $locks,
+        LeaderboardService $leaderboard,
     ): Response {
         $hero = $resolver->resolve();
 
@@ -37,7 +40,47 @@ class HomeController extends Controller
             'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
             'topNews' => $this->topNews(),
             'predictionCta' => $this->predictionCta($hero, $locks),
+            // Не е optional/defer нарочно: и двете биха го скрили при първо
+            // зареждане, а смисълът му е да се види веднага. Гостът не плаща —
+            // me() излиза с null преди която и да е заявка.
+            'me' => $this->me($leaderboard),
         ]);
+    }
+
+    /**
+     * Личното състояние на влезлия: къде е в лигата и с колко точки.
+     *
+     * Допълва predictionCta, а не го дублира — CTA-то се показва, когато НЯМА
+     * прогноза, това се показва, когато има. Дотук влезлият виждаше точно
+     * същата начална страница като анонимния.
+     *
+     * @return array{rank:?int, players:int, points:int, predictions:int}|null
+     */
+    private function me(LeaderboardService $leaderboard): ?array
+    {
+        $user = request()->user();
+        $season = Season::current();
+
+        if ($user === null || $season === null) {
+            return null;
+        }
+
+        $stats = $leaderboard->userStats($user, $season);
+
+        // Никога неигралият няма позиция — за него CTA-то върши работа.
+        if ($stats['predictions'] === 0) {
+            return null;
+        }
+
+        $board = $leaderboard->forSeason($season);
+        $entry = $board->first(fn (array $row) => $row['user']->id === $user->id);
+
+        return [
+            'rank' => $entry['position'] ?? null,
+            'players' => $board->count(),
+            'points' => $stats['points'],
+            'predictions' => $stats['predictions'],
+        ];
     }
 
     /**
@@ -88,6 +131,13 @@ class HomeController extends Controller
      */
     private function liveSession(OpenF1Client $openF1, OpenF1TokenManager $tokens): ?array
     {
+        // При изключен флаг банерът дори не се рендира (виж Home.vue), а
+        // заявката е в рендер пътя: при авария на OpenF1 всеки посетител на
+        // началната плаща таймаута. Проверката е първа нарочно.
+        if (! config('features.live_timing')) {
+            return null;
+        }
+
         // Без OpenF1 кредитали live достъпът е блокиран по време на сесии (401),
         // затова не правим излишна заявка на всяко зареждане на началната страница.
         if (! $tokens->hasCredentials()) {
@@ -112,6 +162,10 @@ class HomeController extends Controller
             ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
             ->whereNotNull('title_bg')
             ->with('constructor')
+            // Най-важната първо: началната я показва като голяма карта,
+            // останалите като решетка. Дотук всичките шест бяха еднакви и
+            // окото нямаше къде да се закачи.
+            ->orderByDesc('importance_score')
             ->orderByDesc('published_at')
             ->limit(6)
             ->get()

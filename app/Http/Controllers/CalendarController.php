@@ -23,7 +23,16 @@ class CalendarController extends Controller
         $season = Season::current();
 
         $races = $season
-            ? $season->races()->with(['results', 'sessions'])->orderBy('round')->get()
+            ? $season->races()
+                ->with([
+                    // Само състезателната сесия и пилотът с отбора му:
+                    // календарът показва победителя, а без релацията
+                    // ResultResource нямаше как да го назове.
+                    'results' => fn ($q) => $q->where('session_type', 'race')->with('driver.constructor'),
+                    'sessions',
+                ])
+                ->orderBy('round')
+                ->get()
             : collect();
 
         return Inertia::render('Races/Calendar', [

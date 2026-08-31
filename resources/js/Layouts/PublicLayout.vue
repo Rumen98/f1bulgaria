@@ -36,6 +36,7 @@ const secondaryNav = [
     { label: 'Отбори', route: 'teams.index' },
     { label: 'Пилоти', route: 'drivers.index' },
     { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
+    { label: 'Сравни', route: 'compare.index', feature: 'compare' },
     { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'История', route: 'history', feature: 'history' },
     { label: 'Речник', route: 'terminology' },
@@ -51,6 +52,43 @@ const visible = (i) => hasRoute(i.route) && (!i.feature || features.value[i.feat
 const primary = computed(() => primaryNav.filter(visible));
 const secondary = computed(() => secondaryNav.filter(visible));
 const allItems = computed(() => [...primary.value, ...secondary.value]);
+
+// Футърът повтаря навигацията в две тематични колони. Не е украса: това е
+// последното място, където човек, стигнал до дъното на страница, може да
+// тръгне нанякъде вместо да затвори раздела.
+const footerColumns = computed(() => [
+    {
+        heading: 'Сезонът',
+        items: [
+            { label: 'Новини', route: 'news.index' },
+            { label: 'Календар', route: 'calendar' },
+            { label: 'Класиране', route: 'standings' },
+            { label: 'На живо', route: 'live', feature: 'live_timing' },
+            { label: 'Формула 2', route: 'f2', feature: 'f2' },
+        ].filter(visible),
+    },
+    {
+        heading: 'Енциклопедия',
+        items: [
+            { label: 'Пилоти', route: 'drivers.index' },
+            { label: 'Отбори', route: 'teams.index' },
+            { label: 'Писти', route: 'circuits.index', feature: 'circuits' },
+            { label: 'Сравни', route: 'compare.index', feature: 'compare' },
+            { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
+            { label: 'История', route: 'history', feature: 'history' },
+            { label: 'Речник', route: 'terminology' },
+        ].filter(visible),
+    },
+    {
+        heading: 'Играй',
+        items: [
+            { label: 'Прогнози', route: 'leaderboard' },
+            { label: 'Куиз', route: 'quiz', feature: 'quiz' },
+            { label: 'Хронометър', route: 'game', feature: 'game' },
+            { label: 'Цолов', route: 'tsolov', feature: 'tsolov' },
+        ].filter(visible),
+    },
+].filter((column) => column.items.length > 0));
 
 const onClickOutside = (e) => {
     if (moreRef.value && !moreRef.value.contains(e.target)) {
@@ -74,6 +112,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                         v-for="item in primary"
                         :key="item.route"
                         :href="route(item.route)"
+                        prefetch="hover"
                         class="group flex items-center gap-1 whitespace-nowrap text-[13px] font-medium text-zinc-400 transition duration-200 hover:text-white xl:text-sm"
                         :class="{ 'text-white': route().current(item.route) }"
                     >
@@ -113,6 +152,19 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                 </div>
 
                 <div class="flex items-center gap-3 text-sm">
+                    <!-- Иконка, не поле: лентата вече е плътна на lg, а
+                         пълната форма живее на /tarsene. -->
+                    <Link
+                        :href="route('search')"
+                        class="text-zinc-400 transition hover:text-white"
+                        aria-label="Търсене"
+                        :class="{ 'text-white': route().current('search') }"
+                    >
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                        </svg>
+                    </Link>
+
                     <template v-if="user">
                         <!-- xl: на lg лентата с 8 линка + „Енциклопедия" не побира и този — има го и в /leaderboard. -->
                         <Link :href="route('predictions.index')" class="hidden text-zinc-400 transition hover:text-white xl:block">
@@ -141,17 +193,38 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
             </nav>
 
             <div v-show="mobileOpen" class="border-t border-zinc-800/80 lg:hidden">
-                <div class="mx-auto flex max-w-6xl flex-col px-4 py-2">
+                <div class="mx-auto flex max-w-6xl flex-col divide-y divide-zinc-800/50 px-4 py-1">
+                    <Link
+                        :href="route('search')"
+                        class="flex min-h-[44px] items-center gap-1.5 py-3 text-sm font-medium text-zinc-300 transition hover:text-white"
+                        @click="mobileOpen = false"
+                    >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                        </svg>
+                        Търсене
+                    </Link>
                     <Link
                         v-for="item in allItems"
                         :key="item.route"
                         :href="route(item.route)"
-                        class="flex items-center gap-1.5 py-2 text-sm font-medium text-zinc-300 transition hover:text-white"
+                        class="flex min-h-[44px] items-center gap-1.5 py-3 text-sm font-medium text-zinc-300 transition hover:text-white"
                         @click="mobileOpen = false"
                     >
                         <span v-if="item.live" class="h-2 w-2 rounded-full bg-red-600" />
                         {{ item.label }}
                         <FlagIcon v-if="item.flag" :code="item.flag" class="text-[11px]" />
+                    </Link>
+
+                    <!-- „Моите прогнози" е скрито под xl: в горната лента (мястото
+                         не стига) — на телефон обаче няма къде другаде да се хване. -->
+                    <Link
+                        v-if="user && hasRoute('predictions.index')"
+                        :href="route('predictions.index')"
+                        class="flex min-h-[44px] items-center gap-1.5 py-3 text-sm font-medium text-zinc-300 transition hover:text-white"
+                        @click="mobileOpen = false"
+                    >
+                        Моите прогнози
                     </Link>
                 </div>
             </div>
@@ -198,6 +271,25 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                     <NewsletterForm source="footer" />
                 </div>
             </section>
+            <nav
+                v-if="footerColumns.length"
+                aria-label="Карта на сайта"
+                class="mx-auto mb-10 grid max-w-3xl grid-cols-2 gap-x-6 gap-y-8 text-left sm:grid-cols-3"
+            >
+                <div v-for="column in footerColumns" :key="column.heading">
+                    <h3 class="mb-3 font-display text-xs font-black uppercase tracking-[0.2em] text-zinc-500">
+                        {{ column.heading }}
+                    </h3>
+                    <ul class="space-y-2">
+                        <li v-for="item in column.items" :key="item.route">
+                            <Link :href="route(item.route)" class="text-sm text-zinc-400 transition hover:text-white">
+                                {{ item.label }}
+                            </Link>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
             <p class="mx-auto max-w-xl">
                 Падок — независима общност на българските фенове на Формула 1.
             </p>

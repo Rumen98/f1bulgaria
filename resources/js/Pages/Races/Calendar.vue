@@ -3,6 +3,7 @@ import CalendarSubscribe from '@/Components/Calendar/CalendarSubscribe.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { useCountdown } from '@/composables/useCountdown';
+import { NEUTRAL_DOT_COLOR } from '@/utils/racing';
 import { Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
@@ -124,6 +125,17 @@ const countdownText = computed(() => {
                                 </span>
                             </div>
                             <div class="mt-0.5 truncate text-sm text-zinc-500">{{ race.circuit }}, {{ race.country }}</div>
+                            <!-- Победителят: за минал кръг „Завършено" не казва
+                                 нищо, а името е самото съдържание. -->
+                            <div v-if="race.winner" class="mt-1 flex items-center gap-1.5 truncate text-sm">
+                                <span aria-hidden="true">🏆</span>
+                                <span
+                                    class="h-2 w-2 shrink-0 rounded-full"
+                                    :style="{ backgroundColor: race.winner.color ?? NEUTRAL_DOT_COLOR }"
+                                />
+                                <span class="truncate font-medium text-zinc-300">{{ race.winner.name }}</span>
+                                <span v-if="race.winner.team" class="truncate text-xs text-zinc-500">· {{ race.winner.team }}</span>
+                            </div>
                         </div>
                         <div class="mt-2 flex flex-wrap items-baseline gap-x-2 sm:mt-0 sm:block sm:shrink-0 sm:text-right">
                             <div class="whitespace-nowrap text-sm font-medium tabular-nums text-zinc-200">{{ race.race_at_sofia ?? 'TBC' }}</div>

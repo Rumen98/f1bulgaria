@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Race;
+use App\Models\Season;
 use App\Services\Badges\BadgeService;
 use App\Services\Jolpica\ResultSyncService;
+use App\Services\Predictions\LeaderboardService;
 use App\Services\Telegram\F1ChannelEnqueuer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -69,6 +71,8 @@ class SyncResultsCommand extends Command
             $this->table(['Кръг', 'Резултати', 'Спринт', 'Точкувани прогнози', 'Нови значки'], $rows);
         }
 
+        $this->awardChampionIfSeasonOver($badges);
+
         // Синхронът само пълни опашката; изпращането е на channel:post, за да
         // не блокира точкуването при проблем с Telegram.
         $queued = $enqueuer->enqueuePending();
@@ -122,5 +126,40 @@ class SyncResultsCommand extends Command
         return $latest === null
             ? $pending
             : $pending->push($latest)->unique('id')->values();
+    }
+
+    /**
+     * Значката „Шампион на сезона" — присъжда се, щом всички кръгове имат
+     * резултати.
+     *
+     * Методът в BadgeService съществуваше и значката беше в базата, но никой
+     * не го викаше: наградата беше недостижима по конструкция. award() е
+     * идемпотентен, така че повторните пускания на синхрона не дублират.
+     */
+    private function awardChampionIfSeasonOver(BadgeService $badges): void
+    {
+        $season = Season::current();
+
+        if ($season === null) {
+            return;
+        }
+
+        $withoutResults = $season->races()
+            ->whereDoesntHave('results', fn ($q) => $q->where('session_type', 'race'))
+            ->exists();
+
+        if ($withoutResults) {
+            return; // сезонът още тече
+        }
+
+        $leader = app(LeaderboardService::class)->forSeason($season)->first();
+
+        if ($leader === null) {
+            return;
+        }
+
+        if ($badges->awardSeasonChampion($season, $leader['user']) > 0) {
+            $this->info("Значка „Шампион на сезона {$season->year}\" за {$leader['user']->name}.");
+        }
     }
 }
