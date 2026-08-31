@@ -10,12 +10,19 @@ const props = defineProps({
     profile: Object,
     stats: Object,
     quiz: { type: Object, default: () => ({ points: 0, available: 0, attempts: 0 }) },
+    game: { type: Object, default: null },
     season: Number,
 });
 
 const canOpenDriver = computed(() => hasRoute('drivers.show'));
 const canOpenTeam = computed(() => hasRoute('teams.show'));
 const earnedBadges = computed(() => (props.profile.badges ?? []).filter((b) => b.earned).length);
+
+const formatLap = (ms) => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = ((ms % 60000) / 1000).toFixed(3).padStart(6, '0');
+    return `${minutes}:${seconds}`;
+};
 </script>
 
 <template>
@@ -94,6 +101,44 @@ const earnedBadges = computed(() => (props.profile.badges ?? []).filter((b) => b
                     <p v-if="quiz.attempts" class="mt-2 text-xs text-zinc-500">
                         {{ quiz.attempts }} изиграни кръга<template v-if="quiz.best_score !== null">, най-добър {{ quiz.best_score }}/{{ quiz.best_total }}</template>.
                     </p>
+                </div>
+
+                <!-- Хронометърът: покорени писти + най-силни времена -->
+                <div v-if="game && game.tracks_played > 0" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
+                    <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                        <h2 class="font-display text-lg font-bold text-white">Хронометър</h2>
+                        <Link :href="route('game')" class="text-sm font-medium text-red-500 transition hover:text-red-400">
+                            Карай →
+                        </Link>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <span class="font-display text-3xl font-black leading-none tabular-nums text-white">{{ game.tracks_played }}</span>
+                        <span class="pb-0.5 text-sm text-zinc-500">/ {{ game.total_tracks }} покорени писти</span>
+                        <span v-if="game.firsts > 0" class="ml-auto pb-0.5 text-sm font-semibold text-amber-400">
+                            🏆 {{ game.firsts }}× №1
+                        </span>
+                    </div>
+                    <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                        <div
+                            class="h-full bg-gradient-to-r from-red-600 to-fuchsia-500"
+                            :style="{ width: (game.total_tracks ? (game.tracks_played / game.total_tracks) * 100 : 0) + '%' }"
+                        />
+                    </div>
+                    <ul v-if="game.best_laps.length" class="mt-3 space-y-1 text-sm">
+                        <li
+                            v-for="lap in game.best_laps"
+                            :key="lap.track"
+                            class="flex items-baseline justify-between gap-3 text-zinc-300"
+                        >
+                            <span class="truncate">
+                                <span v-if="lap.rank1" title="Рекорд на пистата">🏆</span>
+                                {{ lap.name }}
+                            </span>
+                            <span class="font-mono tabular-nums" :class="lap.rank1 ? 'text-fuchsia-300' : 'text-zinc-400'">
+                                {{ formatLap(lap.lap_ms) }}
+                            </span>
+                        </li>
+                    </ul>
                 </div>
 
                 <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">

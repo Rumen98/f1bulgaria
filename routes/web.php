@@ -15,6 +15,8 @@ use App\Http\Controllers\F2RaceController;
 use App\Http\Controllers\F2TeamsController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\FeedController;
+use App\Http\Controllers\GameController;
+use App\Http\Controllers\GameLeaderboardController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
@@ -112,6 +114,28 @@ Route::middleware('feature:rivalries')->group(function () {
         Route::post('/rivalries', [RivalriesController::class, 'store'])->name('rivalries.store');
     });
     Route::get('/rivalries/{slug}', [RivalriesController::class, 'show'])->name('rivalries.show');
+});
+
+Route::middleware('feature:game')->group(function () {
+    Route::get('/game', [GameController::class, 'index'])->name('game');
+
+    // Класация: публична за четене (лилави рекорди за всички), запис само с
+    // вход. Throttle-ната е като духа: панелът на всяка карта я вика често,
+    // а гост без лимит удря 4 заявки към базата на всяко зареждане.
+    // Изрични префикси на кофите — голият 'throttle:N,M' дели една кофа с
+    // всеки друг гол рут (виж ThrottleBucketsTest).
+    Route::get('/game/leaderboard/{track}', [GameLeaderboardController::class, 'show'])
+        ->middleware('throttle:60,1,game-leaderboard')
+        ->name('game.leaderboard');
+    // Духът на потребител за дуел — публичен, както класацията. Границата на
+    // id-то е и защита: неограничено [0-9]+ прелива PHP int → 500 за гост.
+    Route::get('/game/ghost/{track}/{user}', [GameLeaderboardController::class, 'ghost'])
+        ->where('user', '[0-9]{1,10}')
+        ->middleware('throttle:60,1,game-ghost')
+        ->name('game.ghost');
+    Route::post('/game/lap', [GameLeaderboardController::class, 'store'])
+        ->middleware(['auth', 'throttle:30,1,game-lap'])
+        ->name('game.lap.store');
 });
 
 Route::middleware('feature:quiz')->group(function () {

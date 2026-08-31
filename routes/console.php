@@ -56,6 +56,21 @@ Schedule::command('f1:race-preview')
     ->onOneServer()
     ->withoutOverlapping(120);
 
+// Хронометърът в канала: четвъртък — старт на седмичното предизвикателство
+// на пистата на уикенда; понеделник — резултати + значка на победителя.
+// Вътрешният guard мълчи, когато няма писта на уикенда/никой не е карал.
+Schedule::command('game:weekly-channel --mode=open')
+    ->weeklyOn(4, '10:00')
+    ->timezone('Europe/Sofia')
+    ->onOneServer()
+    ->withoutOverlapping(120);
+
+Schedule::command('game:weekly-channel --mode=wrap')
+    ->weeklyOn(1, '10:00')
+    ->timezone('Europe/Sofia')
+    ->onOneServer()
+    ->withoutOverlapping(120);
+
 // Подсещане за неподадена прогноза. Проверява на кръгъл час, но вътрешният
 // guard (24-часов прозорец преди заключването + `newsletter_sends` по race_id)
 // пуска най-много едно писмо на кръг — обикновено петък вечер.

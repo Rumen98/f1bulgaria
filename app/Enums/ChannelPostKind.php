@@ -29,6 +29,9 @@ enum ChannelPostKind: string
 
     case News = 'news';
 
+    case GameChallenge = 'game_challenge';
+    case GameResults = 'game_results';
+
     public function label(): string
     {
         return match ($this) {

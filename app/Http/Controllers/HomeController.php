@@ -8,6 +8,8 @@ use App\Enums\NewsStatus;
 use App\Models\RaceSession;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
+use App\Services\Game\LeaderboardService as GameLeaderboardService;
+use App\Services\Game\WeekTrackResolver;
 use App\Services\Hero\HeroRaceContext;
 use App\Services\Hero\NextRaceResolver;
 use App\Services\Homepage\ThisDayInF1Service;
@@ -40,11 +42,48 @@ class HomeController extends Controller
             'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
             'topNews' => $this->topNews(),
             'predictionCta' => $this->predictionCta($hero, $locks),
+            'gameTeaser' => $this->gameTeaser(),
             // Не е optional/defer нарочно: и двете биха го скрили при първо
             // зареждане, а смисълът му е да се види веднага. Гостът не плаща —
             // me() излиза с null преди която и да е заявка.
             'me' => $this->me($leaderboard),
         ]);
+    }
+
+
+    /**
+     * Тийзърът на Хронометъра: пистата на уикенда + топ 3 времена (седмични,
+     * с резервен вариант всички времена). Играта иначе е невидима за
+     * никога-не-кликналите „Хронометър“.
+     *
+     * @return array{slug: string, name: string, top: array<int, array<string, mixed>>}|null
+     */
+    private function gameTeaser(): ?array
+    {
+        if (! config('features.game')) {
+            return null;
+        }
+
+        $week = app(WeekTrackResolver::class)->resolve();
+
+        if ($week === null) {
+            return null;
+        }
+
+        $leaderboard = app(GameLeaderboardService::class);
+        $top = $leaderboard->topLaps($week['slug'], null, 3, $week['week_start']);
+        if ($top->isEmpty()) {
+            $top = $leaderboard->topLaps($week['slug'], null, 3);
+        }
+
+        $name = collect($leaderboard->trackIndex())
+            ->firstWhere('slug', $week['slug'])['name'] ?? $week['slug'];
+
+        return [
+            'slug' => $week['slug'],
+            'name' => (string) $name,
+            'top' => $top->values()->all(),
+        ];
     }
 
     /**

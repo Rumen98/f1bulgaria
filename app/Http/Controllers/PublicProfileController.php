@@ -9,6 +9,7 @@ use App\Http\Resources\DriverResource;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Badges\BadgeService;
+use App\Services\Game\LeaderboardService as GameLeaderboardService;
 use App\Services\Predictions\LeaderboardService;
 use App\Services\Quiz\QuizProgressService;
 use Illuminate\Support\Carbon;
@@ -17,8 +18,12 @@ use Inertia\Response;
 
 class PublicProfileController extends Controller
 {
-    public function show(User $user, LeaderboardService $leaderboard, QuizProgressService $quiz): Response
-    {
+    public function show(
+        User $user,
+        LeaderboardService $leaderboard,
+        QuizProgressService $quiz,
+        GameLeaderboardService $game,
+    ): Response {
         $season = Season::current();
 
         $stats = $season
@@ -44,6 +49,7 @@ class PublicProfileController extends Controller
             ],
             'stats' => $stats,
             'quiz' => $quiz->statsFor($user),
+            'game' => config('features.game') ? $game->profileStats($user) : null,
             'season' => $season?->year,
         ]);
     }
@@ -58,6 +64,10 @@ class PublicProfileController extends Controller
         $earned = $user->badges->keyBy('slug');
 
         return collect(BadgeService::DEFINITIONS)
+            // Значките на Хронометъра се показват само при включен модул:
+            // иначе профилът рекламира заключени награди за невидима функция.
+            ->filter(fn (array $definition, string $slug) => config('features.game')
+                || ! str_starts_with($slug, 'game-'))
             ->map(fn (array $definition, string $slug) => [
                 'slug' => $slug,
                 'name' => $definition['name'],
