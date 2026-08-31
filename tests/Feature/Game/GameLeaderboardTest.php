@@ -272,6 +272,85 @@ it('отхвърлените от преиграването обиколки и
         ->assertJsonMissing(['name' => 'Хитрецът']);
 });
 
+it('класацията носи user_id и has_ghost за дуелите', function () {
+    $user = User::factory()->create(['name' => 'Духчо']);
+    GameLapRecord::factory()->for($user)->create([
+        'lap_ms' => 91000,
+        'verify_status' => 'verified',
+        'ghost_frames' => 'кадри-base64',
+        'lap_ticks' => 10920,
+    ]);
+
+    // Без кадри → без дуел бутон.
+    $ghostless = User::factory()->create(['name' => 'Безплътния']);
+    GameLapRecord::factory()->for($ghostless)->create(['lap_ms' => 95000]);
+
+    $this->getJson('/game/leaderboard/monza')
+        ->assertOk()
+        ->assertJsonPath('top.0.user_id', $user->id)
+        ->assertJsonPath('top.0.has_ghost', true)
+        ->assertJsonPath('top.1.user_id', $ghostless->id)
+        ->assertJsonPath('top.1.has_ghost', false);
+});
+
+it('духът е най-бързата обиколка С кадри, дори по-бърза без кадри да съществува', function () {
+    $user = User::factory()->create();
+    // По-бърза, но без кадри (стар запис отпреди фийчъра).
+    GameLapRecord::factory()->for($user)->create(['lap_ms' => 88000, 'verify_status' => 'verified']);
+    GameLapRecord::factory()->for($user)->create([
+        'lap_ms' => 90000,
+        'sim_version' => 2,
+        'verify_status' => 'verified',
+        'ghost_frames' => 'кадри-на-90',
+        'lap_ticks' => 10800,
+    ]);
+
+    $this->getJson("/game/ghost/monza/{$user->id}")
+        ->assertOk()
+        ->assertJsonPath('lap_ms', 90000)
+        ->assertJsonPath('frames', 'кадри-на-90');
+});
+
+it('сервира духа на потребител за дуел', function () {
+    $user = User::factory()->create(['name' => 'Призрак']);
+    GameLapRecord::factory()->for($user)->create([
+        'lap_ms' => 90500,
+        'sim_version' => 2,
+        'verify_status' => 'verified',
+        'ghost_frames' => 'кадри-base64',
+        'lap_ticks' => 10860,
+    ]);
+
+    $this->getJson("/game/ghost/monza/{$user->id}")
+        ->assertOk()
+        ->assertJson([
+            'v' => 2,
+            'lap_ms' => 90500,
+            'lap_ticks' => 10860,
+            'frames' => 'кадри-base64',
+            'name' => 'Призрак',
+        ]);
+});
+
+it('духът е 404 без кадри или за непозната писта', function () {
+    $user = User::factory()->create();
+    GameLapRecord::factory()->for($user)->create(['lap_ms' => 90500]);
+
+    $this->getJson("/game/ghost/monza/{$user->id}")->assertNotFound();
+    $this->getJson("/game/ghost/nope/{$user->id}")->assertNotFound();
+});
+
+it('отхвърлен запис не сервира дух', function () {
+    $user = User::factory()->create();
+    GameLapRecord::factory()->for($user)->create([
+        'lap_ms' => 60000,
+        'verify_status' => 'rejected',
+        'ghost_frames' => 'фалшиви-кадри',
+    ]);
+
+    $this->getJson("/game/ghost/monza/{$user->id}")->assertNotFound();
+});
+
 it('pending и error обиколките продължават да се броят', function () {
     $user = User::factory()->create();
 

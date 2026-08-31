@@ -201,6 +201,12 @@ function buildLandmarks(track, circuit, sampler) {
         COLORS.building
     );
     if (buildings) {
+        // Нощно състезание: фасадите светят топло (прозорци/градска светлина)
+        // — иначе градът зад мантинелите е черна маса.
+        if (circuit.atmosphere?.night) {
+            buildings.material.emissive = new THREE.Color(0x2a2214);
+            buildings.material.emissiveIntensity = 0.5;
+        }
         out.push(buildings);
     }
 
@@ -871,6 +877,11 @@ function buildKerbs(track) {
     const white = new THREE.Color(COLORS.kerbWhite);
     const blockSteps = Math.max(1, Math.round(KERB_BLOCK / spacing));
 
+    // Назъбване на външния ръб (rumble strip): вълна по дължината, ~0.9 m
+    // период. Камерата вече вибрира на керба — сега окото вижда защо.
+    const serration = (row) =>
+        KERB_HEIGHT * (0.7 + 0.3 * Math.sin((row * spacing * Math.PI) / 0.9));
+
     for (const range of ranges) {
         for (let r = range.from; r < range.to; r++) {
             const i0 = ((r % count) + count) % count;
@@ -884,9 +895,9 @@ function buildKerbs(track) {
             // следва ширината ПО ТОЧКА и банкинга на платното.
             for (const [idx, sideMul, h] of [
                 [i0, 0, Y.kerb],
-                [i0, 1, KERB_HEIGHT],
+                [i0, 1, serration(r)],
                 [i1, 0, Y.kerb],
-                [i1, 1, KERB_HEIGHT],
+                [i1, 1, serration(r + 1)],
             ]) {
                 // Кербът е от вътрешната страна на завоя: при завой към
                 // нормалата (side=+1) вътрешната страна е тази на нормалата.

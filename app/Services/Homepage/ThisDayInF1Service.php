@@ -6,6 +6,7 @@ namespace App\Services\Homepage;
 
 use App\Enums\ResultSessionType;
 use App\Models\Result;
+use App\Support\DriverName;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -40,7 +41,11 @@ class ThisDayInF1Service
                     'race' => $r->race?->name,
                     'circuit' => $r->race?->circuit,
                     'circuit_slug' => $r->race?->jolpica_id,
-                    'winner' => $r->driver?->fullName(),
+                    // Кирилското име, както навсякъде другаде — иначе блокът
+                    // показва „Oscar Piastri“ насред българския текст.
+                    'winner' => $r->driver !== null
+                        ? DriverName::display($r->driver->slug, $r->driver->fullName())
+                        : null,
                     'winner_slug' => $r->driver?->slug,
                     'team' => $r->driver?->constructor?->name,
                     'color' => $r->driver?->constructor?->color_hex,

@@ -7,6 +7,8 @@ namespace App\Http\Controllers;
 use App\Enums\NewsStatus;
 use App\Models\RaceSession;
 use App\Models\TeamNewsItem;
+use App\Services\Game\LeaderboardService;
+use App\Services\Game\WeekTrackResolver;
 use App\Services\Hero\HeroRaceContext;
 use App\Services\Hero\NextRaceResolver;
 use App\Services\Homepage\ThisDayInF1Service;
@@ -28,7 +30,43 @@ class HomeController extends Controller
             'liveSession' => $this->liveSession($openF1, $tokens),
             'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
             'topNews' => $this->topNews(),
+            'gameTeaser' => $this->gameTeaser(),
         ]);
+    }
+
+    /**
+     * Тийзърът на Хронометъра: пистата на уикенда + топ 3 времена (седмични,
+     * с резервен вариант всички времена). Играта иначе е невидима за
+     * никога-не-кликналите „Хронометър".
+     *
+     * @return array{slug: string, name: string, top: array<int, array<string, mixed>>}|null
+     */
+    private function gameTeaser(): ?array
+    {
+        if (! config('features.game')) {
+            return null;
+        }
+
+        $week = app(WeekTrackResolver::class)->resolve();
+
+        if ($week === null) {
+            return null;
+        }
+
+        $leaderboard = app(LeaderboardService::class);
+        $top = $leaderboard->topLaps($week['slug'], null, 3, $week['week_start']);
+        if ($top->isEmpty()) {
+            $top = $leaderboard->topLaps($week['slug'], null, 3);
+        }
+
+        $name = collect($leaderboard->trackIndex())
+            ->firstWhere('slug', $week['slug'])['name'] ?? $week['slug'];
+
+        return [
+            'slug' => $week['slug'],
+            'name' => (string) $name,
+            'top' => $top->values()->all(),
+        ];
     }
 
     /**

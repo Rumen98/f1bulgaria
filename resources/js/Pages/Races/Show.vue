@@ -108,7 +108,10 @@ const showsTime = computed(() => active.value?.rows.some((r) => r.time));
                     </p>
                 </template>
 
-                <template v-else-if="finished && userPrediction">
+                <!-- `race.finished`, а не голо `finished`: последното не е проп и
+                     Vue го резолвваше до undefined, така че блокът с точките
+                     никога не се рендираше и играчът виждаше „заключени“. -->
+                <template v-else-if="race.finished && userPrediction">
                     <div class="rounded-lg border border-zinc-800 bg-black/40 p-4 text-center">
                         <div class="font-display text-3xl font-black text-red-600">{{ userPrediction.points ?? 0 }}</div>
                         <div class="text-xs uppercase tracking-wide text-zinc-500">точки за това състезание</div>

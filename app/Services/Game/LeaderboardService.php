@@ -7,7 +7,9 @@ namespace App\Services\Game;
 use App\Jobs\ValidateGameLapJob;
 use App\Models\GameLapRecord;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Класация на Хронометъра: лилави рекорди, топ обиколки и записване на нова
@@ -43,26 +45,136 @@ class LeaderboardService
     }
 
     /**
-     * Топ N потребители по най-добра обиколка на пистата.
+     * Топ N потребители по най-добра обиколка на пистата. `has_ghost` казва
+     * дали има сървърен дух за дуел („Карай срещу…"); $since ограничава до
+     * седмичното предизвикателство (пистата на уикенда).
      *
-     * @return Collection<int, array{name: string, lap_ms: int, is_you: bool}>
+     * @return Collection<int, array{user_id: int, name: string, avatar: string|null, lap_ms: int, is_you: bool, has_ghost: bool}>
      */
-    public function topLaps(string $trackSlug, ?User $viewer = null, int $limit = 10): Collection
+    public function topLaps(string $trackSlug, ?User $viewer = null, int $limit = 10, ?Carbon $since = null): Collection
     {
+        // has_ghost е нарочно all-time и в седмичния изглед (без $since):
+        // ghostOf() винаги сервира най-добрата обиколка на потребителя изобщо,
+        // така че дуелът има смисъл независимо кога е карана седмичната.
+        $withGhosts = GameLapRecord::query()
+            ->counted()
+            ->where('track_slug', $trackSlug)
+            ->whereNotNull('ghost_frames')
+            ->distinct()
+            ->pluck('user_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
         return GameLapRecord::query()
             ->counted()
             ->where('game_lap_records.track_slug', $trackSlug)
+            ->when($since !== null, fn ($query) => $query->where('game_lap_records.created_at', '>=', $since))
             ->join('users', 'users.id', '=', 'game_lap_records.user_id')
-            ->groupBy('game_lap_records.user_id', 'users.name')
-            ->selectRaw('game_lap_records.user_id, users.name, MIN(lap_ms) as lap_ms')
+            ->groupBy('game_lap_records.user_id', 'users.name', 'users.avatar_path')
+            ->selectRaw('game_lap_records.user_id, users.name, users.avatar_path, MIN(lap_ms) as lap_ms')
             ->orderByRaw('MIN(lap_ms)')
             ->limit($limit)
             ->get()
             ->map(fn (GameLapRecord $row): array => [
+                'user_id' => (int) $row->user_id,
                 'name' => (string) $row->name,
+                'avatar' => $row->avatar_path !== null ? (string) $row->avatar_path : null,
                 'lap_ms' => (int) $row->lap_ms,
                 'is_you' => $viewer !== null && (int) $row->user_id === $viewer->id,
+                'has_ghost' => in_array((int) $row->user_id, $withGhosts, true),
             ]);
+    }
+
+    /**
+     * Статистика за публичния профил: карани писти, първи места и трите
+     * най-силни времена (с имена на пистите от кеширания каталог).
+     *
+     * @return array{tracks_played: int, total_tracks: int, firsts: int,
+     *               best_laps: array<int, array{track: string, name: string, lap_ms: int, rank1: bool}>}
+     */
+    public function profileStats(User $user): array
+    {
+        $userBests = GameLapRecord::query()
+            ->counted()
+            ->where('user_id', $user->id)
+            ->groupBy('track_slug')
+            ->selectRaw('track_slug, MIN(lap_ms) as lap_ms')
+            ->pluck('lap_ms', 'track_slug');
+
+        if ($userBests->isEmpty()) {
+            return ['tracks_played' => 0, 'total_tracks' => count((array) config('game.tracks', [])), 'firsts' => 0, 'best_laps' => []];
+        }
+
+        // Абсолютният рекорд на всяка от караните писти — за „първо място".
+        $overall = GameLapRecord::query()
+            ->counted()
+            ->whereIn('track_slug', $userBests->keys())
+            ->groupBy('track_slug')
+            ->selectRaw('track_slug, MIN(lap_ms) as lap_ms')
+            ->pluck('lap_ms', 'track_slug');
+
+        $names = collect($this->trackIndex())->pluck('name', 'slug');
+
+        $bestLaps = $userBests
+            ->map(fn (int $lapMs, string $slug): array => [
+                'track' => $slug,
+                'name' => (string) ($names[$slug] ?? $slug),
+                'lap_ms' => $lapMs,
+                'rank1' => (int) ($overall[$slug] ?? 0) === $lapMs,
+            ])
+            ->sortBy('lap_ms')
+            ->values();
+
+        return [
+            'tracks_played' => $userBests->count(),
+            'total_tracks' => count((array) config('game.tracks', [])),
+            'firsts' => $bestLaps->where('rank1', true)->count(),
+            'best_laps' => $bestLaps->take(3)->all(),
+        ];
+    }
+
+    /**
+     * Каталогът на пистите (public/game-tracks/index.json) — същият кеш ключ
+     * като валидацията на записа. Публичен: тийзърът на началната страница
+     * взима имената оттук.
+     *
+     * @return array<int, array{slug: string, name: string}>
+     */
+    public function trackIndex(): array
+    {
+        return Cache::remember('game.tracks.index', now()->addHour(), function (): array {
+            $path = public_path('game-tracks/index.json');
+
+            if (! file_exists($path)) {
+                return [];
+            }
+
+            try {
+                return json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                return [];
+            }
+        });
+    }
+
+    /**
+     * Най-бързата обиколка СЪС записани кадри на потребителя за пистата —
+     * духът, срещу който се кара дуел.
+     */
+    public function ghostOf(int $userId, string $trackSlug): ?GameLapRecord
+    {
+        // Изричен списък колони: без него редът идва с input_trace (до 620 KB
+        // MEDIUMTEXT), който отговорът изобщо не ползва. Tiebreak-ът по id
+        // огледално повтаря pruneGhostFrames — двете винаги сочат един ред.
+        return GameLapRecord::query()
+            ->counted()
+            ->with('user:id,name')
+            ->where('user_id', $userId)
+            ->where('track_slug', $trackSlug)
+            ->whereNotNull('ghost_frames')
+            ->orderBy('lap_ms')
+            ->orderByDesc('id')
+            ->first(['id', 'user_id', 'sim_version', 'lap_ms', 'lap_ticks', 'ghost_frames']);
     }
 
     /** Най-добрата обиколка на потребителя за пистата, в милисекунди. */

@@ -1,5 +1,6 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { isMobileDevice } from '@/game/device.js';
 import { formatDelta, formatLapTime } from '@/game/format.js';
 import { Head, usePage } from '@inertiajs/vue3';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
@@ -27,6 +28,7 @@ const canvas = ref(null);
 const game = shallowRef(null);
 const selectedTrack = ref(null);
 const loading = ref(false);
+const loadProgress = ref(0); // 0..1 — реални байтове (болид/среда/текстури)
 const error = ref(null);
 const transmission = ref('auto'); // 'auto' | 'manual' (ръчна: W нагоре, S надолу)
 const rivals = ref('race'); // 'race' (AI съперници на пистата) | 'solo' (чиста обиколка)
@@ -38,13 +40,26 @@ const isMobile = ref(false); // телефон/тъч → tilt завиване 
 const tiltError = ref(false); // накланянето не е достъпно/разрешено
 
 onMounted(() => {
-    isMobile.value =
-        /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
-        (navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches);
+    // Общият детектор с Game.js (device.js) — двете преценки не бива да се
+    // разминават (мобилни контроли + десктоп рендер на iPad).
+    isMobile.value = isMobileDevice();
 
     // Ръчните скорости са неудобни на телефон — само авто.
     if (isMobile.value) {
         transmission.value = 'auto';
+    }
+
+    // Линк-покана за дуел: /game?track=monza&rival=12 отваря пистата направо
+    // срещу духа на съперника.
+    const params = new URLSearchParams(window.location.search);
+    const trackParam = params.get('track');
+    const rivalParam = params.get('rival');
+    if (trackParam) {
+        const track = props.tracks.find((t) => t.slug === trackParam);
+        if (track) {
+            const rivalId = rivalParam && /^\d+$/.test(rivalParam) ? Number(rivalParam) : null;
+            startGame(track, rivalId);
+        }
     }
 });
 
@@ -54,6 +69,11 @@ const emptyTelemetry = () => ({
     gear: 1,
     position: 1,
     fieldSize: 1,
+    raceLap: 0,
+    raceTotalLaps: 0,
+    tower: null,
+    ghostDelta: null,
+    mapDots: [],
     lapTime: null,
     lastLap: null,
     bestLap: null,
@@ -70,6 +90,52 @@ const emptyTelemetry = () => ({
 });
 
 const telemetry = ref(emptyTelemetry());
+
+// ── Мини-картата: пътят се рисува веднъж, точките — на всяко обновяване ───
+const minimapCanvas = ref(null);
+const MINIMAP_SIZE = 128;
+// Играч / бот / официален дух (златист) / личен дух (син) / дуелен (фуксия) —
+// типът идва от Game (mapDots.t) и следва цвета на 3D духа.
+const DOT_COLORS = ['#e10600', '#9aa3ad', '#f2c14e', '#9fc8ff', '#e879f9'];
+
+const drawMinimapPath = () => {
+    drawMinimap(telemetry.value);
+};
+
+const drawMinimap = (values) => {
+    const canvas = minimapCanvas.value;
+    const path = game.value?.minimap?.path;
+    if (!canvas || !path) {
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    const s = MINIMAP_SIZE;
+    const pad = 8;
+    const scale = s - pad * 2;
+    ctx.clearRect(0, 0, s, s);
+
+    ctx.beginPath();
+    for (let i = 0; i < path.length; i++) {
+        const [x, y] = path[i];
+        if (i === 0) {
+            ctx.moveTo(pad + x * scale, pad + y * scale);
+        } else {
+            ctx.lineTo(pad + x * scale, pad + y * scale);
+        }
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    for (const dot of values.mapDots ?? []) {
+        ctx.beginPath();
+        ctx.arc(pad + dot.x * scale, pad + dot.y * scale, dot.t === 0 ? 4 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = DOT_COLORS[dot.t] ?? '#fff';
+        ctx.fill();
+    }
+};
 
 // ── Класация / резултат ───────────────────────────────────────────────────
 // Лилавите рекорди на пистата (обиколка + по сектори), топ класация и резултатът
@@ -103,9 +169,9 @@ const onFinish = (res) => {
     resultMeta.value = null;
     submitError.value = null;
 
-    // Състезателните обиколки не се записват: контактите с ботовете ги
-    // правят невъзпроизводими за сървърната валидация. Класацията е соло.
-    if (res.valid && !res.competition && res.trace && authUser.value) {
+    // onFinish идва само от соло обиколки (състезанието завършва с подиум,
+    // без запис — контактите го правят невъзпроизводимо за валидацията).
+    if (res.valid && res.trace && authUser.value) {
         submitLap(res);
     }
 };
@@ -158,11 +224,159 @@ const newLap = () => {
     game.value?.reset(true);
 };
 
+// Ново състезание от подиума: решетка + светлини отначало.
+const newRace = () => {
+    replaying.value = false;
+    raceResult.value = null;
+    game.value?.reset(true);
+};
+
+// ── Share-карта за Telegram: PNG на резултата + линк за дуел ──────────────
+const sharing = ref(false);
+
+const shareResult = async () => {
+    if (!result.value || !selectedTrack.value || sharing.value) {
+        return;
+    }
+    sharing.value = true;
+    try {
+        const challengeUrl = authUser.value
+            ? challengeLink(selectedTrack.value.slug, authUser.value.id)
+            : null;
+        const { buildShareCard } = await import('@/game/shareCard.js');
+        const blob = await buildShareCard({
+            trackName: selectedTrack.value.name,
+            lapMs: result.value.lapMs,
+            sectorsMs: result.value.sectorsMs,
+            rank: resultMeta.value?.rank ?? null,
+            state: lapState.value,
+            challengeUrl,
+        });
+
+        const file = new File([blob], 'padok-hronometar.png', { type: 'image/png' });
+        if (navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ files: [file] });
+        } else {
+            // Десктоп: сваляне + линкът за дуел в клипборда.
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'padok-hronometar.png';
+            link.click();
+            URL.revokeObjectURL(url);
+            if (challengeUrl) {
+                try {
+                    await navigator.clipboard.writeText(challengeUrl);
+                } catch {
+                    // Блокиран клипборд — PNG-то пак е свалено, линкът е и в него.
+                }
+            }
+        }
+    } catch {
+        // Отказан share диалог/блокиран canvas — нищо.
+    } finally {
+        sharing.value = false;
+    }
+};
+
+// Дуел директно от резултатния екран: духът се зарежда в ТЕКУЩАТА игра
+// (без ново зареждане на пистата) и тръгва нова обиколка.
+const duelFromBoard = async (row) => {
+    if (!game.value || !selectedTrack.value || !row.has_ghost) {
+        return;
+    }
+    const instance = game.value;
+    try {
+        const { data } = await window.axios.get(
+            `/game/ghost/${selectedTrack.value.slug}/${row.user_id}`
+        );
+        if (game.value === instance && instance.setRivalGhost(data)) {
+            rivalInfo.value = { name: data.name, lapMs: data.lap_ms };
+            newLap();
+        }
+    } catch {
+        // Духът междувременно е изчезнал — нищо.
+    }
+};
+
 // ── ТВ повторение на завършената обиколка ─────────────────────────────────
 const replaying = ref(false);
 
 // ── Стартова процедура (състезание): брой светнали лампи, null = няма ─────
 const launchLights = ref(null);
+
+// ── Финал на състезанието: {position, standings} от Game.onRaceFinish ─────
+const raceResult = ref(null);
+
+// ── Дуел: духът на съперник от класацията ─────────────────────────────────
+const rivalInfo = ref(null); // {name, lapMs} — показва се като чип в HUD-а
+
+// ── Класация на pre-game екрана: разгъната писта + редовете ѝ ─────────────
+const expandedBoard = ref(null); // slug на пистата с отворена класация
+const boardRows = ref([]);
+const boardWeekly = ref(null); // седмичната класация (само пистата на уикенда)
+const boardTab = ref('all'); // 'week' | 'all'
+const boardLoading = ref(false);
+
+const displayedBoardRows = computed(() =>
+    boardTab.value === 'week' && boardWeekly.value !== null ? boardWeekly.value : boardRows.value
+);
+const copiedChallenge = ref(null); // ключ на реда с копиран линк (за ✓)
+
+const toggleBoard = async (slug) => {
+    if (expandedBoard.value === slug) {
+        expandedBoard.value = null;
+        return;
+    }
+    expandedBoard.value = slug;
+    boardRows.value = [];
+    boardWeekly.value = null;
+    boardLoading.value = true;
+    try {
+        const { data } = await window.axios.get(`/game/leaderboard/${slug}`);
+        if (expandedBoard.value === slug) {
+            boardRows.value = data.top ?? [];
+            boardWeekly.value = data.weekly ?? null;
+            // Пистата на уикенда отваря направо седмичното предизвикателство.
+            boardTab.value = data.weekly !== null && data.weekly !== undefined ? 'week' : 'all';
+        }
+    } catch {
+        if (expandedBoard.value === slug) {
+            boardRows.value = [];
+            // Без weekly данни табът „Тази седмица" от предишна писта би
+            // показал седмично празно съобщение на писта без предизвикателство.
+            boardTab.value = 'all';
+        }
+    } finally {
+        // Закъснял отговор за ВЕЧЕ сменена писта не бива да гаси спинера
+        // на текущата (и обратно) — всичко е гейтнато по slug-а.
+        if (expandedBoard.value === slug) {
+            boardLoading.value = false;
+        }
+    }
+};
+
+// Линк-покана: отваря играта директно в дуел срещу духа на потребителя.
+const challengeLink = (slug, userId) =>
+    `${window.location.origin}/game?track=${encodeURIComponent(slug)}&rival=${userId}`;
+
+let copiedTimer = null;
+
+const copyChallenge = async (slug, userId, key) => {
+    try {
+        await navigator.clipboard.writeText(challengeLink(slug, userId));
+        copiedChallenge.value = key;
+        // Един таймер: повторен клик рестартира отброяването, вместо старият
+        // таймер да гаси ✓-то предсрочно.
+        clearTimeout(copiedTimer);
+        copiedTimer = setTimeout(() => {
+            copiedChallenge.value = null;
+        }, 2500);
+    } catch {
+        // Клипбордът е блокиран (стар браузър/без HTTPS) — показваме линка.
+        window.prompt('Копирай линка за дуела:', challengeLink(slug, userId));
+    }
+};
 
 const startReplay = () => {
     if (game.value?.startReplay()) {
@@ -178,8 +392,7 @@ const stopReplay = () => {
 // Лилаво = рекорд на пистата. Докато сървърът не отговори, сравняваме локално
 // спрямо рекордите отпреди обиколката; после ползваме авторитетния отговор.
 const lapIsPurple = computed(() => {
-    // Състезателно време не се сравнява с рекордите — те са соло територия.
-    if (!result.value || !result.value.valid || result.value.competition) {
+    if (!result.value || !result.value.valid) {
         return false;
     }
     if (resultMeta.value) {
@@ -190,7 +403,7 @@ const lapIsPurple = computed(() => {
 });
 
 const sectorIsPurple = (i) => {
-    if (!result.value || !result.value.valid || result.value.competition || result.value.sectorsMs[i] === null) {
+    if (!result.value || !result.value.valid || result.value.sectorsMs[i] === null) {
         return false;
     }
     if (resultMeta.value) {
@@ -203,7 +416,7 @@ const sectorIsPurple = (i) => {
 // Цвят на сектор/обиколка (F1): лилаво = рекорд на всички (има предимство),
 // зелено = личен рекорд, жълто = по-бавно от личния рекорд.
 const sectorState = (i) => {
-    if (!result.value || !result.value.valid || result.value.competition || result.value.sectorsMs[i] === null) {
+    if (!result.value || !result.value.valid || result.value.sectorsMs[i] === null) {
         return 'none';
     }
     if (sectorIsPurple(i)) {
@@ -217,7 +430,7 @@ const sectorState = (i) => {
 };
 
 const lapState = computed(() => {
-    if (!result.value || !result.value.valid || result.value.competition) {
+    if (!result.value || !result.value.valid) {
         return 'none';
     }
     if (lapIsPurple.value) {
@@ -288,9 +501,14 @@ const isFirstPlace = computed(() => resultMeta.value?.rank === 1);
  * Three.js се зарежда динамично: ~600 KB, които нямат работа в основния
  * бъндъл на сайта, щом играта е една страница от двайсет.
  */
-const startGame = async (track) => {
+const startGame = async (track, rivalUserId = null) => {
+    // Клавиатура/бърз двоен тап: едно зареждане наведнъж.
+    if (loading.value || selectedTrack.value) {
+        return;
+    }
     loading.value = true;
     error.value = null;
+    rivalInfo.value = null;
 
     try {
         const [{ Game }, response] = await Promise.all([
@@ -320,13 +538,20 @@ const startGame = async (track) => {
             throw new Error('Платното не се инициализира.');
         }
 
+        loadProgress.value = 0;
         game.value = new Game(
             canvas.value,
             data,
             (values) => {
                 telemetry.value = values;
+                drawMinimap(values);
             },
-            onFinish
+            onFinish,
+            {
+                onProgress: (fraction) => {
+                    loadProgress.value = fraction;
+                },
+            }
         );
 
         // Реплеят може да свърши и отвътре (R рестарт) — сваляме си флага.
@@ -339,6 +564,38 @@ const startGame = async (track) => {
             launchLights.value = lights;
         };
 
+        // Карираният флаг на състезанието → подиумът.
+        game.value.onRaceFinish = (result) => {
+            raceResult.value = result;
+        };
+
+        // Вътрешен reset (R / „Рестарт" по време на реплей) сваля и соло
+        // резултатния екран — иначе новата обиколка кара зад стария overlay.
+        game.value.onResultClear = () => {
+            result.value = null;
+            resultMeta.value = null;
+            submitError.value = null;
+        };
+
+        // Дуел от класацията: духът на съперника се тегли паралелно със
+        // зареждането на средата. Дуелът е соло дисциплина (духът се крие в
+        // състезание) — селекторът застава на „Сам на пистата", а опцията
+        // „Състезание" е деактивирана, докато дуелът е активен.
+        if (rivalUserId !== null) {
+            rivals.value = 'solo';
+            const instance = game.value;
+            window.axios
+                .get(`/game/ghost/${track.slug}/${rivalUserId}`)
+                .then(({ data }) => {
+                    if (game.value === instance && instance.setRivalGhost(data)) {
+                        rivalInfo.value = { name: data.name, lapMs: data.lap_ms };
+                    }
+                })
+                .catch(() => {
+                    // Няма дух (изтрит/невалиден) — караш си нормална обиколка.
+                });
+        }
+
         // Изчакай средата (HDRI + болид + текстури) да се зареди. НЕ стартираме
         // тук — стартът чака бутона „Карай" от pre-start екрана (beginLap), след
         // като играчът избере трансмисия. Ако играчът напусне през това време
@@ -349,6 +606,10 @@ const startGame = async (track) => {
             return;
         }
         window.addEventListener('resize', handleResize);
+
+        // Духът кара демо зад pre-start екрана, докато избираш настройки.
+        instance.startAttract();
+        drawMinimapPath();
     } catch (e) {
         error.value = e.message ?? 'Нещо се обърка при зареждането.';
         selectedTrack.value = null;
@@ -375,6 +636,16 @@ const beginLap = () => {
         if (controlMode.value === 'tilt') {
             enableTilt();
         }
+
+        // Цял екран + пейзаж (Android; iOS няма API — жестът просто минава).
+        // Играта е строена за широк изглед: chase камерата вижда 3× повече.
+        try {
+            const container = canvas.value?.parentElement;
+            container?.requestFullscreen?.().catch(() => {});
+            screen.orientation?.lock?.('landscape').catch(() => {});
+        } catch {
+            // Без поддръжка — нищо.
+        }
     }
 
     preStart.value = false;
@@ -382,11 +653,24 @@ const beginLap = () => {
 };
 
 const quit = () => {
+    // Мобилният fullscreen + orientation lock (beginLap) не падат сами със
+    // смяната на екрана — сайтът оставаше „залепен" в пейзаж на цял екран.
+    try {
+        document.exitFullscreen?.().catch(() => {});
+        screen.orientation?.unlock?.();
+    } catch {
+        // Не сме във fullscreen / без поддръжка — нищо.
+    }
     teardown();
     selectedTrack.value = null;
     preStart.value = false;
     replaying.value = false;
     launchLights.value = null;
+    raceResult.value = null;
+    rivalInfo.value = null;
+    // Панелът с класацията може да е остарял след изкараните обиколки.
+    expandedBoard.value = null;
+    boardRows.value = [];
     telemetry.value = emptyTelemetry();
     result.value = null;
     resultMeta.value = null;
@@ -548,43 +832,126 @@ const recenterTilt = () => {
                 <code class="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">php artisan game:generate-tracks</code>.
             </div>
 
-            <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <button
+            <div v-else class="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div
                     v-for="track in orderedTracks"
                     :key="track.slug"
-                    type="button"
-                    :disabled="loading"
-                    class="group relative overflow-hidden rounded-xl border p-5 text-left transition hover:bg-zinc-900 disabled:cursor-wait disabled:opacity-50"
-                    :class="track.slug === weekTrack
-                        ? 'border-[#e10600]/70 bg-zinc-900/80 hover:border-[#e10600]'
-                        : 'border-zinc-800 bg-zinc-900/60 hover:border-[#e10600]/60'"
-                    @click="startGame(track)"
+                    class="group relative overflow-hidden rounded-xl border transition"
+                    :class="[
+                        track.slug === weekTrack
+                            ? 'border-[#e10600]/70 bg-zinc-900/80 hover:border-[#e10600]'
+                            : 'border-zinc-800 bg-zinc-900/60 hover:border-[#e10600]/60',
+                        loading ? 'pointer-events-none opacity-50' : '',
+                    ]"
                 >
-                    <div
-                        v-if="track.slug === weekTrack"
-                        class="mb-2 inline-block rounded-full bg-[#e10600]/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#ff5a55]"
+                    <button
+                        type="button"
+                        :disabled="loading"
+                        class="w-full p-5 text-left transition hover:bg-zinc-900 disabled:cursor-wait"
+                        @click="startGame(track)"
                     >
-                        Пистата на уикенда
-                    </div>
-                    <div class="text-lg font-bold text-zinc-100 group-hover:text-white">
-                        {{ track.name }}
-                    </div>
-                    <div class="mt-1 text-sm text-zinc-500">{{ track.location }}</div>
-                    <div class="mt-4 flex items-baseline gap-4">
-                        <div class="flex items-baseline gap-1.5">
-                            <span class="font-mono text-2xl font-bold text-[#e10600]">
-                                {{ (track.length / 1000).toFixed(3) }}
-                            </span>
-                            <span class="text-xs uppercase tracking-wider text-zinc-500">км</span>
+                        <div
+                            v-if="track.slug === weekTrack"
+                            class="mb-2 inline-block rounded-full bg-[#e10600]/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#ff5a55]"
+                        >
+                            Пистата на уикенда
                         </div>
-                        <div v-if="track.elevation > 3" class="flex items-baseline gap-1.5">
-                            <span class="font-mono text-lg font-semibold text-zinc-300">
-                                {{ Math.round(track.elevation) }}
-                            </span>
-                            <span class="text-xs uppercase tracking-wider text-zinc-500">м денивелация</span>
+                        <div class="text-lg font-bold text-zinc-100 group-hover:text-white">
+                            {{ track.name }}
                         </div>
+                        <div class="mt-1 text-sm text-zinc-500">{{ track.location }}</div>
+                        <div class="mt-4 flex items-baseline gap-4">
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="font-mono text-2xl font-bold text-[#e10600]">
+                                    {{ (track.length / 1000).toFixed(3) }}
+                                </span>
+                                <span class="text-xs uppercase tracking-wider text-zinc-500">км</span>
+                            </div>
+                            <div v-if="track.elevation > 3" class="flex items-baseline gap-1.5">
+                                <span class="font-mono text-lg font-semibold text-zinc-300">
+                                    {{ Math.round(track.elevation) }}
+                                </span>
+                                <span class="text-xs uppercase tracking-wider text-zinc-500">м денивелация</span>
+                            </div>
+                        </div>
+                    </button>
+
+                    <!-- Класацията на пистата: разгъва се под картата, с дуели. -->
+                    <button
+                        type="button"
+                        class="flex w-full items-center justify-between border-t border-zinc-800/70 px-5 py-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500 transition hover:text-zinc-200"
+                        @click="toggleBoard(track.slug)"
+                    >
+                        <span>🏆 Класация</span>
+                        <span class="text-zinc-600">{{ expandedBoard === track.slug ? '▴' : '▾' }}</span>
+                    </button>
+
+                    <div v-if="expandedBoard === track.slug" class="border-t border-zinc-800/70 px-5 py-3">
+                        <!-- Пистата на уикенда: седмично предизвикателство + всички времена -->
+                        <div v-if="boardWeekly !== null" class="mb-2 flex gap-1.5">
+                            <button
+                                v-for="tab in [
+                                    { v: 'week', l: 'Тази седмица' },
+                                    { v: 'all', l: 'Всички времена' },
+                                ]"
+                                :key="tab.v"
+                                type="button"
+                                class="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition"
+                                :class="boardTab === tab.v
+                                    ? 'bg-[#e10600]/20 text-[#ff5a55]'
+                                    : 'bg-zinc-800/70 text-zinc-400 hover:text-zinc-200'"
+                                @click="boardTab = tab.v"
+                            >
+                                {{ tab.l }}
+                            </button>
+                        </div>
+
+                        <div v-if="boardLoading" class="py-2 text-center text-xs text-zinc-500">
+                            Зареждане…
+                        </div>
+                        <div v-else-if="displayedBoardRows.length === 0" class="py-2 text-center text-xs text-zinc-500">
+                            {{ boardTab === 'week' ? 'Никой не е карал тази седмица — бъди първи!' : 'Още няма времена — бъди първи!' }}
+                        </div>
+                        <ol v-else class="space-y-1.5">
+                            <li
+                                v-for="(row, idx) in displayedBoardRows"
+                                :key="row.user_id"
+                                class="flex items-center justify-between gap-2 text-sm"
+                                :class="row.is_you ? 'text-fuchsia-300' : 'text-zinc-300'"
+                            >
+                                <span class="min-w-0 truncate">
+                                    <span class="tabular-nums text-zinc-500">{{ idx + 1 }}.</span>
+                                    <a
+                                        :href="`/profiles/${row.user_id}`"
+                                        class="transition hover:text-white hover:underline"
+                                        @click.stop
+                                    >{{ row.name }}</a>
+                                </span>
+                                <span class="flex shrink-0 items-center gap-1.5">
+                                    <span class="font-mono text-xs tabular-nums">{{ formatMs(row.lap_ms) }}</span>
+                                    <button
+                                        v-if="row.has_ghost && !row.is_you"
+                                        type="button"
+                                        class="rounded bg-fuchsia-500/15 px-2 py-1 text-[11px] font-bold text-fuchsia-300 transition hover:bg-fuchsia-500/30"
+                                        title="Дуел срещу духа на тази обиколка"
+                                        @click="startGame(track, row.user_id)"
+                                    >
+                                        👻 Дуел
+                                    </button>
+                                    <button
+                                        v-if="row.has_ghost"
+                                        type="button"
+                                        class="rounded bg-zinc-800 px-2 py-1 text-[11px] font-semibold text-zinc-300 transition hover:bg-zinc-700"
+                                        title="Копирай линк-покана към този дуел"
+                                        @click="copyChallenge(track.slug, row.user_id, `${track.slug}:${row.user_id}`)"
+                                    >
+                                        {{ copiedChallenge === `${track.slug}:${row.user_id}` ? '✓' : '🔗' }}
+                                    </button>
+                                </span>
+                            </li>
+                        </ol>
                     </div>
-                </button>
+                </div>
             </div>
 
             <p class="mt-8 text-sm text-zinc-500">
@@ -618,7 +985,9 @@ const recenterTilt = () => {
 
         <!-- ── Игрови екран ───────────────────────────────────────────── -->
         <div v-else class="relative">
-            <div class="relative h-[calc(100vh-4rem)] min-h-[420px] w-full overflow-hidden bg-zinc-950">
+            <!-- dvh: на iOS Safari 100vh включва скритата toolbar лента и
+                 бутонът „Спирачка" попадаше под browser chrome-а. -->
+            <div class="relative h-[calc(100dvh-4rem)] min-h-[420px] w-full overflow-hidden bg-zinc-950">
                 <canvas ref="canvas" class="block h-full w-full touch-none"></canvas>
 
                 <!-- Тайминг -->
@@ -628,7 +997,13 @@ const recenterTilt = () => {
                             class="text-[10px] font-semibold uppercase tracking-widest"
                             :class="telemetry.started ? 'text-zinc-400' : 'text-amber-400'"
                         >
-                            {{ telemetry.started ? 'Квалификационна обиколка' : 'Загряваща обиколка' }}
+                            {{ launchLights !== null
+                                ? 'Стартова процедура'
+                                : telemetry.raceTotalLaps > 0
+                                    ? (telemetry.raceLap === 0
+                                        ? 'Към старта'
+                                        : `Обиколка ${Math.min(telemetry.raceLap, telemetry.raceTotalLaps)}/${telemetry.raceTotalLaps}`)
+                                    : (telemetry.started ? 'Квалификационна обиколка' : 'Загряваща обиколка') }}
                         </div>
                         <div
                             class="font-mono text-3xl font-bold tabular-nums sm:text-4xl"
@@ -641,6 +1016,15 @@ const recenterTilt = () => {
                             class="text-[10px] font-semibold uppercase tracking-wider text-amber-400"
                         >
                             Върни скоростта…
+                        </div>
+
+                        <!-- Живата делта срещу духа: зелено = пред него -->
+                        <div
+                            v-if="telemetry.ghostDelta !== null"
+                            class="font-mono text-lg font-bold tabular-nums"
+                            :class="telemetry.ghostDelta <= 0 ? 'text-emerald-400' : 'text-red-400'"
+                        >
+                            {{ (telemetry.ghostDelta > 0 ? '+' : '') + telemetry.ghostDelta.toFixed(2) }}
                         </div>
 
                         <div class="mt-2 space-y-0.5 text-xs">
@@ -670,7 +1054,10 @@ const recenterTilt = () => {
                             </div>
                         </div>
 
-                        <div v-if="!telemetry.started" class="mt-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                        <div
+                            v-if="!telemetry.started && telemetry.raceTotalLaps === 0 && launchLights === null"
+                            class="mt-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500"
+                        >
                             Мини старта за хронометрирана обиколка
                         </div>
                         <div
@@ -710,6 +1097,33 @@ const recenterTilt = () => {
                             <span class="ml-1 text-zinc-200">{{ sec === null ? '—' : sec.toFixed(3) }}</span>
                         </span>
                     </div>
+
+                    <!-- Дуел: срещу чий дух се кара -->
+                    <div
+                        v-if="rivalInfo"
+                        class="mt-1.5 inline-flex items-center gap-1.5 rounded bg-fuchsia-500/20 px-2 py-1 font-mono text-[11px] text-fuchsia-200 backdrop-blur-sm"
+                    >
+                        👻 Дуел с {{ rivalInfo.name }} · {{ formatMs(rivalInfo.lapMs) }}
+                    </div>
+
+                    <!-- Кулата с позициите (състезание): интервал до колата отпред -->
+                    <div
+                        v-if="telemetry.tower"
+                        class="mt-2 rounded-lg bg-black/55 px-3 py-2 font-mono text-[11px] tabular-nums backdrop-blur-sm"
+                    >
+                        <div
+                            v-for="(row, idx) in telemetry.tower"
+                            :key="idx"
+                            class="flex items-baseline justify-between gap-3"
+                            :class="row.isPlayer ? 'font-bold text-fuchsia-300' : 'text-zinc-300'"
+                        >
+                            <span>
+                                <span class="text-zinc-500">{{ idx + 1 }}</span>
+                                {{ row.isPlayer ? 'Ти' : row.name }}
+                            </span>
+                            <span class="text-zinc-500">{{ idx === 0 ? '—' : `+${row.gap}м` }}</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- ODbL иска източникът да се вижда там, където се вижда и картата. -->
@@ -731,9 +1145,12 @@ const recenterTilt = () => {
                         </div>
 
                         <div class="flex items-end justify-end gap-4">
-                            <!-- Предавка -->
+                            <!-- Предавка (key-а рестартира pop анимацията при смяна) -->
                             <div class="text-center">
-                                <div class="font-mono text-4xl font-black leading-none tabular-nums text-white sm:text-5xl">
+                                <div
+                                    :key="gearLabel"
+                                    class="gear-pop font-mono text-4xl font-black leading-none tabular-nums text-white sm:text-5xl"
+                                >
                                     {{ gearLabel }}
                                 </div>
                                 <div class="text-[9px] font-semibold uppercase tracking-widest text-zinc-500">
@@ -757,6 +1174,17 @@ const recenterTilt = () => {
                             <span class="text-zinc-600">об/мин</span>
                         </div>
                     </div>
+                </div>
+
+                <!-- Мини-карта: пътят + живите точки -->
+                <div class="pointer-events-none absolute right-4 top-16 hidden sm:block sm:right-6">
+                    <canvas
+                        ref="minimapCanvas"
+                        :width="MINIMAP_SIZE"
+                        :height="MINIMAP_SIZE"
+                        class="rounded-lg bg-black/40 backdrop-blur-sm"
+                        style="width: 128px; height: 128px"
+                    ></canvas>
                 </div>
 
                 <!-- Изход / рестарт -->
@@ -859,7 +1287,11 @@ const recenterTilt = () => {
                                     :key="opt.v"
                                     type="button"
                                     class="rounded-lg border p-3 text-left transition"
-                                    :class="rivals === opt.v ? 'border-[#e10600] bg-[#e10600]/10' : 'border-zinc-700 hover:border-zinc-500'"
+                                    :class="[
+                                        rivals === opt.v ? 'border-[#e10600] bg-[#e10600]/10' : 'border-zinc-700 hover:border-zinc-500',
+                                        opt.v === 'race' && rivalInfo ? 'cursor-not-allowed opacity-40' : '',
+                                    ]"
+                                    :disabled="opt.v === 'race' && rivalInfo !== null"
                                     @click="rivals = opt.v"
                                 >
                                     <div class="text-sm font-bold text-zinc-100">{{ opt.l }}</div>
@@ -951,9 +1383,21 @@ const recenterTilt = () => {
                             </p>
                         </div>
 
+                        <!-- Истински loading прогрес: болидът/средата по байтове -->
+                        <div v-if="loading" class="mt-5">
+                            <div class="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                                <div
+                                    class="h-full rounded-full bg-[#e10600] transition-all duration-200"
+                                    :style="{ width: `${Math.round(loadProgress * 100)}%` }"
+                                ></div>
+                            </div>
+                            <div class="mt-1.5 text-center text-[11px] text-zinc-500">
+                                Зареждане… {{ Math.round(loadProgress * 100) }}%
+                            </div>
+                        </div>
                         <button
                             type="button"
-                            class="mt-5 w-full rounded-lg bg-[#e10600] px-4 py-3 text-sm font-bold uppercase tracking-wider text-white transition hover:bg-[#ff0800] disabled:cursor-wait disabled:opacity-60"
+                            class="mt-3 w-full rounded-lg bg-[#e10600] px-4 py-3 text-sm font-bold uppercase tracking-wider text-white transition hover:bg-[#ff0800] disabled:cursor-wait disabled:opacity-60"
                             :disabled="loading"
                             @click="beginLap"
                         >
@@ -1002,6 +1446,115 @@ const recenterTilt = () => {
                     </div>
                     <div class="font-mono text-8xl font-black tabular-nums text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
                         {{ telemetry.recoverCount }}
+                    </div>
+                </div>
+
+                <!-- ── Подиум: финалът на състезанието ───────────────────── -->
+                <div
+                    v-if="raceResult && !replaying"
+                    class="absolute inset-0 z-20 flex items-center justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm"
+                >
+                    <div class="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900/95 p-5 shadow-2xl sm:p-6">
+                        <!-- Кариран флаг -->
+                        <div class="mb-4 overflow-hidden rounded">
+                            <svg viewBox="0 0 120 8" preserveAspectRatio="none" class="h-2 w-full">
+                                <defs>
+                                    <pattern id="chequer-race" width="8" height="8" patternUnits="userSpaceOnUse">
+                                        <rect width="8" height="8" fill="#fafafa" />
+                                        <rect width="4" height="4" fill="#0a0a0a" />
+                                        <rect x="4" y="4" width="4" height="4" fill="#0a0a0a" />
+                                    </pattern>
+                                </defs>
+                                <rect width="120" height="8" fill="url(#chequer-race)" />
+                            </svg>
+                        </div>
+
+                        <div class="mb-1 flex items-center justify-center gap-2">
+                            <span class="text-2xl">🏁</span>
+                            <h2 class="text-lg font-black uppercase tracking-wider text-zinc-100">
+                                Финал на състезанието
+                            </h2>
+                        </div>
+                        <p class="mb-4 text-center text-xs text-zinc-500">
+                            {{ selectedTrack?.name }} · {{ telemetry.raceTotalLaps }} обиколки
+                        </p>
+
+                        <div class="text-center">
+                            <div
+                                class="font-mono text-5xl font-black tabular-nums"
+                                :class="raceResult.position === 1 ? 'text-amber-300' : 'text-white'"
+                            >
+                                П{{ raceResult.position }}
+                            </div>
+                            <div v-if="raceResult.position === 1" class="mt-1 text-sm font-bold uppercase tracking-widest text-amber-400">
+                                Победа! 🏆
+                            </div>
+                        </div>
+
+                        <!-- Подиумът: 2-1-3 -->
+                        <div class="mt-5 flex items-end justify-center gap-2">
+                            <div
+                                v-for="slot in [2, 1, 3]"
+                                :key="slot"
+                                class="flex w-24 flex-col items-center"
+                            >
+                                <div
+                                    class="mb-1 w-full truncate text-center text-[11px] font-semibold"
+                                    :class="raceResult.standings[slot - 1]?.isPlayer ? 'text-fuchsia-300' : 'text-zinc-300'"
+                                >
+                                    {{ raceResult.standings[slot - 1]?.isPlayer ? 'Ти' : raceResult.standings[slot - 1]?.name }}
+                                </div>
+                                <div
+                                    class="flex w-full items-start justify-center rounded-t font-mono text-lg font-black"
+                                    :class="[
+                                        slot === 1 ? 'h-16 bg-amber-400/90 text-zinc-900'
+                                            : slot === 2 ? 'h-12 bg-zinc-400/90 text-zinc-900'
+                                            : 'h-9 bg-amber-700/90 text-zinc-100',
+                                    ]"
+                                >
+                                    {{ slot }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Пълното класиране -->
+                        <ol class="mt-4 space-y-1 border-t border-zinc-800 pt-3">
+                            <li
+                                v-for="row in raceResult.standings"
+                                :key="row.position"
+                                class="flex items-baseline justify-between text-sm"
+                                :class="row.isPlayer ? 'font-bold text-fuchsia-300' : 'text-zinc-300'"
+                            >
+                                <span>
+                                    <span class="tabular-nums text-zinc-500">{{ row.position }}.</span>
+                                    {{ row.isPlayer ? 'Ти' : row.name }}
+                                </span>
+                            </li>
+                        </ol>
+
+                        <div class="mt-5 flex gap-2">
+                            <button
+                                type="button"
+                                class="flex-1 rounded-lg bg-[#e10600] px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-white transition hover:bg-[#ff0800]"
+                                @click="newRace"
+                            >
+                                Ново състезание
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-800"
+                                @click="startReplay"
+                            >
+                                📺
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-800"
+                                @click="quit"
+                            >
+                                Смени пистата
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1128,13 +1681,6 @@ const recenterTilt = () => {
                             Невалидна обиколка (излизане извън трасето) — не влиза в класацията.
                         </div>
                         <div
-                            v-else-if="result.competition"
-                            class="mt-3 rounded-lg border border-zinc-700 bg-zinc-800/40 px-3 py-2 text-center text-xs text-zinc-300"
-                        >
-                            Състезателен режим — времето не влиза в класацията.
-                            За рекорд карай <span class="font-semibold">Сам на пистата</span>.
-                        </div>
-                        <div
                             v-else-if="!authUser"
                             class="mt-3 rounded-lg border border-zinc-700 bg-zinc-800/40 px-3 py-2 text-center text-xs text-zinc-300"
                         >
@@ -1151,14 +1697,37 @@ const recenterTilt = () => {
                                 <li
                                     v-for="(row, idx) in leaderboard"
                                     :key="idx"
-                                    class="flex items-baseline justify-between gap-4 text-sm"
+                                    class="flex items-center justify-between gap-2 text-sm"
                                     :class="row.is_you ? 'text-fuchsia-300' : 'text-zinc-300'"
                                 >
-                                    <span class="truncate">
+                                    <span class="min-w-0 truncate">
                                         <span class="tabular-nums text-zinc-500">{{ idx + 1 }}.</span>
-                                        {{ row.name }}
+                                        <a
+                                            :href="`/profiles/${row.user_id}`"
+                                            class="transition hover:text-white hover:underline"
+                                        >{{ row.name }}</a>
                                     </span>
-                                    <span class="font-mono tabular-nums">{{ formatMs(row.lap_ms) }}</span>
+                                    <span class="flex shrink-0 items-center gap-1.5">
+                                        <span class="font-mono tabular-nums">{{ formatMs(row.lap_ms) }}</span>
+                                        <button
+                                            v-if="row.has_ghost && !row.is_you"
+                                            type="button"
+                                            class="rounded bg-fuchsia-500/15 px-2 py-1 text-[11px] font-bold text-fuchsia-300 transition hover:bg-fuchsia-500/30"
+                                            title="Дуел срещу духа на тази обиколка"
+                                            @click="duelFromBoard(row)"
+                                        >
+                                            👻
+                                        </button>
+                                        <button
+                                            v-if="row.has_ghost"
+                                            type="button"
+                                            class="rounded bg-zinc-800 px-2 py-1 text-[11px] font-semibold text-zinc-300 transition hover:bg-zinc-700"
+                                            title="Копирай линк-покана към този дуел"
+                                            @click="copyChallenge(selectedTrack.slug, row.user_id, `result:${row.user_id}`)"
+                                        >
+                                            {{ copiedChallenge === `result:${row.user_id}` ? '✓' : '🔗' }}
+                                        </button>
+                                    </span>
                                 </li>
                             </ol>
                         </div>
@@ -1181,6 +1750,15 @@ const recenterTilt = () => {
                             </button>
                             <button
                                 type="button"
+                                class="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-50"
+                                :disabled="sharing"
+                                title="Сподели резултата (PNG за Telegram)"
+                                @click="shareResult"
+                            >
+                                📤
+                            </button>
+                            <button
+                                type="button"
                                 class="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-800"
                                 @click="quit"
                             >
@@ -1193,3 +1771,19 @@ const recenterTilt = () => {
         </div>
     </PublicLayout>
 </template>
+
+<style scoped>
+/* Предавката „подскача" при смяна — key-ът в шаблона рестартира анимацията. */
+@keyframes gear-pop {
+    0% {
+        transform: scale(1.4);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.gear-pop {
+    animation: gear-pop 0.16s ease-out;
+}
+</style>

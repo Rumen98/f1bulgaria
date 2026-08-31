@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 const BODY_COLOR = 0xd42a26;
 const DARK = 0x1b1b1f;
@@ -166,8 +167,10 @@ export function buildCar() {
  * закачаме в `rig.body`.
  *
  * @param {CarRig} rig
+ * @param {() => boolean} [isStale]
+ * @param {(fraction: number) => void} [onProgress] Прогрес на изтеглянето 0..1
  */
-export function attachCarModel(rig, isStale) {
+export function attachCarModel(rig, isStale, onProgress = () => {}) {
     return new Promise((resolve) => {
         let settled = false;
         const done = () => {
@@ -181,7 +184,11 @@ export function attachCarModel(rig, isStale) {
         // Тежък модел да не държи loading екрана безкрайно.
         const timer = setTimeout(done, 15000);
 
-        new GLTFLoader().load(
+        // GLB-то е meshopt-компресирано (−39% байтове, идентична геометрия;
+        // оригиналът е в storage/app/game/car-original.glb).
+        const loader = new GLTFLoader();
+        loader.setMeshoptDecoder(MeshoptDecoder);
+        loader.load(
             MODEL_URL,
             (gltf) => {
                 const model = gltf.scene;
@@ -235,14 +242,28 @@ export function attachCarModel(rig, isStale) {
                 });
 
                 // Скрий процедурните части — моделът ги замества визуално.
+                // Светлинните ефекти (userData.carLight — спирачно греене и
+                // ауспух от Game.#buildCarLights) НЕ са част от силуета: при
+                // GLB, пристигнал след 15s timeout-а, те вече висят на body-то
+                // и скриването им би ги убило за цялата сесия.
                 for (const child of rig.body.children) {
+                    if (child.userData.carLight) {
+                        continue;
+                    }
                     child.visible = false;
                 }
                 rig.body.add(model);
                 rig.model = model;
                 done();
             },
-            undefined,
+            (xhr) => {
+                // Прогрес по реалните байтове; без Content-Length — груба оценка.
+                onProgress(
+                    xhr.total > 0
+                        ? Math.min(1, xhr.loaded / xhr.total)
+                        : Math.min(0.95, xhr.loaded / 7_000_000)
+                );
+            },
             done,   // няма външен модел — остава процедурният силует
         );
     });

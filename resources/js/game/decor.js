@@ -148,6 +148,22 @@ export function buildCircuitDecor(track, circuit, sampler) {
     group.add(marshals.group);
     const marshalPosts = marshals.posts;
 
+    // Нощно състезание: прожекторните кули СА светлината (директната в Game
+    // е сборният им ефект) — тук са само визуалните пилони с греещи глави.
+    if (circuit.atmosphere?.night) {
+        group.add(buildFloodlightTowers(track, pit, circuit.startGrandstands === true));
+    }
+
+    // ТВ хеликоптерът кръжи над всяка писта — broadcast усещане на хоризонта.
+    const helicopter = buildHelicopter(track);
+    group.add(helicopter.group);
+    animations.push(helicopter.animate);
+
+    // Пит екипи пред гаражите (само където има пит комплекс).
+    if (pit.from !== pit.to) {
+        group.add(buildPitCrew(track, pit));
+    }
+
     return {
         group,
         startLights: gantry.lights,
@@ -322,6 +338,239 @@ function buildMarshalPosts(track) {
     }
 
     return { group, posts };
+}
+
+/**
+ * Прожекторните кули на нощните писти: пилони на ~120 m с греещи глави.
+ * Самата светлина е сборният directional в Game — кулите са визията ѝ;
+ * на десктоп bloom-ът (threshold 1.0) подпалва главите.
+ *
+ * @param {import('./track.js').Track} track
+ * @param {{from: number, to: number, sign: number}} pit Диапазонът на пит комплекса
+ * @param {boolean} hasGrandstands Стартови трибуни (mesh.js) на -pit.sign страната
+ * @returns {THREE.Group}
+ */
+function buildFloodlightTowers(track, pit, hasGrandstands) {
+    const group = new THREE.Group();
+    const every = Math.max(1, Math.round(120 / track.spacing));
+    const count = Math.ceil(track.count / every);
+
+    const pole = new THREE.CylinderGeometry(0.22, 0.3, 14, 6);
+    pole.translate(0, 7, 0);
+    const poles = new THREE.InstancedMesh(
+        pole,
+        new THREE.MeshStandardMaterial({ color: 0x3a3e46, metalness: 0.4, roughness: 0.6 }),
+        count
+    );
+
+    const head = new THREE.BoxGeometry(1.9, 0.55, 0.3);
+    head.translate(0, 14.1, 0);
+    const heads = new THREE.InstancedMesh(
+        head,
+        new THREE.MeshStandardMaterial({
+            color: 0x1a1c20,
+            emissive: 0xf2f6ff,
+            emissiveIntensity: 3.2,
+            roughness: 0.4,
+        }),
+        count
+    );
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3(1, 1, 1);
+    const up = new THREE.Vector3(0, 1, 0);
+
+    // Пит зоната в увити редове (както buildDistanceMarkers в mesh.js) —
+    // кула на half+11 би стояла точно между питлейна и фасадата на гаражите.
+    const inPit = (i) => {
+        const wrapped = i > track.count / 2 ? i - track.count : i;
+        return wrapped > pit.from && wrapped < pit.to;
+    };
+
+    // Стартовите трибуни заемат -pit.sign страната ~20 m преди до ~150 m
+    // след линията (mesh.js buildStartGrandstands) — пилон там пронизва
+    // седалките и публиката.
+    const inGrandstand = (i) => {
+        const wrapped = i > track.count / 2 ? i - track.count : i;
+        const meters = wrapped * track.spacing;
+        return meters > -20 && meters < 150;
+    };
+
+    const blocked = (i, side) =>
+        (inPit(i) && side === pit.sign) ||
+        (hasGrandstands && side === -pit.sign && inGrandstand(i));
+
+    let placed = 0;
+    let slot = 0;
+    for (let i = 0; i < track.count && placed < count; i += every) {
+        // Редуваме страните по слота (не по placed — пропуснат ред да не
+        // разбърква редуването); заета страна → отсрещната, двете заети
+        // (стартовата права: пит + трибуна) → без кула на този ред.
+        let side = slot % 2 === 0 ? 1 : -1;
+        slot++;
+        if (blocked(i, side)) {
+            side = -side;
+            if (blocked(i, side)) {
+                continue;
+            }
+        }
+        const offset = side * (track.halfWidths[i] + 11);
+
+        position.set(
+            track.xs[i] + track.nx[i] * offset,
+            track.ys[i] - Math.abs(offset) * 0.035 - offset * track.bankSlope[i],
+            track.zs[i] + track.nz[i] * offset
+        );
+        // Главата гледа към трасето.
+        quaternion.setFromAxisAngle(
+            up,
+            Math.atan2(-track.nx[i] * side, -track.nz[i] * side)
+        );
+        matrix.compose(position, quaternion, scale);
+        poles.setMatrixAt(placed, matrix);
+        heads.setMatrixAt(placed, matrix);
+        placed++;
+    }
+
+    poles.count = placed;
+    heads.count = placed;
+    poles.frustumCulled = false;
+    heads.frustumCulled = false;
+    group.add(poles);
+    group.add(heads);
+
+    return group;
+}
+
+/**
+ * ТВ хеликоптерът: low-poly силует, кръжащ бавно над трасето с въртящ се
+ * ротор — незабавно „broadcast" усещане на хоризонта.
+ *
+ * @param {import('./track.js').Track} track
+ * @returns {{group: THREE.Group, animate: (dt: number) => void}}
+ */
+function buildHelicopter(track) {
+    // Центроид на трасето — орбитата е около него.
+    let cx = 0;
+    let cz = 0;
+    let cy = 0;
+    for (let i = 0; i < track.count; i++) {
+        cx += track.xs[i];
+        cz += track.zs[i];
+        cy = Math.max(cy, track.ys[i]);
+    }
+    cx /= track.count;
+    cz /= track.count;
+
+    const group = new THREE.Group();
+    const body = new THREE.Group();
+
+    const dark = new THREE.MeshStandardMaterial({ color: 0x23262e, metalness: 0.3, roughness: 0.55 });
+    const accent = new THREE.MeshStandardMaterial({ color: 0xd7d9de, metalness: 0.2, roughness: 0.5 });
+
+    const hull = new THREE.Mesh(new THREE.SphereGeometry(1.6, 8, 6), dark);
+    hull.scale.set(1, 0.72, 1.5);
+    body.add(hull);
+
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 5.2, 6), accent);
+    tail.rotation.x = Math.PI / 2;
+    tail.position.set(0, 0.25, -3.8);
+    body.add(tail);
+
+    const rotor = new THREE.Mesh(new THREE.BoxGeometry(9, 0.06, 0.35), dark);
+    rotor.position.y = 1.35;
+    body.add(rotor);
+
+    group.add(body);
+
+    // Орбита: радиус до най-далечната точка + отстъп, височина ~90 m.
+    let radius = 0;
+    for (let i = 0; i < track.count; i += 8) {
+        radius = Math.max(radius, Math.hypot(track.xs[i] - cx, track.zs[i] - cz));
+    }
+    radius = radius * 0.55;
+
+    let angle = 0;
+    const animate = (dt) => {
+        angle += dt * 0.03; // ~3.5 минути на обиколка на орбитата
+        const x = cx + Math.cos(angle) * radius;
+        const z = cz + Math.sin(angle) * radius;
+        group.position.set(x, cy + 90, z);
+        // Носът по посоката на движение + лек крен навътре. Орбитата
+        // (cos a, sin a) има курс -a в three.js yaw — без допълнителни 90°,
+        // иначе носът сочи радиално към центъра и машината лети странично.
+        group.rotation.y = -angle;
+        group.rotation.z = 0.12;
+        rotor.rotation.y += dt * 40;
+    };
+    animate(0);
+
+    return { group, animate };
+}
+
+/**
+ * Пит екипи пред гаражите: статични фигури в цветни гащеризони. На 20+ метра
+ * от трасето позите не се четат — присъствието да.
+ *
+ * @param {import('./track.js').Track} track
+ * @param {{sign: number, from: number, to: number}} pit
+ * @returns {THREE.Group}
+ */
+function buildPitCrew(track, pit) {
+    const group = new THREE.Group();
+    const suits = [0x2563eb, 0xff7a00, 0x00a36c, 0xd7d7de, 0xe6007e, 0xf5c400, 0xd42a26, 0x8b5cf6];
+
+    // Фигурата: крака + гащеризон + глава (същата рецепта като маршала).
+    const spanFrom = pit.from + Math.round((pit.to - pit.from) * 0.3);
+    const spanTo = pit.from + Math.round((pit.to - pit.from) * 0.7);
+    const step = Math.max(2, Math.floor((spanTo - spanFrom) / 8));
+
+    let crewIndex = 0;
+    for (let row = spanFrom; row < spanTo && crewIndex < 8; row += step, crewIndex++) {
+        const i = ((row % track.count) + track.count) % track.count;
+        const offset = pit.sign * (track.halfWidths[i] + 9.6);
+
+        const legs = new THREE.BoxGeometry(0.32, 0.75, 0.24);
+        legs.translate(0, 0.38, 0);
+        paintGeometryFlat(legs, 0x1c1e24);
+        const suit = new THREE.BoxGeometry(0.42, 0.58, 0.28);
+        suit.translate(0, 1.03, 0);
+        paintGeometryFlat(suit, suits[crewIndex % suits.length]);
+        const head = new THREE.IcosahedronGeometry(0.12, 0);
+        head.translate(0, 1.48, 0);
+        paintGeometryFlat(head, 0xe8e8ec); // каска
+
+        const legsFlat = legs.toNonIndexed();
+        legs.dispose();
+        const suitFlat = suit.toNonIndexed();
+        suit.dispose();
+
+        const figure = mergeGeometries([legsFlat, suitFlat, head], false);
+        legsFlat.dispose();
+        suitFlat.dispose();
+        head.dispose();
+
+        if (!figure) {
+            continue;
+        }
+
+        const mesh = new THREE.Mesh(
+            figure,
+            new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 })
+        );
+        mesh.position.set(
+            track.xs[i] + track.nx[i] * offset,
+            track.ys[i] - Math.abs(offset) * 0.012 - offset * track.bankSlope[i],
+            track.zs[i] + track.nz[i] * offset
+        );
+        // Гледа към пит лентата.
+        mesh.rotation.y = Math.atan2(-track.nx[i] * pit.sign, -track.nz[i] * pit.sign);
+        group.add(mesh);
+    }
+
+    return group;
 }
 
 // ── Геометрични помощници ────────────────────────────────────────────────

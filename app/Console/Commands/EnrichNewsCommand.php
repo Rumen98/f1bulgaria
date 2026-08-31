@@ -22,6 +22,7 @@ class EnrichNewsCommand extends Command
             $label = match ($outcome) {
                 'published' => 'публикувана',
                 'duplicate' => 'дубликат',
+                'off_topic' => 'извън темата',
                 default => 'ГРЕШКА ('.($error ?? '?').')',
             };
 
@@ -29,11 +30,12 @@ class EnrichNewsCommand extends Command
         });
 
         $this->table(
-            ['Обработени', 'Успешни', 'Дубликати', 'Провалени', 'Без статия', 'Input tokens', 'Output tokens'],
+            ['Обработени', 'Успешни', 'Дубликати', 'Извън темата', 'Провалени', 'Без статия', 'Input tokens', 'Output tokens'],
             [[
                 $stats['processed'],
                 $stats['success'],
                 $stats['duplicates'],
+                $stats['off_topic'],
                 $stats['failed'],
                 $stats['articles_failed'],
                 $stats['input_tokens'],

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Badges;
 
 use App\Models\Badge;
+use App\Models\GameLapRecord;
 use App\Models\Prediction;
 use App\Models\Race;
 use App\Models\Season;
@@ -46,6 +47,38 @@ class BadgeService
         'season-champion' => [
             'name' => 'Шампион на сезона',
             'description' => 'Завърши №1 в класирането на прогнозите за сезона.',
+            'icon' => 'heroicon-o-trophy',
+        ],
+
+        // ── Хронометърът ────────────────────────────────────────────────
+        'game-first-lap' => [
+            'name' => 'Първа обиколка',
+            'description' => 'Записа първото си потвърдено време в Хронометъра.',
+            'icon' => 'heroicon-o-clock',
+        ],
+        'game-beat-official' => [
+            'name' => 'По-бърз от Падок',
+            'description' => 'Изпревари официалния дух на Падок на някоя писта.',
+            'icon' => 'heroicon-o-sparkles',
+        ],
+        'game-five-tracks' => [
+            'name' => 'Пет писти',
+            'description' => 'Потвърдени времена на пет различни писти.',
+            'icon' => 'heroicon-o-map',
+        ],
+        'game-all-tracks' => [
+            'name' => 'Клуб 24',
+            'description' => 'Потвърдено време на всяка писта от календара.',
+            'icon' => 'heroicon-o-globe-europe-africa',
+        ],
+        'game-track-record' => [
+            'name' => 'Лилаво',
+            'description' => 'Държа рекорда на цяла писта в Хронометъра.',
+            'icon' => 'heroicon-o-bolt',
+        ],
+        'game-week-winner' => [
+            'name' => 'Победител на седмицата',
+            'description' => 'Спечели седмичното предизвикателство на пистата на уикенда.',
             'icon' => 'heroicon-o-trophy',
         ],
     ];
@@ -90,6 +123,66 @@ class BadgeService
     public function awardSeasonChampion(Season $season, User $champion): int
     {
         return $this->award($champion, 'season-champion');
+    }
+
+    /**
+     * Значките от Хронометъра — вика се от ValidateGameLapJob СЛЕД успешна
+     * валидация: отхвърлена от преиграването обиколка не бива да е раздала
+     * значки, които няма как да се върнат.
+     */
+    public function evaluateForGameLap(GameLapRecord $record): int
+    {
+        $user = $record->user;
+
+        if ($user === null) {
+            return 0;
+        }
+
+        $awarded = $this->award($user, 'game-first-lap');
+
+        // По-бърз от официалния дух на Падок за тази писта.
+        $ghostPath = public_path("game-ghosts/{$record->track_slug}.json");
+        if (file_exists($ghostPath)) {
+            try {
+                $ghost = json_decode((string) file_get_contents($ghostPath), true, 8, JSON_THROW_ON_ERROR);
+                if (is_numeric($ghost['lapMs'] ?? null) && $record->lap_ms < (int) $ghost['lapMs']) {
+                    $awarded += $this->award($user, 'game-beat-official');
+                }
+            } catch (\JsonException) {
+                // Повреден файл на духа — значката просто изчаква.
+            }
+        }
+
+        $tracksPlayed = GameLapRecord::query()
+            ->counted()
+            ->where('user_id', $user->id)
+            ->distinct()
+            ->count('track_slug');
+
+        if ($tracksPlayed >= 5) {
+            $awarded += $this->award($user, 'game-five-tracks');
+        }
+        if ($tracksPlayed >= count((array) config('game.tracks', []))) {
+            $awarded += $this->award($user, 'game-all-tracks');
+        }
+
+        // Рекордът на пистата (лилаво): никой counted не е по-бърз.
+        $overallBest = GameLapRecord::query()
+            ->counted()
+            ->where('track_slug', $record->track_slug)
+            ->min('lap_ms');
+
+        if ($overallBest !== null && (int) $overallBest === $record->lap_ms) {
+            $awarded += $this->award($user, 'game-track-record');
+        }
+
+        return $awarded;
+    }
+
+    /** Победителят в седмичното предизвикателство (game:weekly-wrap). */
+    public function awardWeekWinner(User $user): int
+    {
+        return $this->award($user, 'game-week-winner');
     }
 
     /**

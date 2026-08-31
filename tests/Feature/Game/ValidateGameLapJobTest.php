@@ -34,6 +34,16 @@ it('потвърждава истинска обиколка чрез преиг
         'verify_status' => 'pending',
     ]);
 
+    // По-стара (по-бавна) обиколка на същия потребител с кадри — pruning-ът
+    // трябва да ги изчисти, щом новата стане най-добрата с дух.
+    $older = GameLapRecord::factory()->for($record->user)->create([
+        'track_slug' => 'monza',
+        'lap_ms' => $this->fixture['lap_ms'] + 60000,
+        'verify_status' => 'verified',
+        'ghost_frames' => 'старите-кадри',
+        'lap_ticks' => 999,
+    ]);
+
     (new ValidateGameLapJob($record->id))->handle();
 
     $record->refresh();
@@ -41,7 +51,12 @@ it('потвърждава истинска обиколка чрез преиг
     expect($record->verify_status)->toBe('verified')
         ->and($record->verified_lap_ms)->toBe($this->fixture['lap_ms'])
         // Преиграното време е авторитетното — записът го носи.
-        ->and($record->lap_ms)->toBe($this->fixture['lap_ms']);
+        ->and($record->lap_ms)->toBe($this->fixture['lap_ms'])
+        // Кадрите на духа идват от преиграването — дуелите ги чакат.
+        ->and($record->ghost_frames)->not->toBeNull()
+        ->and($record->lap_ticks)->toBeGreaterThan(0)
+        // Само най-добрата обиколка пази кадри.
+        ->and($older->refresh()->ghost_frames)->toBeNull();
 })->skip(
     fn (): bool => trim((string) shell_exec('node --version 2>&1')) === '',
     'Node не е наличен в тази среда.',
@@ -62,7 +77,12 @@ it('отхвърля обиколка с подправено (по-бързо) 
 
     (new ValidateGameLapJob($record->id))->handle();
 
-    expect($record->refresh()->verify_status)->toBe('rejected');
+    $record->refresh();
+
+    // Отхвърлена обиколка никога не оставя дух — иначе фалшиво време би
+    // се раздавало като съперник за дуели.
+    expect($record->verify_status)->toBe('rejected')
+        ->and($record->ghost_frames)->toBeNull();
 })->skip(
     fn (): bool => trim((string) shell_exec('node --version 2>&1')) === '',
     'Node не е наличен в тази среда.',

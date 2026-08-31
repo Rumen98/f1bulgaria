@@ -24,6 +24,9 @@
         <title>{{ $seo->resolvedTitle() }}</title>
         <meta name="description" content="{{ $seo->resolvedDescription() }}">
         <link rel="canonical" href="{{ $seo->resolvedCanonical() }}">
+        @if ($seo->isNoindex())
+            <meta name="robots" content="noindex, follow">
+        @endif
 
         <meta property="og:site_name" content="Падок">
         <meta property="og:type" content="{{ $seo->resolvedType() }}">

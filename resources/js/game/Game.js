@@ -19,6 +19,8 @@ import { driveAutopilot } from './autopilot.js';
 import { buildCar, updateCarRig, attachCarModel } from './car.js';
 import { circuitFor } from './circuits.js';
 import { resolveCarContacts } from './collisions.js';
+import { ParticleEffects } from './particles.js';
+import { SkidMarks } from './skidmarks.js';
 import { buildTrackMeshes, COLORS } from './mesh.js';
 import { CAR, FIXED_DT, speedKmh } from './physics.js';
 import {
@@ -31,6 +33,7 @@ import {
     encodeTrace,
 } from './sim.js';
 import { createEngineSound } from './sound.js';
+import { isMobileDevice } from './device.js';
 import { prepareTrack } from './track.js';
 import { createDrivetrain, shiftDown, shiftUp, updateDrivetrain } from './drivetrain.js';
 
@@ -48,6 +51,12 @@ const TELEMETRY_INTERVAL = 1 / 30;
 
 /** Ливреи на AI съперниците — генерични цветове, без реални отбори. */
 const LIVERIES = [0x2563eb, 0xff7a00, 0x00a36c, 0xd7d7de, 0xe6007e, 0xf5c400];
+
+/** Измислени имена на ботовете за класирането — никакви реални пилоти. */
+const BOT_NAMES = ['В. Колев', 'М. Петров', 'Г. Илиев', 'Д. Стоянов', 'Н. Радев', 'Х. Марков'];
+
+/** Дистанция на състезанието, обиколки (обиколка 1 тръгва от решетката). */
+const RACE_TOTAL_LAPS = 3;
 
 /** Стартова процедура (състезание): интервал между светлините и решетката. */
 const LAUNCH_LIGHT_INTERVAL = 0.85; // s между палене на две светлини
@@ -112,16 +121,16 @@ const GRADE_SHADER = {
 
 /**
  * Груба евристика за слабо устройство (телефон / малко CPU ядра) — ползва се, за
- * да се смъкне post-processing-ът там, където fill-rate-ът е тесен.
+ * да се смъкне post-processing-ът там, където fill-rate-ът е тесен. Мобилната
+ * преценка е ОБЩАТА с Vue (device.js) — иначе iPad получаваше десктоп рендер
+ * (composer, HDRI, 1024 сенки) с мобилни контроли.
  *
  * @returns {boolean}
  */
 function isLowPowerDevice() {
-    const ua = navigator.userAgent || '';
-    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
     const fewCores = (navigator.hardwareConcurrency || 8) <= 4;
 
-    return mobile || fewCores;
+    return isMobileDevice() || fewCores;
 }
 
 export class Game {
@@ -136,6 +145,9 @@ export class Game {
         this.canvas = canvas;
         this.onTelemetry = onTelemetry;
         this.onFinish = onFinish;
+        this.onProgress = options.onProgress ?? (() => {});
+        // Една преценка за слабо устройство — ползва се на 5+ места.
+        this.lowPower = isLowPowerDevice();
         // Визуалната идентичност на пистата: питлейн, терен, светлина, а вече
         // и ГЕОМЕТРИЯ — widthProfile/banking влизат в prepareTrack (circuits.js).
         this.circuit = circuitFor(trackData.slug);
@@ -146,15 +158,22 @@ export class Game {
             antialias: true,
             powerPreference: 'high-performance',
         });
-        // Над 2 нищо не се печели визуално, а на телефон убива кадрите.
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        // Над 2 нищо не се печели визуално; на телефон 1.5 е неразличимо в
+        // движение, а е -44% пиксели. Отгоре работи и динамичният governor.
+        this.baseDpr = Math.min(window.devicePixelRatio, this.lowPower ? 1.5 : 2);
+        this.renderScale = 1;
+        this.frameAvgMs = 16;
+        this.scaleCooldown = 0;
+        this.renderer.setPixelRatio(this.baseDpr);
 
         // Филмов tone mapping + сенки (Фаза 1 реализъм). Експозицията е част от
         // атмосферата на пистата (мек Спа срещу ярко крайбрежие в Зандвоорт).
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = this.circuit.atmosphere.exposure;
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // Телефон: PCF (не Soft) — tap-овете са в пъти по-евтини, а на
+        // малък екран разликата не се чете.
+        this.renderer.shadowMap.type = this.lowPower ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 
         const atmosphere = this.circuit.atmosphere;
         this.scene = new THREE.Scene();
@@ -177,13 +196,46 @@ export class Game {
         this.carRig = buildCar();
         this.scene.add(this.carRig.root);
         // По избор: външен GLB болид (public/game-models/car.glb). Липсва ли —
-        // остава процедурният силует по-горе.
-        const carReady = attachCarModel(this.carRig, () => this.disposed || this.started);
+        // остава процедурният силует по-горе. Спирачното греене/ауспухът се
+        // закачат СЛЕД подмяната — attachCarModel скрива децата на body-то.
+        const carReady = attachCarModel(
+            this.carRig,
+            () => this.disposed || this.started,
+            (fraction) => {
+                this.loadParts.car = fraction;
+                this.#reportProgress();
+            }
+        ).then(() => {
+            this.loadParts.car = 1;
+            this.#reportProgress();
+            this.#buildCarLights();
+        });
+
+        // Дим/чакъл/искри + следите от гуми на играча. Размерът на частиците
+        // е в буферни пиксели — казваме им реалния DPR (и после governor-а).
+        this.particles = new ParticleEffects(this.scene);
+        this.particles.setScale(this.baseDpr);
+        this.skidMarks = new SkidMarks(this.scene);
+        this.pendingImpact = null;
+        this._contacts = [];
 
         // HDRI-то и външният болид се зареждат асинхронно. Изчакваме ги ПРЕДИ
         // старта (виж Game/Index.vue), за да не подменят вида по средата на
         // играта. Никога не reject-ва — при липса остава процедурното.
-        this.ready = Promise.all([envReady, carReady, trackReady]).then(() => this.#warmup());
+        // Прогресът тежи по реалните байтове: болидът е най-голямото сваляне.
+        this.loadParts = { car: 0, env: 0, tex: 0 };
+        envReady.then(() => {
+            this.loadParts.env = 1;
+            this.#reportProgress();
+        });
+        trackReady.then(() => {
+            this.loadParts.tex = 1;
+            this.#reportProgress();
+        });
+        this.ready = Promise.all([envReady, carReady, trackReady]).then(() => {
+            this.#warmup();
+            this.onProgress(1);
+        });
 
         // Сенки: всичко ПРИЕМА сянка; хвърлят я колата и подбраният декор
         // близо до трасето (гантри, пит стена/гараж, гуми, табели, мостове —
@@ -194,6 +246,11 @@ export class Game {
         this.scene.traverse((o) => {
             if (o.isMesh) {
                 o.receiveShadow = true;
+                // Телефон: декорът НЕ хвърля сянка (цял geometry pass по-малко);
+                // колите си я пазят — тяхната е тази, която „стъпва" на пътя.
+                if (this.lowPower) {
+                    o.castShadow = false;
+                }
             }
         });
         this.carRig.root.traverse((o) => {
@@ -226,6 +283,9 @@ export class Game {
         this.halo = buildHaloOverlay();
         this.halo.visible = false;
         this.camera.add(this.halo);
+        // Воланът в бордовата камера — върти се със state.steer.
+        this.steeringWheel = buildSteeringWheel();
+        this.halo.add(this.steeringWheel);
 
         // G-force наклоните на бордовата камера (изгладени ускорения).
         this.gLong = 0;
@@ -266,6 +326,31 @@ export class Game {
         // Vue-то показва светлините през този callback (брой светнали, null = край).
         this.onLaunch = () => {};
 
+        // Финал на състезанието: {position, standings} след RACE_TOTAL_LAPS.
+        this.raceResult = null;
+        this.onRaceFinish = () => {};
+
+        // Соло резултатният екран пада симетрично на подиума: вътрешен reset
+        // (R / „Рестарт" по време на реплей) чисти и Vue състоянието през това.
+        this.onResultClear = () => {};
+
+        // Дуел: духът на съперник от класацията (сървърни кадри). Докато е
+        // зареден, се показва ТОЙ (фуксия), а не личният/официалният.
+        this.rivalGhost = null;
+
+        // Живата делта срещу духа: указател в кадрите му (локално търсене).
+        this.ghostDeltaHint = 0;
+
+        // Доплер на съперника: последна дистанция/време за радиалната скорост.
+        this.prevRivalDistance = null;
+        this.prevRivalTime = 0;
+
+        // Attract: духът кара демо зад pre-start екрана, докато чакаш „Карай".
+        this.attractId = null;
+
+        // Мини-картата: нормализирани точки на трасето (веднъж) за Vue canvas.
+        this.minimap = buildMinimap(this.track);
+
         this.accumulator = 0;
         this.lastFrame = 0;
         this.running = false;
@@ -297,6 +382,7 @@ export class Game {
             return;
         }
 
+        this.stopAttract();
         this.running = true;
         this.started = true;
         this.lastFrame = performance.now();
@@ -304,6 +390,46 @@ export class Game {
         this.sound.start();
         this.onLaunch(this.launch ? 0 : null);
         this.rafId = requestAnimationFrame(this.#frame);
+    }
+
+    /**
+     * Attract режим: духът (официалният или дуелният) кара ТВ демо зад
+     * pre-start екрана. Спира се сам при start()/dispose.
+     */
+    startAttract() {
+        if (this.attractId !== null || this.running || this.disposed) {
+            return;
+        }
+
+        const ghost = this.rivalGhost ?? this.ghost;
+        if (!ghost?.frames || ghost.frames.length < 6) {
+            return;
+        }
+
+        this.replay = { frames: ghost.frames, t: 0, camIndex: -1 };
+        this.lastFrame = performance.now();
+
+        const loop = (now) => {
+            if (this.running || this.disposed || this.replay === null) {
+                this.attractId = null;
+                return;
+            }
+            this.attractId = requestAnimationFrame(loop);
+            const dt = Math.min((now - this.lastFrame) / 1000, MAX_FRAME_TIME);
+            this.lastFrame = now;
+            this.#replayFrame(dt);
+        };
+        this.attractId = requestAnimationFrame(loop);
+    }
+
+    stopAttract() {
+        if (this.attractId === null) {
+            return;
+        }
+        cancelAnimationFrame(this.attractId);
+        this.attractId = null;
+        this.replay = null;
+        this.#placeCameraBehindCar();
     }
 
     /** Спира цикъла, без да освобождава ресурси. */
@@ -326,11 +452,45 @@ export class Game {
         this.sim.reset(keepRecords);
         this.accumulator = 0;
         // Нова обиколка = ново състезание: решетка + светлини отначало.
+        // Vue-то сваля подиума през същия callback (R по време на подиум).
+        this.raceResult = null;
+        this.onRaceFinish(null);
+        this.onResultClear();
         this.#gridOpponents();
         this.#gridPlayer();
         this.#armLaunch();
         this.playerRace = { laps: 0, lastProgress: this.sim.lastProgress };
         this.#placeCameraBehindCar();
+    }
+
+    /**
+     * Зарежда духа на съперник от класацията (сървърните кадри от
+     * потвърдената му обиколка) — дуелът „Карай срещу…".
+     *
+     * @param {{frames: string, lap_ticks: number|null, lap_ms: number, name: string}} data
+     * @returns {boolean}
+     */
+    setRivalGhost(data) {
+        const frames = decodeFrames(data.frames);
+        if (!frames || frames.length < 6) {
+            return false;
+        }
+
+        this.rivalGhost = {
+            frames,
+            // lap_ticks липсва при стари записи — извежда се от кадрите.
+            lapTicks: data.lap_ticks ?? Math.floor(frames.length / 3) * FRAME_EVERY,
+            name: data.name,
+        };
+        tintGhostRig(this.ghostRig, 0xe879f9); // фуксия = съперник от класацията
+
+        // Демото зад pre-start екрана превключва на дуелния дух.
+        if (!this.running) {
+            this.stopAttract();
+            this.startAttract();
+        }
+
+        return true;
     }
 
     /**
@@ -497,6 +657,8 @@ export class Game {
         this.disposed = true;
         this.stop();
         this.sound.dispose();
+        this.particles.dispose();
+        this.skidMarks.dispose();
         this.#unbindEvents();
 
         this.scene.traverse((object) => {
@@ -573,10 +735,14 @@ export class Game {
         // и само ако играта още не е тръгнала/освободена — иначе остава
         // процедурният цвят (без черно, без късен pop). repeat: u напречно (по
         // ширината), v по дължина на всеки 8 m (виж UV-то в ribbonMesh).
+        // Телефон: само diffuse — normal/rough картите (≈4.3 MB) не се четат
+        // на малък екран под движеща се камера, а тройният texture fetch на
+        // фрагмент яде точно тесния мобилен bandwidth.
+        const detail = !this.lowPower;
         const applyTo = (name, dir, repeat) => Promise.all([
             load(`/game-textures/${dir}/diff.jpg`, true, repeat),
-            load(`/game-textures/${dir}/nor.jpg`, false, repeat),
-            load(`/game-textures/${dir}/rough.jpg`, false, repeat),
+            detail ? load(`/game-textures/${dir}/nor.jpg`, false, repeat) : Promise.resolve(null),
+            detail ? load(`/game-textures/${dir}/rough.jpg`, false, repeat) : Promise.resolve(null),
         ]).then(([map, normalMap, roughnessMap]) => {
             const material = this.surfaceMaterials?.[name];
             if (!map || this.started || this.disposed || !material) {
@@ -613,11 +779,18 @@ export class Game {
         // Посока на слънцето от азимут/елевация — част от атмосферата на
         // пистата (ниското златно слънце на Монца, високото на Монако).
         const atmosphere = this.circuit.atmosphere;
+        const night = atmosphere.night === true;
         const elevation = atmosphere.sunElevation;
         const azimuth = atmosphere.sunAzimuth;
         const phi = THREE.MathUtils.degToRad(90 - elevation);
         const theta = THREE.MathUtils.degToRad(azimuth);
         const sunDir = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
+
+        // Нощ: „слънцето" на НЕБЕСНИЯ шейдър отива под хоризонта (-12°) —
+        // Rayleigh моделът сам дава тъмносиния здрач; directional-ът горе
+        // остава конфигурираният (сборният ефект на прожекторите).
+        const skyPhi = night ? THREE.MathUtils.degToRad(90 + 12) : phi;
+        const skySunDir = new THREE.Vector3().setFromSphericalCoords(1, skyPhi, theta);
 
         // Атмосферно небе (Rayleigh/Mie). Рендираме го в кубмап → фон (винаги на
         // хоризонта, независимо от позицията) + environment map за IBL.
@@ -628,7 +801,7 @@ export class Game {
         u.rayleigh.value = 2.2;
         u.mieCoefficient.value = 0.005;
         u.mieDirectionalG.value = 0.8;
-        u.sunPosition.value.copy(sunDir);
+        u.sunPosition.value.copy(skySunDir);
 
         const cubeRT = new THREE.WebGLCubeRenderTarget(256);
         const cubeCam = new THREE.CubeCamera(1, 200000, cubeRT);
@@ -641,20 +814,67 @@ export class Game {
         this.envRT = pmrem.fromCubemap(cubeRT.texture);
         this.scene.environment = this.envRT.texture;
         // Същата сила като при HDRI-то → няма скок в осветлението, ако HDRI-то
-        // се приложи по-късно или изобщо липсва.
-        this.scene.environmentIntensity = 0.6;
+        // се приложи по-късно или изобщо липсва. Нощем env-ът е блед здрач.
+        this.scene.environmentIntensity = night ? 0.25 : 0.6;
         this.cubeRT = cubeRT;
+
+        // Звезди над нощните писти — статичен Points купол. Радиусът стои ПОД
+        // far плана на камерата (2200): точка извън клип обема се реже изцяло
+        // от GPU-то (frustumCulled=false спира само CPU cull-а). Seed-ът е
+        // детерминиран по пистата — небето не се разбърква при рестарт.
+        if (night) {
+            const starCount = 450;
+            const positions = new Float32Array(starCount * 3);
+            const rand = mulberry32(hashString(this.track.slug));
+            for (let i = 0; i < starCount; i++) {
+                // Горна полусфера, равномерно по площ.
+                const azimuthAngle = rand() * Math.PI * 2;
+                const y = 0.12 + rand() * 0.88;
+                const r = Math.sqrt(1 - y * y);
+                positions[i * 3] = Math.cos(azimuthAngle) * r * 1800;
+                positions[i * 3 + 1] = y * 1800;
+                positions[i * 3 + 2] = Math.sin(azimuthAngle) * r * 1800;
+            }
+            const starGeometry = new THREE.BufferGeometry();
+            starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const stars = new THREE.Points(
+                starGeometry,
+                new THREE.PointsMaterial({
+                    color: 0xdfe8ff,
+                    size: 2.0,
+                    sizeAttenuation: false,
+                    transparent: true,
+                    opacity: 0.8,
+                    depthWrite: false,
+                    fog: false,
+                })
+            );
+            stars.frustumCulled = false;
+            this.scene.add(stars);
+            // Куполът следва камерата в #render (skybox трик): пистите не са
+            // центрирани в origin-а (Джеда стига ~1.4 km встрани) и статичен
+            // купол пак би излязъл извън far плана на отсрещния ръб.
+            this.stars = stars;
+        }
         pmrem.dispose();
         sky.geometry.dispose();
         sky.material.dispose();
 
         // Мека околна светлина + ключова слънчева със сенки.
-        // Намалена — HDRI-то вече дава небесен fill, затова аналитичната е по-слаба.
-        this.scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x33402f, 0.75));
+        // Намалена — HDRI-то вече дава небесен fill, затова аналитичната е
+        // по-слаба. Нощем fill-ът е студен и слаб (небето не свети).
+        this.scene.add(
+            night
+                ? new THREE.HemisphereLight(0x27324a, 0x0b0d12, 0.5)
+                : new THREE.HemisphereLight(0xbfd8ff, 0x33402f, 0.75)
+        );
 
         const sun = new THREE.DirectionalLight(atmosphere.sunColor, atmosphere.sunIntensity);
         sun.castShadow = true;
-        sun.shadow.mapSize.set(1024, 1024); // върху стегнатата кутия (виж s) 1024 е остро
+        // Телефон: 512 върху 60 m кутия е пак ~8.5 texel/m — контактната
+        // сянка под колата остава, цената пада 4×.
+        const shadowSize = this.lowPower ? 512 : 1024;
+        sun.shadow.mapSize.set(shadowSize, shadowSize);
         sun.shadow.bias = -0.0004;
         sun.shadow.normalBias = 0.6;
         // Само болидът хвърля сянка (виж конструктора) и сенчестата камера следва
@@ -679,6 +899,12 @@ export class Game {
         // подменя фон/светлина по средата на играта („смяна на климата").
         // PMREM се смята веднъж → нулев per-frame разход. Никога не reject-ва:
         // при липсващ файл или бавна мрежа остава процедурното небе.
+        // Нощем HDRI (дневно небе) няма работа — процедурният здрач остава.
+        // На телефон — също: 4.5 MB заради отражения, нечетими на 6" екран.
+        if (night || this.lowPower) {
+            return Promise.resolve();
+        }
+
         return new Promise((resolve) => {
             let settled = false;
             const done = () => {
@@ -724,31 +950,100 @@ export class Game {
     }
 
     #setupComposer() {
+        // Телефон: БЕЗ composer изобщо. Директният renderer.render прилага
+        // ACES + sRGB нативно, а antialias:true на контекста дава хардуерен
+        // MSAA — почти безплатен на мобилните tile GPU-та. Плащахме 5+
+        // fullscreen прохода за grade/SMAA, които на 6" не се четат.
+        if (this.lowPower) {
+            this.composer = null;
+            return;
+        }
+
         const w = this.canvas.clientWidth || 1;
         const h = this.canvas.clientHeight || 1;
 
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-        // Bloom е скъп (~11 fullscreen прохода — mip верига): само на десктоп.
-        // GTAO остава изключено нарочно (на full-res сваляше кадрите).
-        if (!isLowPowerDevice()) {
-            // Само ярките акценти греят: слънчеви отблясъци по clearcoat боята и
-            // яркото HDRI небе. Висок threshold + умерена сила.
-            this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.1, 0.5, 1.0));
-        }
+        // Само ярките акценти греят: слънчеви отблясъци по clearcoat боята,
+        // прожекторите/стартовите светлини нощем. Висок threshold.
+        this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.1, 0.5, 1.0));
 
-        // Broadcast грейд — един евтин fullscreen проход, на всички устройства.
+        // Broadcast грейд — един евтин fullscreen проход.
         this.composer.addPass(new ShaderPass(GRADE_SHADER));
 
-        // SMAA винаги — евтин AA (3 прохода) и ЕДИНСТВЕНИЯТ тук: composer-ът
-        // рендерира в собствен offscreen target, тъй че antialias:true на контекста
-        // не важи. На слабо устройство печелим от пропуснатия bloom, но пазим ръбовете.
+        // SMAA — composer-ът рендерира в offscreen target, така че
+        // antialias:true на контекста не важи по този път.
         this.composer.addPass(new SMAAPass());
 
         // Финал: tone mapping (ACES от рендера) + sRGB към екрана. При composer
         // рендерът е линеен до OutputPass, затова няма двойно tone mapping.
         this.composer.addPass(new OutputPass());
+    }
+
+    /** Loading прогрес към Vue: болидът е ~70% от реалните байтове. */
+    #reportProgress() {
+        this.onProgress(
+            Math.min(0.99, this.loadParts.car * 0.7 + this.loadParts.env * 0.15 + this.loadParts.tex * 0.15)
+        );
+    }
+
+    /**
+     * Governor на резолюцията: пълзяща средна на кадъра; над ~22 ms сваля
+     * мащаба със стъпка (бързо надолу), под ~13 ms бавно го връща. HUD-ът е
+     * DOM и остава кристален независимо от 3D резолюцията.
+     *
+     * @param {number} rawDt Секунди, преди MAX_FRAME_TIME клампата
+     */
+    #governResolution(rawDt) {
+        // Връщане от скрит таб дава rawDt от секунди/минути — това е пауза,
+        // не бавен кадър, и се игнорира изцяло: дори клампната ѝ стойност би
+        // вдигнала EMA-то над прага и би струвала стъпка надолу на здраво
+        // устройство. Реални бавни кадри (thermal) са 30-60 ms, не >250 ms.
+        if (rawDt > 0.25) {
+            return;
+        }
+        this.frameAvgMs += (rawDt * 1000 - this.frameAvgMs) * 0.05;
+        this.scaleCooldown -= rawDt;
+
+        if (this.scaleCooldown > 0) {
+            return;
+        }
+
+        if (this.frameAvgMs > 22 && this.renderScale > 0.55) {
+            this.renderScale = Math.max(0.55, this.renderScale - 0.15);
+            this.scaleCooldown = 1.0;
+            this.#applyRenderScale();
+        } else if (this.frameAvgMs < 13 && this.renderScale < 1) {
+            this.renderScale = Math.min(1, this.renderScale + 0.15);
+            this.scaleCooldown = 3.0;
+            this.#applyRenderScale();
+        }
+    }
+
+    #applyRenderScale() {
+        this.renderer.setPixelRatio(this.baseDpr * this.renderScale);
+        // EffectComposer кешира pixel ratio-то при конструкция — без изричния
+        // setPixelRatio неговите render targets (RenderPass/Bloom/SMAA, т.е.
+        // основната GPU цена) остават на пълна резолюция и governor-ът само
+        // замъглява картината, без да печели кадри.
+        this.composer?.setPixelRatio(this.baseDpr * this.renderScale);
+        // Частиците са оразмерени в буферни пиксели — подаваме новия мащаб,
+        // за да не подскачат спрямо колата при стъпка на governor-а.
+        this.particles.setScale(this.baseDpr * this.renderScale);
+        this.resize();
+    }
+
+    /** Рендер през composer-а (десктоп) или директно (телефон). */
+    #render() {
+        // Звездите (нощ) висят на фиксиран радиус ОКОЛО камерата — така
+        // никога не опират far плана, а без паралакс изглеждат безкрайно далеч.
+        this.stars?.position.copy(this.camera.position);
+        if (this.composer) {
+            this.composer.render();
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 
     /**
@@ -763,8 +1058,8 @@ export class Game {
         }
         this.renderer.compile(this.scene, this.camera);
         // renderer.compile не топли post passes-ите — трябват реални кадри.
-        this.composer.render();
-        this.composer.render();
+        this.#render();
+        this.#render();
     }
 
     /**
@@ -807,7 +1102,11 @@ export class Game {
                 return;
             }
             this.ghost = { frames, lapTicks: parsed.lapTicks, official: true };
-            tintGhostRig(this.ghostRig, 0xf2c14e); // златист = официалният
+            if (!this.rivalGhost) {
+                tintGhostRig(this.ghostRig, 0xf2c14e); // златист = официалният
+            }
+            // Ако pre-start екранът още стои — духът тръгва като демо.
+            this.startAttract();
         } catch {
             // Няма официален дух за тази писта — нищо страшно.
         }
@@ -822,7 +1121,7 @@ export class Game {
     #saveGhost(frames, lapTicks) {
         // Духът в паметта се обновява ВИНАГИ — квотата на localStorage може
         // да провали само персистирането, не тазсесийния съперник.
-        if (this.ghost?.official) {
+        if (this.ghost?.official && !this.rivalGhost) {
             tintGhostRig(this.ghostRig, 0x9fc8ff); // вече е личният, син
         }
         this.ghost = { frames, lapTicks };
@@ -857,7 +1156,10 @@ export class Game {
                 this.keys.add(event.code);
             }
 
-            if (event.code === 'KeyR') {
+            // R преди старта би убил attract демото зад pre-start екрана
+            // (reset → stopReplay нулира replay и цикълът му умира на място) —
+            // рестартът има смисъл само след „Карай".
+            if (event.code === 'KeyR' && this.started) {
                 this.reset(true);
             }
 
@@ -963,6 +1265,18 @@ export class Game {
      * @param {object} event Събитието от sim.tick
      */
     #onLapFinished(event) {
+        // Състезание: няма резултатен екран по средата — следващата обиколка
+        // се въоръжава ВЕДНАГА (не през 'formation', иначе се хронометрира
+        // само всяка втора). Кадрите на ПОСЛЕДНАТА обиколка хранят ТВ реплея
+        // на подиума; финалът идва от #finishRace след RACE_TOTAL_LAPS.
+        if (this.opponents.length > 0) {
+            if (event.frames) {
+                this.lastLapFrames = event.frames;
+            }
+            this.sim.rearmFlyingLap();
+            return;
+        }
+
         if (event.frames) {
             this.lastLapFrames = event.frames;
 
@@ -976,17 +1290,20 @@ export class Game {
                 this.opponents.length === 0 &&
                 (this.ghost === null || this.ghost.official || event.lapTicks < this.ghost.lapTicks)
             ) {
+                // Камбанка само за истинско подобрение (не за първата/официалния).
+                if (this.ghost !== null && !this.ghost.official && event.lapTicks < this.ghost.lapTicks) {
+                    this.sound.recordChime();
+                }
                 this.#saveGhost(event.frames, event.lapTicks);
             }
         }
 
+        // Дотук стигат само соло обиколки (състезанието излезе по-горе) —
+        // затова времето е възпроизводимо и може да върви към класацията.
         this.onFinish({
             lapMs: event.lapMs,
             sectorsMs: event.sectorsMs,
             valid: event.valid,
-            // Времето от състезание НЕ влиза в класацията: контактите с
-            // ботовете правят обиколката невъзпроизводима за сървърния реплей.
-            competition: this.opponents.length > 0,
             // Записът на входа — доказателството на обиколката за сървъра.
             trace: event.trace ? encodeTrace(event.trace) : null,
             simVersion: SIM_VERSION,
@@ -1036,6 +1353,9 @@ export class Game {
             // ъгли (до ~3°), но продават претоварването по-добре от всичко.
             this.camera.rotateX(this.gLong * 0.0012);
             this.camera.rotateZ(-this.gLat * 0.0022);
+
+            // Воланът следва реалния ъгъл (визуално ~100° до упор).
+            this.steeringWheel.rotation.z = state.steer * 1.8;
 
             this.#updateFov(dt, state);
             return;
@@ -1112,8 +1432,13 @@ export class Game {
 
         this.rafId = requestAnimationFrame(this.#frame);
 
-        const dt = Math.min((now - this.lastFrame) / 1000, MAX_FRAME_TIME);
+        const rawDt = (now - this.lastFrame) / 1000;
+        const dt = Math.min(rawDt, MAX_FRAME_TIME);
         this.lastFrame = now;
+
+        // Динамична резолюция: реалният кадър (преди клампата) управлява
+        // мащаба — хваща и слаби устройства, и thermal throttling.
+        this.#governResolution(rawDt);
 
         // ── ТВ реплей: симулацията е замразена, кадрите се превъртат ────────
         if (this.replay) {
@@ -1181,7 +1506,21 @@ export class Game {
                         cars.push(opp.sim.state);
                     }
                 }
-                resolveCarContacts(cars);
+                resolveCarContacts(cars, this._contacts);
+
+                // Ударите С УЧАСТИЕ на играча хранят искри + звук (веднъж на
+                // кадър — най-силният).
+                for (const contact of this._contacts) {
+                    if (contact.a !== state && contact.b !== state) {
+                        continue;
+                    }
+                    if (contact.impulse < 1.2) {
+                        continue;
+                    }
+                    if (this.pendingImpact === null || contact.impulse > this.pendingImpact.impulse) {
+                        this.pendingImpact = contact;
+                    }
+                }
             }
 
             this.accumulator -= FIXED_DT;
@@ -1192,6 +1531,16 @@ export class Game {
         trackWrap(this.playerRace, sim.lastProgress);
         for (const opp of this.opponents) {
             trackWrap(opp, opp.sim.lastProgress);
+        }
+
+        // Финал на състезанието: пресичане № RACE_TOTAL_LAPS+1 (първото е
+        // потеглянето от решетката) = карирания флаг за играча.
+        if (
+            this.opponents.length > 0 &&
+            !this.raceResult &&
+            this.playerRace.laps > RACE_TOTAL_LAPS
+        ) {
+            this.#finishRace();
         }
 
         // След телепорт (връщане на пистата) не интерполираме от старото място —
@@ -1264,6 +1613,31 @@ export class Game {
             this.cameraMode === 'onboard' ? shake + rumble * 0.8 : shake * 0.45 + rumble * 0.2;
         this.camera.position.y += this.cameraShakeOffset;
 
+        // Дим/чакъл/искри — данните (slip, повърхност) вече са сметнати.
+        this.particles.update(dt, render, sim.surface.height, state, sim);
+
+        // Следите от гуми: плъзгане или яко спиране с накъсана задница.
+        const skidding =
+            state.slip > 0.3 ||
+            (this.input.brake > 0 && Math.abs(state.vForward) > 30 && state.slip > 0.12);
+        this.skidMarks.update(skidding, render, sim.surface.height, sim.surface.bank);
+
+        // Удар от този кадър: искри + звук + вибрация (Android).
+        if (this.pendingImpact !== null) {
+            const impact = this.pendingImpact;
+            this.pendingImpact = null;
+            const strength = Math.min(1, impact.impulse / 6);
+            this.particles.burst(impact.x, sim.surface.height + 0.4, impact.z, strength);
+            this.sound.impact(strength);
+            navigator.vibrate?.(30);
+        }
+
+        // Кратък тактилен тик при качване на керб (Android; iOS няма API).
+        if (sim.onKerb && !this.wasOnKerb) {
+            navigator.vibrate?.(8);
+        }
+        this.wasOnKerb = sim.onKerb;
+
         // Маршалът вее карирания флаг само на летящата (финалната) обиколка.
         if (this.marshalFlag) {
             if (sim.phase === 'flying') {
@@ -1317,13 +1691,35 @@ export class Game {
         }
 
         // Трансмисия (обороти/предавка за HUD) — гладко, всеки кадър.
+        const gearBefore = this.drivetrain.gear;
         updateDrivetrain(this.drivetrain, state.vForward, this.input.throttle);
 
+        // Смяната на предавка: звуковият „крак"/blip + пламък от ауспуха.
+        if (this.drivetrain.gear !== gearBefore && Math.abs(state.vForward) > 2) {
+            this.sound.shift(this.drivetrain.gear > gearBefore ? 1 : -1);
+            this.exhaustFlash = 0.09;
+        }
+
+        // Спирачно греене + пламък от ауспуха.
+        this.#updateCarLights(dt, state);
+
         // Звукът следва реалните обороти + повърхността под колата.
+        // Тълпата се чува при трибуните на старт-финала; тунелът (Монако)
+        // включва риверба.
+        const progressMeters = sim.lastProgress * this.track.length;
+        const startDistance = Math.min(progressMeters, this.track.length - progressMeters);
+        const tunnel = this.circuit.tunnel;
+
         this.sound.update(this.drivetrain.rpm, this.input.throttle, {
             kerb: sim.onKerb,
             gravel: sim.offSurface === 'gravel',
             speed: Math.abs(state.vForward),
+            slip: state.slip,
+            brake: this.input.brake,
+            crowd: this.circuit.startGrandstands
+                ? Math.max(0, 1 - startDistance / 220)
+                : 0,
+            tunnel: tunnel !== undefined && progressMeters >= tunnel.from && progressMeters <= tunnel.to,
         });
         this.#updateRivalSound(render);
 
@@ -1336,7 +1732,7 @@ export class Game {
             render.z + this.sunDir.z * 300
         );
 
-        this.composer.render();
+        this.#render();
 
         // HUD телеметрия — не по-често от 30 Hz (виж TELEMETRY_INTERVAL): Vue
         // реактивността на всеки кадър е излишен diff/patch + GC натиск, а
@@ -1351,6 +1747,7 @@ export class Game {
         // Гридът стартира пред теб → тръгваш последен и гониш; изпревариш ли
         // кола физически, позицията пада веднага.
         let position = 1;
+        let tower = null;
         if (this.opponents.length > 0) {
             const race = this.playerRace;
             const covered = race.laps + race.lastProgress;
@@ -1359,6 +1756,40 @@ export class Game {
                     position++;
                 }
             }
+
+            // Кулата с позициите: интервал до колата ОТПРЕД, в метри.
+            const entries = [
+                { name: null, isPlayer: true, covered },
+                ...this.opponents.map((opp, i) => ({
+                    name: BOT_NAMES[i % BOT_NAMES.length],
+                    isPlayer: false,
+                    covered: opp.laps + opp.lastProgress,
+                })),
+            ];
+            entries.sort((a, b) => b.covered - a.covered);
+            tower = entries.map((entry, idx) => ({
+                name: entry.name,
+                isPlayer: entry.isPlayer,
+                gap: idx === 0
+                    ? 0
+                    : Math.round((entries[idx - 1].covered - entry.covered) * this.track.length),
+            }));
+        }
+
+        // Живата делта срещу духа (соло/дуел) — зелено/червено в HUD-а.
+        const ghostDelta = this.#ghostDelta();
+
+        // Мини-картата: нормализирани точки на колите (30 Hz е достатъчно).
+        const mapDots = [{ ...this.minimap.project(state.x, state.z), t: 0 }];
+        for (const opp of this.opponents) {
+            mapDots.push({ ...this.minimap.project(opp.sim.state.x, opp.sim.state.z), t: 1 });
+        }
+        if (this.ghostRig.root.visible) {
+            const g = this.ghostRig.root.position;
+            // Типът оцветява точката като 3D духа: официален златист (2),
+            // личен син (3), дуелен фуксия (4) — виж DOT_COLORS в Index.vue.
+            const t = this.rivalGhost ? 4 : this.ghost?.official ? 2 : 3;
+            mapDots.push({ ...this.minimap.project(g.x, g.z), t });
         }
 
         this.onTelemetry({
@@ -1367,6 +1798,11 @@ export class Game {
             gear: this.drivetrain.gear,
             position,
             fieldSize: this.opponents.length + 1,
+            raceLap: this.playerRace.laps,
+            raceTotalLaps: this.opponents.length > 0 ? RACE_TOTAL_LAPS : 0,
+            tower,
+            ghostDelta,
+            mapDots,
             lapTime: sim.phase === 'flying' ? sim.lapTicks * FIXED_DT : null,
             lastLap: sim.lastLapTicks === null ? null : sim.lastLapTicks * FIXED_DT,
             bestLap: sim.bestLapTicks === null ? null : sim.bestLapTicks * FIXED_DT,
@@ -1382,6 +1818,182 @@ export class Game {
             maxWarnings: MAX_WARNINGS,
         });
     };
+
+    /**
+     * Карираният флаг: класирането се снима в момента на финала на играча
+     * (по място на пистата — изпреварилите ботове са легитимно напред).
+     */
+    #finishRace() {
+        const entries = [
+            {
+                name: null,
+                isPlayer: true,
+                covered: this.playerRace.laps + this.playerRace.lastProgress,
+            },
+            ...this.opponents.map((opp, i) => ({
+                name: BOT_NAMES[i % BOT_NAMES.length],
+                isPlayer: false,
+                covered: opp.laps + opp.lastProgress,
+            })),
+        ];
+
+        entries.sort((a, b) => b.covered - a.covered);
+
+        const standings = entries.map((entry, i) => ({
+            position: i + 1,
+            name: entry.name,
+            isPlayer: entry.isPlayer,
+        }));
+
+        this.raceResult = {
+            position: standings.find((s) => s.isPlayer).position,
+            standings,
+        };
+        this.sound.fanfare(this.raceResult.position);
+        this.onRaceFinish(this.raceResult);
+    }
+
+    /**
+     * Живата делта срещу духа: времето, на което духът е бил на ТОВА място,
+     * срещу текущия хронометър. Търсенето в кадрите е локално около указател.
+     *
+     * @returns {number|null} Секунди (+ = изоставаш), null когато няма дуел
+     */
+    #ghostDelta() {
+        const ghost = this.rivalGhost ?? this.ghost;
+        const sim = this.sim;
+
+        if (
+            !ghost?.frames ||
+            sim.phase !== 'flying' ||
+            sim.timerGated ||
+            this.opponents.length > 0
+        ) {
+            return null;
+        }
+
+        const frames = ghost.frames;
+        const count = Math.floor(frames.length / 3);
+        if (count < 2) {
+            return null;
+        }
+
+        // Нова обиколка → указателят се връща на старта.
+        if (sim.lapTicks < 10) {
+            this.ghostDeltaHint = 0;
+        }
+
+        const x = sim.state.x;
+        const z = sim.state.z;
+        let best = this.ghostDeltaHint;
+        let bestD = Infinity;
+        const window = 150;
+
+        // Кадрите са ЕДНА обиколка, не цикъл — клампваме търсенето вместо
+        // модулно увиване: на линията увиването залепва за отсрещния край и
+        // делтата проблясва ±цяла обиколка за един телеметричен кадър.
+        const from = Math.max(0, this.ghostDeltaHint - 20);
+        const to = Math.min(count - 1, this.ghostDeltaHint + window);
+        for (let k = from; k <= to; k++) {
+            const dx = x - frames[k * 3];
+            const dz = z - frames[k * 3 + 2];
+            const d = dx * dx + dz * dz;
+            if (d < bestD) {
+                bestD = d;
+                best = k;
+            }
+        }
+
+        this.ghostDeltaHint = best;
+
+        // Далеч от линията на духа (излизане/recovery) — делтата лъже.
+        if (bestD > 35 * 35) {
+            return null;
+        }
+
+        // Същият -1 кадър като #updateGhost: frames[k] е състоянието СЛЕД
+        // тик (k+1)·FRAME_EVERY — без корекцията делтата постоянно надписва
+        // ~17 ms изоставане и спори с рендерирания дух.
+        return (sim.lapTicks - (best + 1) * FRAME_EVERY) * FIXED_DT;
+    }
+
+    /**
+     * Спирачно греене на задните колела + пламък от ауспуха. Закача се СЛЕД
+     * attachCarModel (той скрива децата на body-то при подмяна с GLB) —
+     * добавеното после остава видимо и се накланя с болида.
+     */
+    #buildCarLights() {
+        if (this.disposed) {
+            return;
+        }
+
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff5a20,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+        });
+
+        this.brakeGlows = [];
+        for (const side of [-1, 1]) {
+            const disc = new THREE.Mesh(new THREE.CircleGeometry(0.17, 12), glowMaterial.clone());
+            disc.position.set(side * 0.84, 0.37, -1.55);
+            disc.rotation.y = side * (Math.PI / 2);
+            // Тагът пази ефекта от attachCarModel: късен GLB скрива децата
+            // на body-то, но тагнатите светлини остават видими.
+            disc.userData.carLight = true;
+            this.carRig.body.add(disc);
+            this.brakeGlows.push(disc);
+        }
+
+        const flame = new THREE.Mesh(
+            new THREE.ConeGeometry(0.09, 0.5, 6),
+            new THREE.MeshBasicMaterial({
+                color: 0xffa040,
+                transparent: true,
+                opacity: 0,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            })
+        );
+        // Върхът назад: конусът гледа по -z (върхът на ConeGeometry е по +Y,
+        // Rx(-π/2) го обръща към -Z — колата гледа по +Z).
+        flame.rotation.x = -Math.PI / 2;
+        flame.position.set(0, 0.5, -2.45);
+        flame.userData.carLight = true;
+        this.carRig.body.add(flame);
+        this.exhaust = flame;
+
+        this.brakeGlowLevel = 0;
+        this.exhaustFlash = 0;
+    }
+
+    /**
+     * @param {number} dt
+     * @param {import('./physics.js').CarState} state
+     */
+    #updateCarLights(dt, state) {
+        if (!this.brakeGlows) {
+            return;
+        }
+
+        // Дисковете се нагряват/охлаждат плавно — не са лампа on/off.
+        const heating = this.input.brake > 0 && Math.abs(state.vForward) > 8 ? 1 : 0;
+        this.brakeGlowLevel += (heating - this.brakeGlowLevel) * (1 - Math.exp(-6 * dt));
+        const glow = this.brakeGlowLevel * 0.85;
+        for (const disc of this.brakeGlows) {
+            disc.material.opacity = glow;
+        }
+
+        // Пламъкът: проблясъкът идва от детекцията на смяната в #frame.
+        this.exhaustFlash = Math.max(0, this.exhaustFlash - dt);
+
+        const idleFlame = this.input.throttle > 0 && Math.abs(state.vForward) > 3 ? 0.1 : 0;
+        this.exhaust.material.opacity = this.exhaustFlash > 0 ? 0.85 : idleFlame;
+        const pulse = this.exhaustFlash > 0 ? 1.5 : 0.7;
+        this.exhaust.scale.set(pulse, pulse, pulse);
+    }
 
     /** Маха съперниците от сцената и освобождава ресурсите им. */
     #clearOpponents() {
@@ -1499,7 +2111,7 @@ export class Game {
     #armLaunch() {
         this.launch =
             this.opponents.length > 0
-                ? { elapsed: 0, hold: 0.6 + Math.random() * 0.9 }
+                ? { elapsed: 0, hold: 0.6 + Math.random() * 0.9, prevLit: 0 }
                 : null;
         this.onLaunch(this.launch ? 0 : null);
     }
@@ -1518,6 +2130,12 @@ export class Game {
         const lit = Math.min(5, Math.floor(launch.elapsed / LAUNCH_LIGHT_INTERVAL) + 1);
         const outAt = 4 * LAUNCH_LIGHT_INTERVAL + launch.hold;
 
+        // Бийп на всяка нова светлина; по-висок и дълъг при гасенето.
+        if (lit !== launch.prevLit) {
+            launch.prevLit = lit;
+            this.sound.beep(600 + lit * 40);
+        }
+
         if (launch.elapsed >= outAt) {
             // Гаснат — и потегляме.
             if (this.startLights) {
@@ -1525,6 +2143,8 @@ export class Game {
                     material.emissiveIntensity = 0;
                 }
             }
+            this.sound.beep(980, 0.28);
+            navigator.vibrate?.(40);
             this.launch = null;
             this.accumulator = 0;
             this.onLaunch(null);
@@ -1552,7 +2172,7 @@ export class Game {
         }
 
         this.onLaunch(lit);
-        this.composer.render();
+        this.#render();
     }
 
     /**
@@ -1622,7 +2242,21 @@ export class Game {
             pan = ((nx - this.camera.position.x) * e[0] + (nz - this.camera.position.z) * e[2]) / 25;
         }
 
-        this.sound.updateRival(nearest, speed, pan);
+        // Доплер: радиална скорост от разликата на дистанциите между кадри.
+        // Голям скок = смяна на най-близкия/телепорт — нулира се, не „свисти".
+        let closing = 0;
+        if (
+            Number.isFinite(nearest) &&
+            this.prevRivalDistance !== null &&
+            Math.abs(this.prevRivalDistance - nearest) < 15
+        ) {
+            const frameDt = Math.max(1 / 240, (performance.now() - this.prevRivalTime) / 1000);
+            closing = (this.prevRivalDistance - nearest) / frameDt;
+        }
+        this.prevRivalDistance = Number.isFinite(nearest) ? nearest : null;
+        this.prevRivalTime = performance.now();
+
+        this.sound.updateRival(nearest, speed, pan, closing);
     }
 
     /**
@@ -1631,7 +2265,8 @@ export class Game {
      */
     #updateGhost() {
         const sim = this.sim;
-        const ghost = this.ghost;
+        // Дуелният дух (класацията) има предимство пред личния/официалния.
+        const ghost = this.rivalGhost ?? this.ghost;
 
         // Духът е СОЛО фийчър: в състезание позлатеният официален дух би
         // карал „през" полето като седми, недосегаем съперник — объркващо,
@@ -1712,6 +2347,21 @@ export class Game {
         const frames = replay.frames;
         const frameCount = Math.floor(frames.length / 3);
 
+        // Живите частици догарят, спирачното греене гасне — без нови спаунове.
+        this.particles.tick(dt);
+        if (this.brakeGlows) {
+            for (const disc of this.brakeGlows) {
+                disc.material.opacity *= 0.9;
+            }
+            this.exhaust.material.opacity *= 0.9;
+        }
+
+        // Декорът живее и в реплея: attract демото върти този кадър с минути
+        // зад pre-start екрана — замръзнал хеликоптер/знамена издават сцената.
+        for (const animate of this.decorAnimations) {
+            animate(dt);
+        }
+
         // 60 кадъра/секунда реално време.
         replay.t += dt * (120 / FRAME_EVERY);
         if (replay.t >= frameCount - 1) {
@@ -1789,7 +2439,7 @@ export class Game {
             this.camera.updateProjectionMatrix();
         }
 
-        this.composer.render();
+        this.#render();
     }
 
     /**
@@ -1965,6 +2615,74 @@ function hashString(value) {
     }
 
     return hash >>> 0;
+}
+
+/**
+ * Мини-картата: нормализира трасето в квадрат [0,1]² (центрирано) и дава
+ * project() за живите точки. Строи се веднъж; Vue рисува по canvas.
+ *
+ * @param {import('./track.js').Track} track
+ * @returns {{path: Array<[number, number]>, project: (x: number, z: number) => {x: number, y: number}}}
+ */
+function buildMinimap(track) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+
+    for (let i = 0; i < track.count; i++) {
+        minX = Math.min(minX, track.xs[i]);
+        maxX = Math.max(maxX, track.xs[i]);
+        minZ = Math.min(minZ, track.zs[i]);
+        maxZ = Math.max(maxZ, track.zs[i]);
+    }
+
+    const size = Math.max(maxX - minX, maxZ - minZ) || 1;
+    const padX = (size - (maxX - minX)) / 2;
+    const padZ = (size - (maxZ - minZ)) / 2;
+
+    const project = (x, z) => ({
+        x: (x - minX + padX) / size,
+        y: (z - minZ + padZ) / size,
+    });
+
+    const path = [];
+    const step = Math.max(1, Math.floor(track.count / 220));
+    for (let i = 0; i < track.count; i += step) {
+        const p = project(track.xs[i], track.zs[i]);
+        path.push([p.x, p.y]);
+    }
+
+    return { path, project };
+}
+
+/**
+ * Воланът за бордовата камера: обръч + спици + хъб, дете на halo групата.
+ *
+ * @returns {THREE.Group}
+ */
+function buildSteeringWheel() {
+    const group = new THREE.Group();
+    const dark = new THREE.MeshBasicMaterial({ color: 0x14161a });
+    const accent = new THREE.MeshBasicMaterial({ color: 0x2c3038 });
+
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.02, 6, 20), dark);
+    group.add(rim);
+
+    for (const angle of [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3]) {
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.15, 0.015), accent);
+        spoke.position.set(Math.sin(angle) * 0.075, Math.cos(angle) * 0.075, 0);
+        spoke.rotation.z = -angle;
+        group.add(spoke);
+    }
+
+    const hub = new THREE.Mesh(new THREE.CircleGeometry(0.045, 10), accent);
+    hub.position.z = 0.008;
+    group.add(hub);
+
+    group.position.set(0, -0.32, -0.52);
+
+    return group;
 }
 
 /**

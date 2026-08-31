@@ -8,14 +8,20 @@ use App\Http\Resources\ConstructorResource;
 use App\Http\Resources\DriverResource;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Game\LeaderboardService as GameLeaderboardService;
 use App\Services\Predictions\LeaderboardService;
+use App\Services\Quiz\QuizProgressService;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class PublicProfileController extends Controller
 {
-    public function show(User $user, LeaderboardService $leaderboard): Response
-    {
+    public function show(
+        User $user,
+        LeaderboardService $leaderboard,
+        QuizProgressService $quiz,
+        GameLeaderboardService $game,
+    ): Response {
         $season = Season::current();
 
         $stats = $season
@@ -44,6 +50,9 @@ class PublicProfileController extends Controller
                 ]),
             ],
             'stats' => $stats,
+            'quiz' => $quiz->statsFor($user),
+            // Хронометърът: карани писти, първи места, най-силни времена.
+            'game' => config('features.game') ? $game->profileStats($user) : null,
             'season' => $season?->year,
         ]);
     }

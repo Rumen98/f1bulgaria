@@ -27,6 +27,8 @@ class GameLapRecord extends Model
         'sim_version',
         'verify_status',
         'verified_lap_ms',
+        'ghost_frames',
+        'lap_ticks',
     ];
 
     /** @return array<string, string> */
@@ -39,6 +41,7 @@ class GameLapRecord extends Model
             'sector3_ms' => 'integer',
             'sim_version' => 'integer',
             'verified_lap_ms' => 'integer',
+            'lap_ticks' => 'integer',
         ];
     }
 

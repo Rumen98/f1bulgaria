@@ -61,6 +61,20 @@
 @endforeach
 @endif
 
+@if ($quiz)
+## Куизът на Падок 🧠
+Имаш **{{ $quiz['points'] }}** от **{{ $quiz['available'] }}** точки.
+@if ($quiz['remaining'] > 0)
+Остават ти **{{ $quiz['remaining'] }}** непокорени въпроса — всеки дава точка при първия верен отговор.
+@else
+Покори всички въпроси. Щом добавим нови, ще ги видиш тук.
+@endif
+
+@component('mail::button', ['url' => url('/quiz'), 'color' => 'success'])
+Играй куиза
+@endcomponent
+@endif
+
 @if ($userStats)
 @component('mail::button', ['url' => url('/leaderboard')])
 Виж пълното класиране

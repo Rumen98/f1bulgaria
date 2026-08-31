@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\GameLapRecord;
+use App\Services\Badges\BadgeService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
@@ -37,6 +40,27 @@ class ValidateGameLapJob implements ShouldQueue
     public int $tries = 2;
 
     public function __construct(public readonly int $recordId) {}
+
+    /**
+     * Две едновременни валидации на един потребител+писта могат взаимно да си
+     * изтрият кадрите на духа (prune-ът е read-then-write) — сериализират се.
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        $record = GameLapRecord::query()->find($this->recordId, ['user_id', 'track_slug']);
+
+        if ($record === null) {
+            return [];
+        }
+
+        return [
+            (new WithoutOverlapping("game-lap:{$record->user_id}:{$record->track_slug}"))
+                ->releaseAfter(15)
+                ->expireAfter(180),
+        ];
+    }
 
     public function handle(): void
     {
@@ -136,6 +160,12 @@ class ValidateGameLapJob implements ShouldQueue
             // подарък (клиент би заявил replayed − 119 ms и би минал).
             $sectors = is_array($result['sectorsMs'] ?? null) ? $result['sectorsMs'] : [null, null, null];
 
+            // Кадрите от преиграването = сървърният дух за дуелите. Таван
+            // срещу раздут изход (~90 KB е нормална обиколка).
+            $frames = is_string($result['frames'] ?? null) && strlen($result['frames']) <= 4_000_000
+                ? $result['frames']
+                : null;
+
             $record->update([
                 'verify_status' => 'verified',
                 'verified_lap_ms' => $replayedMs,
@@ -143,7 +173,22 @@ class ValidateGameLapJob implements ShouldQueue
                 'sector1_ms' => is_numeric($sectors[0] ?? null) ? (int) $sectors[0] : $record->sector1_ms,
                 'sector2_ms' => is_numeric($sectors[1] ?? null) ? (int) $sectors[1] : $record->sector2_ms,
                 'sector3_ms' => is_numeric($sectors[2] ?? null) ? (int) $sectors[2] : $record->sector3_ms,
+                'ghost_frames' => $frames,
+                'lap_ticks' => is_numeric($result['lapTicks'] ?? null) ? (int) $result['lapTicks'] : null,
             ]);
+
+            $this->pruneGhostFrames($record);
+
+            // Значките — чак СЛЕД потвърждението (отхвърлена обиколка не бива
+            // да е раздала значки). Провал тук не проваля валидацията.
+            try {
+                app(BadgeService::class)->evaluateForGameLap($record->refresh());
+            } catch (\Throwable $e) {
+                Log::warning('game: значките след валидация гръмнаха', [
+                    'record' => $record->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return;
         }
@@ -161,5 +206,39 @@ class ValidateGameLapJob implements ShouldQueue
                 'status' => $status,
             ]);
         }
+    }
+
+    /**
+     * Кадрите на духа се пазят само за НАЙ-ДОБРАТА обиколка на потребителя на
+     * пистата — всяка друга е мъртво тегло от ~90 KB. Дуелът от класацията
+     * винаги сочи най-бързия наличен дух.
+     */
+    private function pruneGhostFrames(GameLapRecord $record): void
+    {
+        // Заключваме редовете: изборът на „най-добрата" и изтриването на
+        // останалите трябва да са една атомарна стъпка (WithoutOverlapping
+        // пази между два worker-а, транзакцията — при всичко останало).
+        DB::transaction(function () use ($record): void {
+            $best = GameLapRecord::query()
+                ->counted()
+                ->where('user_id', $record->user_id)
+                ->where('track_slug', $record->track_slug)
+                ->whereNotNull('ghost_frames')
+                ->lockForUpdate()
+                ->orderBy('lap_ms')
+                ->orderByDesc('id')
+                ->first(['id']);
+
+            if ($best === null) {
+                return;
+            }
+
+            GameLapRecord::query()
+                ->where('user_id', $record->user_id)
+                ->where('track_slug', $record->track_slug)
+                ->where('id', '!=', $best->id)
+                ->whereNotNull('ghost_frames')
+                ->update(['ghost_frames' => null]);
+        });
     }
 }

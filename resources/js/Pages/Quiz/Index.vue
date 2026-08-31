@@ -1,16 +1,22 @@
 <script setup>
+import QuizLeaderboard from '@/Components/Quiz/QuizLeaderboard.vue';
+import QuizProgress from '@/Components/Quiz/QuizProgress.vue';
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import Trophy from '@/Components/UI/Trophy.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
 
 const props = defineProps({
     questions: { type: Array, default: () => [] },
     result: { type: Object, default: null }, // != null => режим резултат/ревю
+    stats: { type: Object, default: () => ({ points: 0, available: 0, attempts: 0, best_score: null, best_total: null }) },
+    leaderboard: { type: Array, default: () => [] },
 });
+
+const currentUser = computed(() => usePage().props.auth?.user ?? null);
 
 // ── Режим куиз ────────────────────────────────────────────────────────────
 const selected = reactive({});
@@ -223,6 +229,16 @@ watch(
                     🏁 Нов кръг
                 </button>
             </div>
+
+            <!-- Постоянният прогрес живее ПОД кръга: показва, че резултатът е
+                 оставил следа, вместо да изчезне с напускането на страницата. -->
+            <div class="mt-8">
+                <QuizProgress :stats="stats" :new-points="result.new_points ?? 0" :authenticated="!!currentUser" />
+            </div>
+
+            <div class="mt-8">
+                <QuizLeaderboard :rows="leaderboard" :current-user-id="currentUser?.id ?? null" />
+            </div>
         </template>
 
         <!-- ═══════════════ РЕЖИМ КУИЗ ═══════════════ -->
@@ -230,6 +246,10 @@ watch(
             <div class="mb-6 flex items-center gap-2.5">
                 <span class="flag-chip h-6 w-6 rounded" />
                 <h1 class="font-display text-2xl font-black sm:text-3xl">Куизът на Падок<span class="text-red-600">.</span></h1>
+            </div>
+
+            <div class="mb-6">
+                <QuizProgress :stats="stats" :authenticated="!!currentUser" />
             </div>
 
             <EmptyState v-if="questions.length === 0">Все още няма въпроси. Върни се скоро!</EmptyState>
@@ -294,6 +314,10 @@ watch(
                     </button>
                 </div>
             </template>
+
+            <div class="mt-10">
+                <QuizLeaderboard :rows="leaderboard" :current-user-id="currentUser?.id ?? null" />
+            </div>
         </template>
     </PublicLayout>
 </template>

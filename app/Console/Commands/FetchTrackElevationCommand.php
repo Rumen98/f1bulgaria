@@ -70,6 +70,14 @@ class FetchTrackElevationCommand extends Command
         foreach ($tracks as $trackSlug => $config) {
             $path = "{$directory}/{$trackSlug}.json";
 
+            // Изключена в конфига (плоска писта) — не хаби дневния лимит на
+            // API-то за данни, които generate-tracks няма да прочете.
+            if (($config['elevation'] ?? true) === false) {
+                $this->line("{$trackSlug}: elevation е изключена в конфига — пропускам");
+
+                continue;
+            }
+
             if (file_exists($path) && ! $this->option('force')) {
                 $this->line("{$trackSlug}: вече е кеширана (--force за презапис)");
 

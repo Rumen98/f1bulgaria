@@ -27,6 +27,7 @@ use App\Http\Controllers\PublicProfileController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\RaceController;
 use App\Http\Controllers\RivalriesController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StandingsController;
 use App\Http\Controllers\StaticPageController;
 use App\Http\Controllers\TeamsController;
@@ -49,6 +50,11 @@ Route::get('/teams/{slug}', [TeamsController::class, 'show'])->name('teams.show'
 Route::get('/drivers', [DriversController::class, 'index'])->name('drivers.index');
 Route::get('/drivers/{slug}', [DriversController::class, 'show'])->name('drivers.show');
 Route::get('/terminologiya', [TerminologyController::class, 'index'])->name('terminology');
+// Търсене из целия сайт. throttle пази LIKE заявките от скъп scan при
+// автоматизиран трафик — 30/мин е далеч над реалното човешко темпо.
+Route::get('/tarsene', SearchController::class)
+    ->middleware('throttle:30,1')
+    ->name('search');
 Route::get('/poveritelnost', [StaticPageController::class, 'privacy'])->name('privacy');
 Route::get('/usloviya', [StaticPageController::class, 'terms'])->name('terms');
 Route::get('/kontakt', [StaticPageController::class, 'contact'])->name('contact');
@@ -109,9 +115,18 @@ Route::middleware('feature:rivalries')->group(function () {
 Route::middleware('feature:game')->group(function () {
     Route::get('/game', [GameController::class, 'index'])->name('game');
 
-    // Класация: публична за четене (лилави рекорди за всички), запис само с вход.
+    // Класация: публична за четене (лилави рекорди за всички), запис само с
+    // вход. Throttle-ната е като духа: панелът на всяка карта я вика често,
+    // а гост без лимит удря 4 заявки към базата на всяко зареждане.
     Route::get('/game/leaderboard/{track}', [GameLeaderboardController::class, 'show'])
+        ->middleware('throttle:60,1')
         ->name('game.leaderboard');
+    // Духът на потребител за дуел — публичен, както класацията. Границата на
+    // id-то е и защита: неограничено [0-9]+ прелива PHP int → 500 за гост.
+    Route::get('/game/ghost/{track}/{user}', [GameLeaderboardController::class, 'ghost'])
+        ->where('user', '[0-9]{1,10}')
+        ->middleware('throttle:60,1')
+        ->name('game.ghost');
     Route::post('/game/lap', [GameLeaderboardController::class, 'store'])
         ->middleware(['auth', 'throttle:30,1'])
         ->name('game.lap.store');

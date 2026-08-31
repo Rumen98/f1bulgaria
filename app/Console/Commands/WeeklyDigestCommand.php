@@ -16,6 +16,7 @@ use App\Models\TeamNewsItem;
 use App\Models\User;
 use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Predictions\LeaderboardService;
+use App\Services\Quiz\QuizProgressService;
 use App\Support\DriverName;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -45,7 +46,7 @@ class WeeklyDigestCommand extends Command
     /** Slug на Цолов в `f2_drivers` — Ф2 секцията следи неговия уикенд. */
     private const TSOLOV_SLUG = 'nikola-tsolov';
 
-    public function handle(LeaderboardService $leaderboard, NewsletterAudience $audience): int
+    public function handle(LeaderboardService $leaderboard, NewsletterAudience $audience, QuizProgressService $quizProgress): int
     {
         $season = Season::current();
 
@@ -99,6 +100,7 @@ class WeeklyDigestCommand extends Command
                 f2: $f2,
                 news: $news,
                 userUnsubscribeUrl: URL::signedRoute('newsletter.user-unsubscribe', ['user' => $user->id]),
+                quiz: $this->quizProgress($quizProgress, $user),
             ));
         }
 
@@ -185,6 +187,30 @@ class WeeklyDigestCommand extends Command
             ->all();
 
         return $stats;
+    }
+
+    /**
+     * Прогресът в куиза за секцията в дайджеста.
+     *
+     * Куизът се подсеща оттук, а не с отделно писмо: при 40 потребители всяко
+     * ново масово писмо е по-скоро причина за отписване, отколкото за връщане.
+     * Дайджестът вече пристига всяка неделя и хората го отварят.
+     *
+     * @return array{points:int, available:int, remaining:int}|null
+     */
+    private function quizProgress(QuizProgressService $progress, User $user): ?array
+    {
+        $stats = $progress->statsFor($user);
+
+        if ($stats['available'] === 0) {
+            return null; // няма въпроси в базата — няма какво да рекламираме
+        }
+
+        return [
+            'points' => $stats['points'],
+            'available' => $stats['available'],
+            'remaining' => max(0, $stats['available'] - $stats['points']),
+        ];
     }
 
     /**

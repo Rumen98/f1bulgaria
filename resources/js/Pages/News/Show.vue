@@ -101,26 +101,23 @@ const analysisParagraphs = computed(() => toParagraphs(props.article.analysis));
                     </div>
                 </div>
 
-                <!-- Източник / attribution -->
+                <!-- Атрибуция. Големият CTA „Прочетете оригинала" е премахнат —
+                     изнасяше читателя точно на мястото с най-високо намерение.
+                     Името на източника остава като дискретен линк: текстът е
+                     наша преработка по чужди факти и атрибуцията е дължима. -->
                 <div class="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
                     <p class="text-sm text-zinc-400">
-                        Резюмето и преводът са изготвени от Падок. Пълната оригинална статия е публикувана от
-                        <span v-if="article.source" class="font-semibold text-zinc-200">{{ article.source }}</span>
+                        Текстът е изготвен от Падок по публикация на
+                        <a
+                            v-if="article.source && article.external_url"
+                            :href="article.external_url"
+                            target="_blank"
+                            rel="noopener nofollow"
+                            class="font-semibold text-zinc-300 underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-100"
+                        >{{ article.source }}<span class="sr-only"> (отваря се в нов раздел)</span></a>
+                        <span v-else-if="article.source" class="font-semibold text-zinc-300">{{ article.source }}</span>
                         <span v-else>първоизточника</span>.
                     </p>
-                    <a
-                        v-if="article.external_url"
-                        :href="article.external_url"
-                        target="_blank"
-                        rel="noopener nofollow"
-                        class="mt-4 inline-block rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-500"
-                    >
-                        <!-- Без flex: всеки текстов възел ставаше отделен flex item
-                             и на телефон се чупеше по средата на израза
-                             („Прочетете / оригинала" до „на The / Race"). -->
-                        Прочетете оригинала<span v-if="article.source" class="whitespace-nowrap"> на {{ article.source }}</span><span aria-hidden="true">&nbsp;→</span>
-                        <span class="sr-only">(отваря се в нов раздел)</span>
-                    </a>
                 </div>
 
                 <!-- Абонамент — тук намерението е най-високо (човекът е дочел статията). -->

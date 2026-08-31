@@ -185,6 +185,58 @@ export function createEngineSound() {
         windFilter.connect(windGain);
         windGain.connect(compressor);
 
+        // Свистене на гуми: тесен bandpass с бавно вибрато — вой, не съскане.
+        const screech = makeNoise();
+        const screechFilter = ctx.createBiquadFilter();
+        screechFilter.type = 'bandpass';
+        screechFilter.frequency.value = 2600;
+        screechFilter.Q.value = 7;
+        const screechGain = ctx.createGain();
+        screechGain.gain.value = 0;
+        const screechLfo = ctx.createOscillator();
+        screechLfo.type = 'sine';
+        screechLfo.frequency.value = 5.5;
+        const screechDepth = ctx.createGain();
+        screechDepth.gain.value = 260;
+        screechLfo.connect(screechDepth);
+        screechDepth.connect(screechFilter.frequency);
+        screech.connect(screechFilter);
+        screechFilter.connect(screechGain);
+        screechGain.connect(compressor);
+
+        // Жагор на трибуните — два разнесени LFO-та по амплитудата.
+        const crowd = makeNoise();
+        const crowdFilter = ctx.createBiquadFilter();
+        crowdFilter.type = 'bandpass';
+        crowdFilter.frequency.value = 640;
+        crowdFilter.Q.value = 0.6;
+        const crowdGain = ctx.createGain();
+        crowdGain.gain.value = 0;
+        crowd.connect(crowdFilter);
+        crowdFilter.connect(crowdGain);
+        crowdGain.connect(compressor);
+
+        // Тунелен риверб (Монако): процедурен impulse response, wet само там.
+        const convolver = ctx.createConvolver();
+        const irLength = Math.floor(ctx.sampleRate * 0.7);
+        const ir = ctx.createBuffer(2, irLength, ctx.sampleRate);
+        for (let channel = 0; channel < 2; channel++) {
+            const channelData = ir.getChannelData(channel);
+            let smoothed = 0;
+            for (let i = 0; i < irLength; i++) {
+                // Затихващ шум, леко изгладен (евтин lowpass) — бетонен тунел.
+                const raw = (Math.random() * 2 - 1) * Math.exp((-6 * i) / irLength);
+                smoothed = smoothed * 0.6 + raw * 0.4;
+                channelData[i] = smoothed;
+            }
+        }
+        convolver.buffer = ir;
+        const tunnelSend = ctx.createGain();
+        tunnelSend.gain.value = 0;
+        engineFilter.connect(tunnelSend);
+        tunnelSend.connect(convolver);
+        convolver.connect(compressor);
+
         // Съперник наблизо: втори, приглушен двигател — чува се само когато
         // друга кола е на метри, с панорама според това от коя страна е.
         const rival = ctx.createOscillator();
@@ -205,12 +257,13 @@ export function createEngineSound() {
             rivalGain.connect(compressor);
         }
 
-        for (const src of [sawA, sawB, pulse, kerbLfo, intake, kerb, gravel, wind, rival]) {
+        for (const src of [sawA, sawB, pulse, kerbLfo, intake, kerb, gravel, wind, rival, screech, screechLfo, crowd]) {
             src.start();
         }
 
         nodes = {
             master,
+            compressor,
             engineGain,
             engineFilter,
             sawA,
@@ -225,6 +278,62 @@ export function createEngineSound() {
             rival,
             rivalGain,
             rivalPan,
+            screechGain,
+            crowdGain,
+            tunnelSend,
+            noiseBuffer,
+        };
+    };
+
+    // Едно-shot помощници: тон и шумов взрив, през master (mute важи).
+    const oneShotTone = (type, freq, duration, peak, glideTo = null) => {
+        if (!ctx || !nodes || ctx.state !== 'running') {
+            return;
+        }
+        const t = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        if (glideTo !== null) {
+            osc.frequency.exponentialRampToValueAtTime(Math.max(20, glideTo), t + duration);
+        }
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(peak, t + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+        osc.connect(gain);
+        gain.connect(nodes.compressor);
+        osc.start(t);
+        osc.stop(t + duration + 0.05);
+        osc.onended = () => {
+            osc.disconnect();
+            gain.disconnect();
+        };
+    };
+
+    const noiseBurst = (filterFreq, filterType, duration, peak) => {
+        if (!ctx || !nodes || ctx.state !== 'running') {
+            return;
+        }
+        const t = ctx.currentTime;
+        const src = ctx.createBufferSource();
+        // Преизползва общия шумов буфер от build() през нов източник.
+        src.buffer = nodes.noiseBuffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = filterType;
+        filter.frequency.value = filterFreq;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(peak, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(nodes.compressor);
+        src.start(t);
+        src.stop(t + duration + 0.05);
+        src.onended = () => {
+            src.disconnect();
+            filter.disconnect();
+            gain.disconnect();
         };
     };
 
@@ -315,17 +424,115 @@ export function createEngineSound() {
 
             const windLevel = Math.min(1, (extras.speed / 92) ** 2) * 0.1;
             nodes.windGain.gain.setTargetAtTime(windLevel, t, 0.1);
+
+            // Свистене на гумите: расте с плъзгането; локване (спирачка +
+            // започващо плъзгане) също вие. Чуваш лимита ПРЕДИ чакъла.
+            const slip = extras.slip ?? 0;
+            const slipLevel = Math.max(0, Math.min(1, (slip - 0.22) / 0.5));
+            const lockLevel = (extras.brake ?? 0) > 0.7 && slip > 0.12 ? 0.35 : 0;
+            const speedFactor = Math.min(1, extras.speed / 22);
+            nodes.screechGain.gain.setTargetAtTime(
+                Math.min(0.4, (slipLevel * 0.32 + lockLevel) * speedFactor),
+                t,
+                0.03
+            );
+
+            // Тълпата се чува при трибуните на старт-финала.
+            nodes.crowdGain.gain.setTargetAtTime((extras.crowd ?? 0) * 0.11, t, 0.2);
+
+            // Тунелът (Монако): мокър send към риверба само вътре.
+            nodes.tunnelSend.gain.setTargetAtTime(extras.tunnel ? 0.9 : 0, t, 0.12);
+        },
+
+        /**
+         * Смяна на предавка: при качване — ignition-cut „крак" (срез на
+         * двигателя + метален щрак); при сваляне — кратък blip нагоре.
+         *
+         * @param {1|-1} direction
+         */
+        shift(direction) {
+            if (!ctx || !nodes || ctx.state !== 'running') {
+                return;
+            }
+
+            if (direction > 0) {
+                const t = ctx.currentTime;
+                const current = nodes.engineGain.gain.value;
+                nodes.engineGain.gain.cancelScheduledValues(t);
+                nodes.engineGain.gain.setValueAtTime(current, t);
+                nodes.engineGain.gain.linearRampToValueAtTime(0.02, t + 0.018);
+                nodes.engineGain.gain.setTargetAtTime(current, t + 0.07, 0.03);
+                noiseBurst(1900, 'bandpass', 0.07, 0.5);
+            } else {
+                // Auto-blip: къс возходящ рев.
+                oneShotTone('sawtooth', 420, 0.12, 0.2, 760);
+            }
+        },
+
+        /**
+         * Бийп на стартовите светлини (по-висок и дълъг при гасенето).
+         *
+         * @param {number} freq
+         * @param {number} [duration]
+         */
+        beep(freq, duration = 0.09) {
+            oneShotTone('square', freq, duration, 0.12);
+        },
+
+        /**
+         * Удар между коли: тъп нискочестотен взрив + кратко „хлътване" на
+         * двигателя, мащабирано по силата.
+         *
+         * @param {number} strength 0..1
+         */
+        impact(strength) {
+            if (!ctx || !nodes || ctx.state !== 'running') {
+                return;
+            }
+            noiseBurst(230, 'lowpass', 0.16, 0.35 + strength * 0.5);
+            oneShotTone('sine', 95, 0.14, 0.3 + strength * 0.3, 48);
+
+            const t = ctx.currentTime;
+            const current = nodes.engineGain.gain.value;
+            nodes.engineGain.gain.cancelScheduledValues(t);
+            nodes.engineGain.gain.setValueAtTime(current * 0.4, t);
+            nodes.engineGain.gain.setTargetAtTime(current, t + 0.05, 0.05);
+        },
+
+        /**
+         * Подиумен джингъл: мажорно арпеджио за П1-П3, неутрално за назад.
+         *
+         * @param {number} position
+         */
+        fanfare(position) {
+            if (!ctx || !nodes || ctx.state !== 'running') {
+                return;
+            }
+            const notes = position <= 3
+                ? [523.25, 659.25, 783.99, 1046.5] // C-E-G-C
+                : [440, 554.37]; // кратко и неутрално
+            notes.forEach((freq, i) => {
+                setTimeout(() => oneShotTone('triangle', freq, 0.32, 0.16), i * 140);
+            });
+        },
+
+        /** Камбанка за нов личен рекорд: два възходящи чисти тона. */
+        recordChime() {
+            oneShotTone('sine', 880, 0.22, 0.14);
+            setTimeout(() => oneShotTone('sine', 1174.66, 0.3, 0.14), 130);
         },
 
         /**
          * Най-близкият съперник: сила по разстоянието, тон по скоростта му,
-         * панорама според страната. Извън обхват → тишина.
+         * панорама според страната, ДОПЛЕР по радиалната скорост — така
+         * профучаването наистина профучава. Извън обхват → тишина.
          *
          * @param {number} distance Метри до най-близката друга кола (Infinity = няма)
          * @param {number} speed Нейната скорост, m/s
          * @param {number} pan [-1, 1] — отляво/отдясно на камерата
+         * @param {number} [closing] Скорост на сближаване, m/s (+ = приближава)
          */
-        updateRival(distance, speed, pan) {
+        updateRival(distance, speed, pan, closing = 0) {
             if (!ctx || !nodes || ctx.state !== 'running') {
                 return;
             }
@@ -334,10 +541,12 @@ export function createEngineSound() {
             const audible = Number.isFinite(distance) && distance < 70;
             const level = audible ? Math.max(0, 1 - distance / 70) ** 2 * 0.22 : 0;
 
-            // Псевдо-обороти от скоростта — достатъчно за "профучаване".
+            // Псевдо-обороти от скоростта; доплерът е преувеличен ×3 —
+            // физически точният (±v/340) е почти нечут на тези скорости.
             const rpm = 5000 + Math.min(1, speed / 92) * 9500;
+            const doppler = 1 + Math.max(-0.25, Math.min(0.25, (3 * closing) / 340));
             nodes.rival.frequency.setTargetAtTime(
-                Math.max(40, (rpm / 60) * FIRINGS_PER_REV),
+                Math.max(40, (rpm / 60) * FIRINGS_PER_REV * doppler),
                 t,
                 0.04
             );

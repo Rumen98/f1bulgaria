@@ -47,6 +47,33 @@
             .home:hover { background: #ff2d1f; }
             .home:focus-visible { outline: 2px solid #ff2d1f; outline-offset: 2px; }
             .stripe { position: fixed; left: 0; right: 0; bottom: 0; height: 6px; background: #e10600; }
+
+            /* Мрежа с посоки — попълва се само от страници, които дефинират
+               секцията `links` (виж 404). Останалите остават както преди. */
+            .links {
+                margin: 2.5rem auto 0;
+                max-width: 34rem;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.5rem;
+                text-align: left;
+            }
+            @media (min-width: 640px) { .links { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+            .links a {
+                display: block;
+                padding: 0.625rem 0.875rem;
+                border: 1px solid #27272a;
+                border-radius: 0.5rem;
+                background: rgba(24, 24, 27, 0.6);
+                color: #e4e4e7;
+                font-size: 0.875rem;
+                font-weight: 600;
+                text-decoration: none;
+                transition: border-color 0.2s, color 0.2s;
+            }
+            .links a:hover { border-color: rgba(225, 6, 0, 0.5); color: #fff; }
+            .links a:focus-visible { outline: 2px solid #ff2d1f; outline-offset: 2px; }
+            .links-note { margin-top: 1.75rem; font-size: 0.8125rem; color: #71717a; }
         </style>
     </head>
     <body>
@@ -55,6 +82,12 @@
             <div class="code">@yield('code')</div>
             <p class="message">@yield('message')</p>
             <a class="home" href="/">← Към началото</a>
+            @hasSection('links')
+                <p class="links-note">@yield('links-note')</p>
+                <nav class="links" aria-label="Полезни страници">
+                    @yield('links')
+                </nav>
+            @endif
         </main>
         <div class="stripe" aria-hidden="true"></div>
     </body>

@@ -17,7 +17,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { SIM_VERSION, createSimFromData, decodeTrace, readTraceInput } from '../../resources/js/game/sim.js';
+import { SIM_VERSION, createSimFromData, decodeTrace, encodeFrames, readTraceInput } from '../../resources/js/game/sim.js';
 import { projectOnTrack } from '../../resources/js/game/track.js';
 
 const payloadPath = process.argv[2];
@@ -96,6 +96,11 @@ sim.recordEnabled = false;
 
 sim.restoreForReplay(trace.start);
 
+// Преиграването „снима" обиколката: кадрите стават сървърният дух на
+// потребителя (дуелите „Карай срещу…" в класацията). Входовете се записват
+// повторно покрай тях — шепа килобайти, изхвърлят се.
+sim.recording = true;
+
 const input = { steer: 0, throttle: 0, brake: 0 };
 const ticks = Math.floor(trace.inputs.length / 2);
 let finished = null;
@@ -118,6 +123,10 @@ console.log(
                 lapMs: finished.lapMs,
                 sectorsMs: finished.sectorsMs,
                 valid: finished.valid,
+                lapTicks: finished.lapTicks,
+                // Кадрите на духа — само при валидна обиколка (невалидната
+                // не влиза в класацията, няма срещу кого да се кара).
+                frames: finished.valid && finished.frames ? encodeFrames(finished.frames) : null,
             }
             : { status: 'incomplete', lapMs: null, sectorsMs: null, valid: false }
     )

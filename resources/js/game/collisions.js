@@ -7,8 +7,8 @@
  *
  * ВАЖНО: щом контактът бута ИГРАЧА, времето му вече не е чиста функция от
  * неговия вход → сървърният реплей не може да го възпроизведе. Затова
- * колизиите живеят САМО в състезателния режим, чиито времена Vue НЕ праща
- * към класацията (onFinish гейт по competition флага).
+ * колизиите живеят САМО в състезателния режим, който изобщо не праща
+ * времена (Game.#onLapFinished излиза преди onFinish; финалът е подиум).
  *
  * Известен компромис: удар по кола под lowSpeedThreshold (2 m/s) губи
  * въртящия ритник — кинематичният клон на physics.step презаписва yawRate.
@@ -41,11 +41,21 @@ const MAX_YAW_KICK = 0.9;
  * (x, z, vForward, vLateral, yawRate) на място.
  *
  * @param {Array<import('./physics.js').CarState>} cars
+ * @param {Array<{a: object, b: object, impulse: number, x: number, z: number}>} [outContacts]
+ *        По избор: списък на ударите от този тик (за искри/звук). Подава се
+ *        преизползван масив — нулира се тук.
  */
-export function resolveCarContacts(cars) {
+export function resolveCarContacts(cars, outContacts = null) {
+    if (outContacts !== null) {
+        outContacts.length = 0;
+    }
+
     for (let i = 0; i < cars.length; i++) {
         for (let j = i + 1; j < cars.length; j++) {
-            resolvePair(cars[i], cars[j]);
+            const contact = resolvePair(cars[i], cars[j]);
+            if (contact !== null && outContacts !== null) {
+                outContacts.push(contact);
+            }
         }
     }
 }
@@ -53,6 +63,7 @@ export function resolveCarContacts(cars) {
 /**
  * @param {import('./physics.js').CarState} a
  * @param {import('./physics.js').CarState} b
+ * @returns {{a: object, b: object, impulse: number, x: number, z: number}|null}
  */
 function resolvePair(a, b) {
     // Бърз отказ: центровете са по-далеч от максималния обхват.
@@ -60,7 +71,7 @@ function resolvePair(a, b) {
     const dcz = b.z - a.z;
     const reach = 2 * (HALF_LENGTH + CIRCLE_RADIUS);
     if (dcx * dcx + dcz * dcz > reach * reach) {
-        return;
+        return null;
     }
 
     const aSin = Math.sin(a.heading);
@@ -101,7 +112,7 @@ function resolvePair(a, b) {
     }
 
     if (deepest === null) {
-        return;
+        return null;
     }
 
     const { depth, nx, nz, sa, sb } = deepest;
@@ -149,7 +160,18 @@ function resolvePair(a, b) {
 
         a.yawRate += clamp(-sa * aSide * kick, -MAX_YAW_KICK, MAX_YAW_KICK);
         b.yawRate += clamp(sb * bSide * kick, -MAX_YAW_KICK, MAX_YAW_KICK);
+
+        return {
+            a,
+            b,
+            impulse,
+            x: (a.x + b.x) / 2,
+            z: (a.z + b.z) / 2,
+        };
     }
+
+    // Само разделяне на позициите (застъпване без сближаване) — не е „удар".
+    return null;
 }
 
 /**

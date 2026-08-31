@@ -1,4 +1,5 @@
 <script setup>
+import GameTeaserWidget from '@/Components/Homepage/GameTeaserWidget.vue';
 import HeroSection from '@/Components/Hero/HeroSection.vue';
 import ThisDayWidget from '@/Components/Homepage/ThisDayWidget.vue';
 import LiveSessionBanner from '@/Components/LiveSessionBanner.vue';
@@ -13,6 +14,7 @@ defineProps({
     liveSession: { type: Object, default: null },
     thisDay: { type: Array, default: () => [] },
     topNews: { type: Array, default: () => [] },
+    gameTeaser: { type: Object, default: null },
 });
 
 const page = usePage();
@@ -77,6 +79,9 @@ const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.fea
 
         <!-- На този ден във Формула 1 (V2) -->
         <ThisDayWidget v-if="features.this_day" :events="thisDay" />
+
+        <!-- Хронометърът: пистата на уикенда + топ 3 времена -->
+        <GameTeaserWidget v-if="gameTeaser" :teaser="gameTeaser" />
 
         <!-- Топ новини -->
         <section v-if="topNews.length" class="mt-10">

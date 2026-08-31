@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Race;
+use App\Services\Game\WeekTrackResolver;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class GameController extends Controller
 {
+    public function __construct(private readonly WeekTrackResolver $weekTrack) {}
+
     /**
      * Каталогът на пистите се генерира от `php artisan game:generate-tracks`.
      *
@@ -22,33 +24,8 @@ class GameController extends Controller
     {
         return Inertia::render('Game/Index', [
             'tracks' => $this->tracks(),
-            'weekTrack' => $this->weekTrack(),
+            'weekTrack' => $this->weekTrack->slug(),
         ]);
-    }
-
-    /**
-     * Пистата на уикенда: най-близкото състезание от календара, чиято писта
-     * я има в играта — кара се там, където Ф1 кара този уикенд. До 3 дни след
-     * старта неделя вечер още „брои" за уикенда.
-     */
-    private function weekTrack(): ?string
-    {
-        return Cache::remember('game.week-track', now()->addHour(), function (): ?string {
-            $slugs = array_keys((array) config('game.tracks', []));
-
-            if ($slugs === []) {
-                return null;
-            }
-
-            /** @var Race|null $race */
-            $race = Race::query()
-                ->whereIn('circuit', $slugs)
-                ->where('race_datetime_utc', '>=', now()->subDays(3))
-                ->orderBy('race_datetime_utc')
-                ->first();
-
-            return $race?->circuit;
-        }) ?: null;
     }
 
     /**
