@@ -1,6 +1,7 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
+import BadgeCard from '@/Components/Profile/BadgeCard.vue';
 import { hasRoute } from '@/utils/routes';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
@@ -101,26 +102,11 @@ const earnedBadges = computed(() => (props.profile.badges ?? []).filter((b) => b
                         <span class="text-sm tabular-nums text-zinc-500">{{ earnedBadges }} / {{ profile.badges.length }}</span>
                     </div>
 
-                    <!-- Заключените се показват сиви с условието като описание:
-                         празен списък не казва какво изобщо може да се спечели. -->
-                    <ul class="flex flex-wrap gap-2">
-                        <li
-                            v-for="badge in profile.badges"
-                            :key="badge.slug"
-                            class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm"
-                            :class="badge.earned
-                                ? 'border-amber-500/30 bg-amber-500/10'
-                                : 'border-zinc-800 bg-zinc-950/60'"
-                            :title="badge.description"
-                        >
-                            <span aria-hidden="true">{{ badge.earned ? '🏅' : '🔒' }}</span>
-                            <span class="font-medium" :class="badge.earned ? 'text-amber-300' : 'text-zinc-500'">
-                                {{ badge.name }}
-                            </span>
-                            <span class="sr-only">
-                                {{ badge.earned ? 'Спечелена.' : 'Още не е спечелена.' }} {{ badge.description }}
-                            </span>
-                        </li>
+                    <!-- Карти вместо пилюли: условието за печелене стои видимо
+                         под всяка значка. Дотук беше само в title tooltip, който
+                         на телефон не съществува. -->
+                    <ul class="grid gap-3 sm:grid-cols-2">
+                        <BadgeCard v-for="badge in profile.badges" :key="badge.slug" :badge="badge" />
                     </ul>
                 </div>
             </div>

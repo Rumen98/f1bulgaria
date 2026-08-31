@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Badges\BadgeService;
 use App\Services\Predictions\LeaderboardService;
 use App\Services\Quiz\QuizProgressService;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -62,7 +63,9 @@ class PublicProfileController extends Controller
                 'name' => $definition['name'],
                 'description' => $definition['description'],
                 'earned' => $earned->has($slug),
-                'awarded_at' => $earned->get($slug)?->pivot->awarded_at,
+                'awarded_at' => ($at = $earned->get($slug)?->pivot->awarded_at) !== null
+                    ? Carbon::parse($at)->setTimezone('Europe/Sofia')->format('d.m.Y')
+                    : null,
             ])
             // Спечелените отпред, после заключените — по реда на дефиницията.
             ->sortByDesc('earned')
