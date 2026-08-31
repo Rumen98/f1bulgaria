@@ -26,6 +26,7 @@ use App\Http\Controllers\PublicProfileController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\RaceController;
 use App\Http\Controllers\RivalriesController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StandingsController;
 use App\Http\Controllers\StaticPageController;
 use App\Http\Controllers\TeamsController;
@@ -48,6 +49,13 @@ Route::get('/teams/{slug}', [TeamsController::class, 'show'])->name('teams.show'
 Route::get('/drivers', [DriversController::class, 'index'])->name('drivers.index');
 Route::get('/drivers/{slug}', [DriversController::class, 'show'])->name('drivers.show');
 Route::get('/terminologiya', [TerminologyController::class, 'index'])->name('terminology');
+// Търсене из целия сайт. throttle пази LIKE заявките от скъп scan при
+// автоматизиран трафик — 30/мин е далеч над реалното човешко темпо.
+// Изричен префикс на кофата: голият 'throttle:N,M' се дели с всеки друг
+// гол рут и един бърст изчерпва лимита и на останалите.
+Route::get('/tarsene', SearchController::class)
+    ->middleware('throttle:30,1,search')
+    ->name('search');
 Route::get('/poveritelnost', [StaticPageController::class, 'privacy'])->name('privacy');
 Route::get('/usloviya', [StaticPageController::class, 'terms'])->name('terms');
 Route::get('/kontakt', [StaticPageController::class, 'contact'])->name('contact');

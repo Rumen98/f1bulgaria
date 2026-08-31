@@ -39,6 +39,8 @@ class Seo
     /** @var array<int, array<string, mixed>> Допълнителни JSON-LD възли. */
     private array $schema = [];
 
+    private bool $noindex = false;
+
     public const DEFAULT_TITLE = 'Падок — Формула 1 на български';
 
     public const DEFAULT_DESCRIPTION = 'Формула 1 на български — новини, календар на състезанията, класирания, статистика и прогнози.';
@@ -61,6 +63,24 @@ class Seo
         $this->publishedAt = null;
         $this->modifiedAt = null;
         $this->schema = [];
+        $this->noindex = false;
+    }
+
+    /**
+     * Маркира страницата като неиндексируема. За изгледи без стойност в
+     * търсачките (резултати от търсене), които иначе само разреждат
+     * авторитета на реалните страници.
+     */
+    public function noindex(bool $noindex = true): self
+    {
+        $this->noindex = $noindex;
+
+        return $this;
+    }
+
+    public function isNoindex(): bool
+    {
+        return $this->noindex;
     }
 
     /**
