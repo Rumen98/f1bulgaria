@@ -45,6 +45,20 @@ class HandleInertiaRequests extends Middleware
             // prop, за да го приложи клиентът при SPA навигация — така таб
             // заглавието и индексираното от Google съвпадат.
             'seoTitle' => fn () => app(Seo::class)->resolvedTitle(),
+            // Невидени значки → поздравителен тост (BadgeAwardToast). Празен
+            // масив за гост и за всеки без нови — една лека pivot заявка на
+            // Inertia отговор, само за влезли.
+            'newBadges' => fn () => $request->user()
+                ?->badges()
+                ->wherePivotNull('seen_at')
+                ->get()
+                ->map(fn ($badge) => [
+                    'slug' => $badge->slug,
+                    'name' => $badge->name,
+                    'description' => $badge->description,
+                ])
+                ->values()
+                ->all() ?? [],
             'survey' => [
                 // Една лека индексирана заявка на реквест; при мащаба на сайта
                 // кеширане би било свръхинженерство.

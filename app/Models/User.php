@@ -90,7 +90,7 @@ class User extends Authenticatable implements FilamentUser
     public function badges(): BelongsToMany
     {
         return $this->belongsToMany(Badge::class)
-            ->withPivot('awarded_at')
+            ->withPivot('awarded_at', 'seen_at')
             ->withTimestamps();
     }
 

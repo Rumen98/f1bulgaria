@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\BadgeSeenController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CircuitsController;
 use App\Http\Controllers\CommentsController;
@@ -159,6 +160,11 @@ Route::get('/dashboard', [CalendarController::class, 'index'])
 // Изисква вход.
 Route::middleware('auth')->group(function () {
     Route::get('/predictions', [PredictionController::class, 'index'])->name('predictions.index');
+    // Тостът за нова значка маркира видяното. Кофата е широка нарочно:
+    // викането е по едно на затваряне, но нека не блокира при бърз клик.
+    Route::post('/badges/seen', BadgeSeenController::class)
+        ->middleware('throttle:30,1,badges-seen')
+        ->name('badges.seen');
     Route::post('/races/{race}/prediction', [PredictionController::class, 'store'])->name('predictions.store');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

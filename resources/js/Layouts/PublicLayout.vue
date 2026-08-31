@@ -1,4 +1,5 @@
 <script setup>
+import BadgeAwardToast from '@/Components/Profile/BadgeAwardToast.vue';
 import SurveyPromptCard from '@/Components/Feedback/SurveyPromptCard.vue';
 import FlagIcon from '@/Components/FlagIcon.vue';
 import NewsletterForm from '@/Components/Newsletter/NewsletterForm.vue';
@@ -352,5 +353,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onClickOutside));
                 </nav>
             </div>
         </footer>
+
+        <BadgeAwardToast />
     </div>
 </template>
