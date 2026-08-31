@@ -28,9 +28,33 @@ const age = computed(() => {
 // изключен в V1). Така банер и класиране никога не се разминават.
 const stats = computed(() => props.profile.season_stats ?? null);
 
-// Челен сблъсък с преследвача (Minì): точките му = точки на Цолов минус преднината.
-const rivalName = computed(() => props.profile.standings?.[1]?.name ?? 'Minì');
-const rivalPoints = computed(() => (stats.value ? stats.value.points - stats.value.championship_lead : null));
+// Челен сблъсък със съседа в класирането: преследвачът, ако Цолов води, иначе
+// пилотът точно пред него.
+//
+// Точките му се четат от самото класиране. Преди се смятаха като
+// `points - championship_lead`, а контролерът връща `championship_lead: null`,
+// щом Цолов не е първи — в JavaScript `points - null` дава `points`, така че
+// лентата тихо показваше 50/50 вместо реалната разлика.
+const board = computed(() => props.profile.standings ?? []);
+const rival = computed(() => {
+    const index = board.value.findIndex((row) => row.is_tsolov);
+
+    if (index === -1) {
+        return null;
+    }
+
+    return board.value[index === 0 ? 1 : index - 1] ?? null;
+});
+const rivalName = computed(() => rival.value?.name ?? null);
+const rivalPoints = computed(() => rival.value?.points ?? null);
+const tsolovLeads = computed(() => stats.value?.championship_position === 1);
+const pointsGap = computed(() => {
+    if (!stats.value || rivalPoints.value === null) {
+        return null;
+    }
+
+    return Math.abs(stats.value.points - rivalPoints.value);
+});
 const tsolovShare = computed(() => {
     if (!stats.value || rivalPoints.value === null) {
         return 50;
@@ -124,11 +148,19 @@ const tsolovShare = computed(() => {
                 <StatTile label="Позиция">P{{ stats.championship_position }}</StatTile>
                 <StatTile label="Точки">{{ stats.points }}</StatTile>
                 <StatTile label="Победи">{{ stats.wins }}</StatTile>
-                <StatTile label="Преднина">+{{ stats.championship_lead }}</StatTile>
+                <!-- Плочката сменя смисъла си: „Преднина" има значение само
+                     когато Цолов е първи, иначе показва изоставането. -->
+                <StatTile v-if="tsolovLeads && stats.championship_lead !== null" label="Преднина">
+                    +{{ stats.championship_lead }}
+                </StatTile>
+                <StatTile v-else-if="pointsGap !== null" label="Изоставане">
+                    −{{ pointsGap }}
+                </StatTile>
+                <StatTile v-else label="Кръгове">{{ stats.races ?? '—' }}</StatTile>
             </div>
 
-            <!-- Челен сблъсък с преследвача -->
-            <div v-if="rivalPoints !== null" class="mt-5">
+            <!-- Челен сблъсък със съседа в класирането -->
+            <div v-if="rivalPoints !== null && rivalName" class="mt-5">
                 <div class="mb-1.5 flex items-center justify-between text-xs font-semibold uppercase tracking-wide">
                     <span class="text-emerald-400">Цолов · {{ stats.points }} т.</span>
                     <span class="text-zinc-400">{{ rivalName }} · {{ rivalPoints }} т.</span>
@@ -137,7 +169,11 @@ const tsolovShare = computed(() => {
                     <div class="bg-emerald-500 transition-[width] duration-700 ease-out" :style="{ width: tsolovShare + '%' }" />
                     <div class="bg-red-600 transition-[width] duration-700 ease-out" :style="{ width: 100 - tsolovShare + '%' }" />
                 </div>
-                <p class="mt-1.5 text-center text-xs text-zinc-500">Цолов води с {{ stats.championship_lead }} точки</p>
+                <p class="mt-1.5 text-center text-xs text-zinc-500">
+                    <template v-if="pointsGap === 0">Равни точки с {{ rivalName }}</template>
+                    <template v-else-if="tsolovLeads">Цолов води с {{ pointsGap }} точки</template>
+                    <template v-else>Цолов изостава с {{ pointsGap }} точки от {{ rivalName }}</template>
+                </p>
             </div>
 
             <!-- Мини класиране (топ 5) -->
