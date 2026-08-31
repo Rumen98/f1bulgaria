@@ -9,13 +9,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Журнал на изпратените бюлетинни имейли — източник на истината „пращано ли
- * е вече“. Дайджестът маркира състезанието (race_id), пулсът — само момента.
+ * е вече“. Дайджестът и подсещането за прогноза маркират състезанието
+ * (race_id), пулсът — само момента.
  */
 class NewsletterSend extends Model
 {
     public const TYPE_DIGEST = 'digest';
 
     public const TYPE_PULSE = 'pulse';
+
+    public const TYPE_PREDICTION_REMINDER = 'prediction_reminder';
 
     protected $fillable = ['mail_type', 'race_id', 'sent_at'];
 

@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Predictions\LeaderboardService;
 use App\Services\Predictions\PredictionLockService;
+use App\Services\Quiz\QuizProgressService;
 use App\Support\DriverName;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
@@ -50,8 +51,12 @@ class WeeklyDigestCommand extends Command
     /** Съкратени имена на дните, индекс = Carbon dayOfWeek (0 = неделя). */
     private const WEEKDAYS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
-    public function handle(LeaderboardService $leaderboard, NewsletterAudience $audience, PredictionLockService $locks): int
-    {
+    public function handle(
+        LeaderboardService $leaderboard,
+        NewsletterAudience $audience,
+        PredictionLockService $locks,
+        QuizProgressService $quizProgress,
+    ): int {
         $season = Season::current();
 
         if ($season === null) {
@@ -106,6 +111,7 @@ class WeeklyDigestCommand extends Command
                 news: $news,
                 userUnsubscribeUrl: URL::signedRoute('newsletter.user-unsubscribe', ['user' => $user->id]),
                 nextRace: $nextRace,
+                quiz: $this->quizProgress($quizProgress, $user),
             ));
         }
 
@@ -231,6 +237,30 @@ class WeeklyDigestCommand extends Command
             ->all();
 
         return $stats;
+    }
+
+    /**
+     * Прогресът в куиза за секцията в дайджеста.
+     *
+     * Куизът се подсеща оттук, а не с отделно писмо: при 40 потребители всяко
+     * ново масово писмо е по-скоро причина за отписване, отколкото за връщане.
+     * Дайджестът вече пристига всяка неделя и хората го отварят.
+     *
+     * @return array{points:int, available:int, remaining:int}|null
+     */
+    private function quizProgress(QuizProgressService $progress, User $user): ?array
+    {
+        $stats = $progress->statsFor($user);
+
+        if ($stats['available'] === 0) {
+            return null; // няма въпроси в базата — няма какво да рекламираме
+        }
+
+        return [
+            'points' => $stats['points'],
+            'available' => $stats['available'],
+            'remaining' => max(0, $stats['available'] - $stats['points']),
+        ];
     }
 
     /**

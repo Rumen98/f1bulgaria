@@ -25,6 +25,7 @@ class WeeklyDigestMail extends Mailable
      * @param  array<int, array{title:string, url:string}>  $news  топ новини от седмицата
      * @param  string|null  $userUnsubscribeUrl  signed линк за спиране на имейлите (само за потребители с акаунт)
      * @param  array{name:string, url:string, deadline:string|null}|null  $nextRace  следващият кръг (null извън сезона)
+     * @param  array{points:int, available:int, remaining:int}|null  $quiz  прогрес в куиза (null скрива секцията)
      */
     public function __construct(
         public Race $race,
@@ -36,6 +37,7 @@ class WeeklyDigestMail extends Mailable
         public array $news = [],
         public ?string $userUnsubscribeUrl = null,
         public ?array $nextRace = null,
+        public ?array $quiz = null,
     ) {}
 
     public function envelope(): Envelope
