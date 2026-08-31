@@ -102,6 +102,13 @@ watch(() => props.driver.photo, () => (photoFailed.value = false));
 
         <div class="mt-8 grid gap-8 lg:grid-cols-2">
             <DriverRecentResults :results="recentResults" />
+            <!-- Компонентът беше импортиран и пропът се изчисляваше, но го
+                 нямаше в шаблона — дясната колона на решетката стоеше празна. -->
+            <HeadToHeadBars
+                :h2h="headToHead"
+                :driver-name="driver.name"
+                :color="driver.color_hex"
+            />
         </div>
 
         <div class="mt-10">

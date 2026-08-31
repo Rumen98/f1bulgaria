@@ -337,6 +337,8 @@ class DriverStatsService
 
         $empty = [
             'teammate' => $teammate === null ? null : DriverName::display($teammate->slug, $teammate->fullName()),
+            // Slug-ът прави съотборника кликаем в H2H блока.
+            'teammate_slug' => $teammate?->slug,
             'race_wins' => 0,
             'race_losses' => 0,
             'quali_wins' => 0,

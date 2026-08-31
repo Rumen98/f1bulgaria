@@ -8,13 +8,15 @@ use App\Http\Resources\ConstructorResource;
 use App\Http\Resources\DriverResource;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Badges\BadgeService;
 use App\Services\Predictions\LeaderboardService;
+use App\Services\Quiz\QuizProgressService;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class PublicProfileController extends Controller
 {
-    public function show(User $user, LeaderboardService $leaderboard): Response
+    public function show(User $user, LeaderboardService $leaderboard, QuizProgressService $quiz): Response
     {
         $season = Season::current();
 
@@ -35,16 +37,36 @@ class PublicProfileController extends Controller
                 'favorite_constructor' => $user->favoriteConstructor
                     ? new ConstructorResource($user->favoriteConstructor)
                     : null,
-                'badges' => $user->badges->map(fn ($badge) => [
-                    'name' => $badge->name,
-                    'slug' => $badge->slug,
-                    'description' => $badge->description,
-                    'icon' => $badge->icon,
-                    'awarded_at' => $badge->pivot->awarded_at,
-                ]),
+                // Всички значки, не само спечелените: заключените показват какво
+                // има да се гони. Празният списък иначе не казва нищо.
+                'badges' => $this->badges($user),
             ],
             'stats' => $stats,
+            'quiz' => $quiz->statsFor($user),
             'season' => $season?->year,
         ]);
+    }
+
+    /**
+     * Пълният набор значки със състояние „спечелена/заключена".
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function badges(User $user): array
+    {
+        $earned = $user->badges->keyBy('slug');
+
+        return collect(BadgeService::DEFINITIONS)
+            ->map(fn (array $definition, string $slug) => [
+                'slug' => $slug,
+                'name' => $definition['name'],
+                'description' => $definition['description'],
+                'earned' => $earned->has($slug),
+                'awarded_at' => $earned->get($slug)?->pivot->awarded_at,
+            ])
+            // Спечелените отпред, после заключените — по реда на дефиницията.
+            ->sortByDesc('earned')
+            ->values()
+            ->all();
     }
 }

@@ -2,8 +2,11 @@
 import EmptyState from '@/Components/UI/EmptyState.vue';
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { hasRoute } from '@/utils/routes';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+
+const canOpenProfile = computed(() => hasRoute('profiles.show'));
 
 defineProps({
     season: Number,
@@ -24,7 +27,7 @@ const podium = (pos) => ({
 
     <PublicLayout>
         <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
-            <h1 class="font-display text-2xl font-black sm:text-3xl">Prediction League <span class="text-red-600">{{ season }}</span></h1>
+            <h1 class="font-display text-2xl font-black sm:text-3xl">Лигата на прогнозите <span class="text-red-600">{{ season }}</span></h1>
             <Link
                 v-if="user"
                 :href="route('predictions.index')"
@@ -72,7 +75,16 @@ const podium = (pos) => ({
                             </template>
                             <span v-else>{{ row.position }}</span>
                         </td>
-                        <td class="px-4 py-2.5 font-semibold text-white">{{ row.name }}</td>
+                        <td class="px-4 py-2.5 font-semibold text-white">
+                            <Link
+                                v-if="canOpenProfile && row.id"
+                                :href="route('profiles.show', row.id)"
+                                class="transition hover:text-red-400"
+                            >
+                                {{ row.name }}
+                            </Link>
+                            <span v-else>{{ row.name }}</span>
+                        </td>
                         <td class="px-4 py-2.5 text-center tabular-nums text-zinc-400">{{ row.predictions }}</td>
                         <td class="px-4 py-2.5 text-right font-bold tabular-nums text-white">{{ row.points }}</td>
                     </tr>

@@ -1,12 +1,20 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
+import { hasRoute } from '@/utils/routes';
+import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-defineProps({
+const props = defineProps({
     profile: Object,
     stats: Object,
+    quiz: { type: Object, default: () => ({ points: 0, available: 0, attempts: 0 }) },
     season: Number,
 });
+
+const canOpenDriver = computed(() => hasRoute('drivers.show'));
+const canOpenTeam = computed(() => hasRoute('teams.show'));
+const earnedBadges = computed(() => (props.profile.badges ?? []).filter((b) => b.earned).length);
 </script>
 
 <template>
@@ -24,11 +32,25 @@ defineProps({
                     <dl class="mt-4 space-y-1 text-sm text-zinc-400">
                         <div v-if="profile.favorite_driver">
                             <dt class="inline font-medium text-zinc-300">Любим пилот:</dt>
-                            {{ profile.favorite_driver.full_name }}
+                            <Link
+                                v-if="canOpenDriver && profile.favorite_driver.slug"
+                                :href="route('drivers.show', profile.favorite_driver.slug)"
+                                class="transition hover:text-red-400"
+                            >
+                                {{ profile.favorite_driver.full_name }}
+                            </Link>
+                            <span v-else>{{ profile.favorite_driver.full_name }}</span>
                         </div>
                         <div v-if="profile.favorite_constructor">
                             <dt class="inline font-medium text-zinc-300">Любим отбор:</dt>
-                            {{ profile.favorite_constructor.name }}
+                            <Link
+                                v-if="canOpenTeam && profile.favorite_constructor.slug"
+                                :href="route('teams.show', profile.favorite_constructor.slug)"
+                                class="transition hover:text-red-400"
+                            >
+                                {{ profile.favorite_constructor.name }}
+                            </Link>
+                            <span v-else>{{ profile.favorite_constructor.name }}</span>
                         </div>
                     </dl>
                 </div>
@@ -51,23 +73,55 @@ defineProps({
                     </StatTile>
                 </div>
 
-                <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
-                    <h2 class="mb-4 font-display text-lg font-bold text-white">Значки</h2>
-                    <div v-if="profile.badges.length === 0" class="text-sm text-zinc-500">
-                        Все още няма спечелени значки.
+                <div v-if="quiz.available" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
+                    <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                        <h2 class="font-display text-lg font-bold text-white">Куиз</h2>
+                        <Link :href="route('quiz')" class="text-sm font-medium text-red-500 transition hover:text-red-400">
+                            Играй →
+                        </Link>
                     </div>
-                    <div v-else class="flex flex-wrap gap-3">
+                    <div class="flex items-end gap-2">
+                        <span class="font-display text-3xl font-black leading-none tabular-nums text-white">{{ quiz.points }}</span>
+                        <span class="pb-0.5 text-sm text-zinc-500">/ {{ quiz.available }} покорени въпроса</span>
+                    </div>
+                    <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
                         <div
+                            class="h-full bg-gradient-to-r from-red-600 to-amber-400"
+                            :style="{ width: (quiz.available ? (quiz.points / quiz.available) * 100 : 0) + '%' }"
+                        />
+                    </div>
+                    <p v-if="quiz.attempts" class="mt-2 text-xs text-zinc-500">
+                        {{ quiz.attempts }} изиграни кръга<template v-if="quiz.best_score !== null">, най-добър {{ quiz.best_score }}/{{ quiz.best_total }}</template>.
+                    </p>
+                </div>
+
+                <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
+                    <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                        <h2 class="font-display text-lg font-bold text-white">Значки</h2>
+                        <span class="text-sm tabular-nums text-zinc-500">{{ earnedBadges }} / {{ profile.badges.length }}</span>
+                    </div>
+
+                    <!-- Заключените се показват сиви с условието като описание:
+                         празен списък не казва какво изобщо може да се спечели. -->
+                    <ul class="flex flex-wrap gap-2">
+                        <li
                             v-for="badge in profile.badges"
                             :key="badge.slug"
-                            class="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-sm"
+                            class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm"
+                            :class="badge.earned
+                                ? 'border-amber-500/30 bg-amber-500/10'
+                                : 'border-zinc-800 bg-zinc-950/60'"
                             :title="badge.description"
                         >
-                            <span aria-hidden="true">🏅</span>
-                            <span class="font-medium text-amber-300">{{ badge.name }}</span>
-                            <span class="sr-only">{{ badge.description }}</span>
-                        </div>
-                    </div>
+                            <span aria-hidden="true">{{ badge.earned ? '🏅' : '🔒' }}</span>
+                            <span class="font-medium" :class="badge.earned ? 'text-amber-300' : 'text-zinc-500'">
+                                {{ badge.name }}
+                            </span>
+                            <span class="sr-only">
+                                {{ badge.earned ? 'Спечелена.' : 'Още не е спечелена.' }} {{ badge.description }}
+                            </span>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>

@@ -20,6 +20,9 @@ class LeaderboardController extends Controller
                 'position' => $row['position'],
                 'points' => $row['points'],
                 'predictions' => $row['predictions'],
+                // id-то отваря публичния профил — LeaderboardService вече
+                // връща целия User, така че това е нулева нова заявка.
+                'id' => $row['user']->id,
                 'name' => $row['user']->name,
                 'avatar_path' => $row['user']->avatar_path,
             ])
