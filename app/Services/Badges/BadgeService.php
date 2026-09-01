@@ -43,6 +43,11 @@ class BadgeService
             'description' => 'Позна pole позицията в 5 състезания за сезона.',
             'icon' => 'heroicon-o-star',
         ],
+        'streak-3' => [
+            'name' => 'Постоянство',
+            'description' => 'Подаде прогноза в 3 поредни кръга.',
+            'icon' => 'heroicon-o-fire',
+        ],
         'season-champion' => [
             'name' => 'Шампион на сезона',
             'description' => 'Завърши №1 в класирането на прогнозите за сезона.',
@@ -85,6 +90,8 @@ class BadgeService
             if ($this->correctPoleCount($user, $race->season_id) >= self::POLE_MASTER_THRESHOLD) {
                 $awarded += $this->award($user, 'pole-master');
             }
+
+            $awarded += $this->awardStreak($user, $race);
         }
 
         return $awarded;
@@ -97,6 +104,45 @@ class BadgeService
     public function awardDebut(User $user): int
     {
         return $this->award($user, 'first-prediction');
+    }
+
+    /**
+     * Поредни кръгове с подадена прогноза, броено назад от $endRound.
+     * Мери постоянството — механиката, която решава класирането за наградите.
+     */
+    public function predictionStreak(User $user, int $seasonId, int $endRound): int
+    {
+        $rounds = Prediction::query()
+            ->where('predictions.user_id', $user->id)
+            ->join('races', 'races.id', '=', 'predictions.race_id')
+            ->where('races.season_id', $seasonId)
+            ->pluck('races.round')
+            ->flip();
+
+        $streak = 0;
+
+        while ($rounds->has($endRound - $streak)) {
+            $streak++;
+        }
+
+        return $streak;
+    }
+
+    /**
+     * „Постоянство“ при серия от 3 — вика се при подаване на прогноза и от
+     * evaluateForRace (за наваксване назад).
+     */
+    public function awardStreak(User $user, Race $race): int
+    {
+        if ($race->round === null) {
+            return 0;
+        }
+
+        if ($this->predictionStreak($user, $race->season_id, $race->round) < 3) {
+            return 0;
+        }
+
+        return $this->award($user, 'streak-3');
     }
 
     /**

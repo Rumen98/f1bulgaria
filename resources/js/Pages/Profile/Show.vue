@@ -2,6 +2,7 @@
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
 import BadgeCard from '@/Components/Profile/BadgeCard.vue';
+import PredictionBreakdown from '@/Components/Predictions/PredictionBreakdown.vue';
 import { hasRoute } from '@/utils/routes';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
@@ -10,6 +11,9 @@ const props = defineProps({
     profile: Object,
     stats: Object,
     quiz: { type: Object, default: () => ({ points: 0, available: 0 }) },
+    streak: { type: Number, default: 0 },
+    // Само заключени кръгове — отворена прогноза никога не излиза публично.
+    predictionHistory: { type: Array, default: () => [] },
     season: Number,
 });
 
@@ -72,6 +76,47 @@ const earnedBadges = computed(() => (props.profile.badges ?? []).filter((b) => b
                     >
                         {{ stat.value }}
                     </StatTile>
+                </div>
+
+                <p v-if="streak >= 2" class="flex items-center gap-1.5 text-sm text-zinc-400">
+                    <span aria-hidden="true">🔥</span>
+                    Серия: <span class="font-bold text-orange-400">{{ streak }}</span> поредни кръга с прогноза
+                </p>
+
+                <!-- История на прогнозите: чуждите решения са социалното
+                     съдържание на лигата при този брой играчи. -->
+                <div v-if="predictionHistory.length" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
+                    <h2 class="mb-4 font-display text-lg font-bold text-white">Прогнози по кръгове</h2>
+                    <ul class="space-y-3">
+                        <li
+                            v-for="entry in predictionHistory"
+                            :key="entry.round"
+                            class="rounded-lg border border-zinc-800 bg-black/30 p-3"
+                        >
+                            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                                <span class="font-semibold text-white">
+                                    <span class="text-zinc-500">Кръг {{ entry.round }} ·</span> {{ entry.race }}
+                                </span>
+                                <span
+                                    v-if="entry.points !== null"
+                                    class="shrink-0 font-bold tabular-nums text-red-500"
+                                >{{ entry.points }} т.</span>
+                                <span v-else class="shrink-0 text-xs text-zinc-500">чака резултати</span>
+                            </div>
+                            <ol class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm text-zinc-400">
+                                <li v-for="(name, i) in entry.podium" :key="i" class="flex items-baseline gap-1">
+                                    <span class="text-xs">{{ ['🥇', '🥈', '🥉'][i] }}</span>
+                                    <span>{{ name ?? '—' }}</span>
+                                </li>
+                            </ol>
+                            <details v-if="entry.breakdown" class="mt-2">
+                                <summary class="cursor-pointer text-xs font-medium text-zinc-500 transition hover:text-zinc-300">
+                                    Разбивка на точките
+                                </summary>
+                                <PredictionBreakdown class="mt-2" :breakdown="entry.breakdown" :total="entry.points ?? 0" />
+                            </details>
+                        </li>
+                    </ul>
                 </div>
 
                 <div v-if="quiz.available" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">

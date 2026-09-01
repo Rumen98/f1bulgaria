@@ -68,6 +68,14 @@ Schedule::command('f1:prediction-reminder')
     ->onOneServer()
     ->withoutOverlapping(55);
 
+// Понеделнишкият анонс на куиза (имейл + пост в канала) — 09:00 софийско.
+// Вътрешният guard (newsletter_sends по седмица) пази от дублиране.
+Schedule::command('padok:quiz-monday')
+    ->weeklyOn(1, '09:00')
+    ->timezone('Europe/Sofia')
+    ->onOneServer()
+    ->withoutOverlapping(120);
+
 // „Днес сме на живо" — проверка на 15 мин, но вътрешните пазачи (3-часов
 // прозорец преди старта + newsletter_sends по race_id + флаг + OpenF1
 // креденшъли) го пускат веднъж на състезателна неделя.

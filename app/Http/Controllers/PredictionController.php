@@ -50,6 +50,7 @@ class PredictionController extends Controller
         // връзка за действието и три дни закъснение я обезсмисля. award() е
         // идемпотентен — редакция на прогноза не прави нищо.
         $badges->awardDebut($request->user());
+        $badges->awardStreak($request->user(), $race);
 
         return back()->with('success', 'Прогнозата е запазена.');
     }

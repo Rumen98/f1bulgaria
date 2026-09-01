@@ -34,6 +34,13 @@ export const BADGE_ART = {
         border: 'border-purple-500/40',
         tint: 'bg-purple-500/5',
     },
+    'streak-3': {
+        emoji: '🔥',
+        circle: 'from-orange-400/90 to-red-600',
+        glow: 'shadow-orange-500/25',
+        border: 'border-orange-500/40',
+        tint: 'bg-orange-500/5',
+    },
     'season-champion': {
         emoji: '👑',
         circle: 'from-yellow-300/90 to-amber-600',
