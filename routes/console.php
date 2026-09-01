@@ -84,6 +84,14 @@ Schedule::command('f1:live-announce')
     ->onOneServer()
     ->withoutOverlapping(14);
 
+// Допълване на куиз басейна: LLM чернови с двойна сляпа проверка, влизат
+// направо активни. Пуска се само при активни под quiz.pool_target.
+Schedule::command('padok:generate-quiz-questions --top-up')
+    ->weeklyOn(3, '10:00')
+    ->timezone('Europe/Sofia')
+    ->onOneServer()
+    ->withoutOverlapping(120);
+
 // „Пулс" през паузите — проверка всяка сряда 18:00 софийско време.
 // Седмично, а не месечно: закачен за 1-во число пулсът геометрично не може
 // да улучи лятната пауза (1 август/септември винаги опират в guard-овете).

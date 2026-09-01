@@ -24,6 +24,7 @@ class QuizQuestion extends Model
         'option_3',
         'option_4',
         'correct_option',
+        'source_note',
         'is_active',
     ];
 

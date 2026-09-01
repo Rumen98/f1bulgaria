@@ -34,8 +34,16 @@ class QuizQuestionForm
                 ->default(1)
                 ->inline(),
 
+            Textarea::make('source_note')
+                ->label('Бележка за проверка (от генератора)')
+                ->helperText('Къде/как да се провери фактът. Не се показва на сайта.')
+                ->rows(2)
+                ->maxLength(500)
+                ->columnSpanFull(),
+
             Toggle::make('is_active')
                 ->label('Активен')
+                ->helperText('Генерираните въпроси минават двойна LLM проверка и влизат активни; деактивирай при съмнение.')
                 ->default(true),
         ]);
     }
