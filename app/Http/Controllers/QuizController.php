@@ -27,11 +27,25 @@ class QuizController extends Controller
         // хората могат да си сравняват резултатите от един и същ набор.
         $weekKey = Carbon::now('Europe/Sofia')->isoFormat('GGGG-[W]WW');
 
-        $questions = QuizQuestion::query()
+        $weekly = QuizQuestion::query()
             ->active()
             ->get()
             ->sortBy(fn (QuizQuestion $q) => md5($q->id.'|'.$weekKey))
             ->take($count)
+            ->values();
+
+        // Покорен въпрос изчезва от екрана: точката е взета и повторното му
+        // показване само подсказва фарм, който не съществува. Решил всичко
+        // за седмицата → празен списък → екранът „чакай понеделник".
+        $masteredIds = $user
+            ? $user->masteredQuizQuestions()
+                ->whereIn('quiz_questions.id', $weekly->pluck('id'))
+                ->pluck('quiz_questions.id')
+                ->all()
+            : [];
+
+        $questions = $weekly
+            ->reject(fn (QuizQuestion $q) => in_array($q->id, $masteredIds, true))
             ->map(fn (QuizQuestion $q) => [
                 'id' => $q->id,
                 'question' => $q->question,
@@ -45,6 +59,8 @@ class QuizController extends Controller
             'stats' => $progress->statsFor($user),
             'leaderboard' => $progress->leaderboard(),
             'week' => (int) Carbon::now('Europe/Sofia')->isoWeek(),
+            'weeklyTotal' => $weekly->count(),
+            'weeklyMastered' => count($masteredIds),
         ]);
     }
 

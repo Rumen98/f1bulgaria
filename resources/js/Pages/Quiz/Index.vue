@@ -17,7 +17,11 @@ const props = defineProps({
     // ISO номерът на седмицата — наборът въпроси е един за всички и се сменя
     // всеки понеделник.
     week: { type: Number, default: null },
+    weeklyTotal: { type: Number, default: 0 },
+    weeklyMastered: { type: Number, default: 0 },
 });
+
+const weeklyDone = computed(() => props.weeklyTotal > 0 && props.weeklyMastered >= props.weeklyTotal);
 
 const currentUser = computed(() => usePage().props.auth?.user ?? null);
 
@@ -252,6 +256,9 @@ watch(
             </div>
             <p v-if="week" class="mb-6 text-sm text-zinc-500">
                 Въпросите на седмица <span class="font-semibold text-zinc-300">{{ week }}</span> — еднакви за всички, нови всеки понеделник.
+                <template v-if="weeklyMastered > 0 && !weeklyDone">
+                    Решени: <span class="font-semibold text-emerald-400">{{ weeklyMastered }}/{{ weeklyTotal }}</span> — показваме само останалите.
+                </template>
             </p>
             <div v-else class="mb-4" />
 
@@ -259,7 +266,23 @@ watch(
                 <QuizProgress :stats="stats" :authenticated="!!currentUser" />
             </div>
 
-            <EmptyState v-if="questions.length === 0">Все още няма въпроси. Върни се скоро!</EmptyState>
+            <!-- Решил всичко за седмицата: точката е взета от всеки въпрос —
+                 показването им отново само би подсказвало фарм. КРАЙ до понеделник. -->
+            <section
+                v-if="weeklyDone"
+                class="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center"
+            >
+                <p class="text-3xl" aria-hidden="true">🏆</p>
+                <h2 class="mt-2 font-display text-xl font-black text-white">
+                    Реши всичко за тази седмица
+                </h2>
+                <p class="mx-auto mt-1 max-w-md text-sm text-zinc-400">
+                    Взе точка от всичките {{ weeklyTotal }} въпроса на седмица {{ week }}.
+                    Новите идват в понеделник — дотогава виж как стоиш в класацията отдолу.
+                </p>
+            </section>
+
+            <EmptyState v-else-if="questions.length === 0">Все още няма въпроси. Върни се скоро!</EmptyState>
 
             <template v-else>
                 <!-- Прогрес (стартова решетка) -->

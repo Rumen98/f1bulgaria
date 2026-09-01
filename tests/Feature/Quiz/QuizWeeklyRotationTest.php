@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\QuizQuestion;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -54,4 +55,52 @@ it('подава номера на седмицата към страницат�
 
     $this->get('/quiz')
         ->assertInertia(fn (Assert $page) => $page->where('week', 36));
+});
+
+it('скрива покорените въпроси от седмичния набор', function () {
+    QuizQuestion::factory()->count(25)->create();
+    Carbon::setTestNow(Carbon::parse('2026-09-01 10:00', 'Europe/Sofia'));
+
+    $user = User::factory()->create();
+    $weeklyIds = quizIds($this);
+
+    // Покорява първите 3 от седмичния набор с верните отговори.
+    $answers = collect($weeklyIds)->take(3)
+        ->map(fn (int $id) => ['id' => $id, 'choice' => QuizQuestion::query()->find($id)->correct_option])
+        ->values()->all();
+    $this->actingAs($user)->post('/quiz', ['answers' => $answers])->assertOk();
+
+    $response = $this->actingAs($user)->get('/quiz')->assertOk();
+    $props = $response->viewData('page')['props'];
+    $shown = collect($props['questions'])->pluck('id')->all();
+
+    expect($shown)->toHaveCount(7)
+        ->and(array_intersect($shown, array_slice($weeklyIds, 0, 3)))->toBeEmpty()
+        ->and($props['weeklyMastered'])->toBe(3)
+        ->and($props['weeklyTotal'])->toBe(10);
+});
+
+it('решил всичко за седмицата получава празен списък и пълен брояч', function () {
+    QuizQuestion::factory()->count(12)->create();
+    Carbon::setTestNow(Carbon::parse('2026-09-01 10:00', 'Europe/Sofia'));
+
+    $user = User::factory()->create();
+    $weeklyIds = quizIds($this);
+
+    $answers = collect($weeklyIds)
+        ->map(fn (int $id) => ['id' => $id, 'choice' => QuizQuestion::query()->find($id)->correct_option])
+        ->values()->all();
+    $this->actingAs($user)->post('/quiz', ['answers' => $answers])->assertOk();
+
+    $props = $this->actingAs($user)->get('/quiz')->assertOk()->viewData('page')['props'];
+
+    expect($props['questions'])->toBeEmpty()
+        ->and($props['weeklyMastered'])->toBe($props['weeklyTotal']);
+});
+
+it('гостът вижда пълния набор', function () {
+    QuizQuestion::factory()->count(25)->create();
+    Carbon::setTestNow(Carbon::parse('2026-09-01 10:00', 'Europe/Sofia'));
+
+    expect(quizIds($this))->toHaveCount(10);
 });
