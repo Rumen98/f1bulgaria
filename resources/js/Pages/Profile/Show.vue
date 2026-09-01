@@ -81,16 +81,14 @@ const earnedBadges = computed(() => (props.profile.badges ?? []).filter((b) => b
                             Играй →
                         </Link>
                     </div>
+                    <!-- Само точките: знаменателят „/ N въпроса" беше текущият
+                         брой в базата — расте с всеки добавен въпрос и правеше
+                         целта подвижна, а лентата — безсмислена. -->
                     <div class="flex items-end gap-2">
                         <span class="font-display text-3xl font-black leading-none tabular-nums text-white">{{ quiz.points }}</span>
-                        <span class="pb-0.5 text-sm text-zinc-500">/ {{ quiz.available }} покорени въпроса</span>
+                        <span class="pb-0.5 text-sm text-zinc-500">{{ quiz.points === 1 ? 'точка' : 'точки' }}</span>
                     </div>
-                    <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                        <div
-                            class="h-full bg-gradient-to-r from-red-600 to-amber-400"
-                            :style="{ width: (quiz.available ? (quiz.points / quiz.available) * 100 : 0) + '%' }"
-                        />
-                    </div>
+                    <p class="mt-2 text-xs text-zinc-500">Нови въпроси всеки понеделник.</p>
                 </div>
 
                 <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">

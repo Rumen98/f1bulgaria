@@ -17,22 +17,11 @@ class QuizController extends Controller
 {
     public function index(QuizProgressService $progress): Response
     {
-        $count = (int) config('quiz.count', 10);
         $user = request()->user();
 
         // Въпросите на СЕДМИЦАТА: един и същ набор за всички, нов всеки
-        // понеделник (ISO седмица, софийско време). Изборът е детерминистичен
-        // — md5(id + седмица) като сортов ключ — така куизът става споделен
-        // седмичен ритуал вместо различна селекция на всяко зареждане, а
-        // хората могат да си сравняват резултатите от един и същ набор.
-        $weekKey = Carbon::now('Europe/Sofia')->isoFormat('GGGG-[W]WW');
-
-        $weekly = QuizQuestion::query()
-            ->active()
-            ->get()
-            ->sortBy(fn (QuizQuestion $q) => md5($q->id.'|'.$weekKey))
-            ->take($count)
-            ->values();
+        // понеделник — виж QuizProgressService::weeklyQuestions().
+        $weekly = $progress->weeklyQuestions();
 
         // Един опит на въпрос — завинаги: отговорен (вярно ИЛИ грешно)
         // въпрос не се показва повече. Точки идват само от нови въпроси.

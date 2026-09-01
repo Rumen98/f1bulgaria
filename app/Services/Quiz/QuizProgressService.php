@@ -102,6 +102,26 @@ class QuizProgressService
     }
 
     /**
+     * Детерминистичният седмичен набор: едни и същи въпроси за всички през
+     * дадена ISO седмица (софийско време), нови всеки понеделник. Сортов
+     * ключ md5(id|седмица) — без състояние, без крон.
+     *
+     * @return Collection<int, QuizQuestion>
+     */
+    public function weeklyQuestions(?Carbon $at = null): Collection
+    {
+        $weekKey = ($at ?? Carbon::now('Europe/Sofia'))
+            ->copy()->setTimezone('Europe/Sofia')->isoFormat('GGGG-[W]WW');
+
+        return QuizQuestion::query()
+            ->active()
+            ->get()
+            ->sortBy(fn (QuizQuestion $q) => md5($q->id.'|'.$weekKey))
+            ->take((int) config('quiz.count', 10))
+            ->values();
+    }
+
+    /**
      * Топ играчи по брой покорени въпроси. Без точки — извън класацията.
      *
      * @return Collection<int, array{position:int, id:int, name:string, points:int}>

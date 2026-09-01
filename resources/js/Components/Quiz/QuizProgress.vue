@@ -20,7 +20,7 @@ const remaining = computed(() => Math.max(0, props.stats.available - props.stats
             <div>
                 <p class="font-semibold text-white">Точките ти не се записват</p>
                 <p class="mt-0.5 text-sm text-zinc-400">
-                    Влез, за да трупаш точки от {{ stats.available }} въпроса и да влезеш в класацията.
+                    Влез, за да събираш точки и да се бориш в класацията.
                 </p>
             </div>
             <Link

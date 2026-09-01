@@ -242,11 +242,11 @@ class WeeklyDigestCommand extends Command
     /**
      * Прогресът в куиза за секцията в дайджеста.
      *
-     * Куизът се подсеща оттук, а не с отделно писмо: при 40 потребители всяко
-     * ново масово писмо е по-скоро причина за отписване, отколкото за връщане.
-     * Дайджестът вече пристига всяка неделя и хората го отварят.
+     * Куизът се подсеща оттук, а не с отделно писмо: при този мащаб всяко
+     * ново масово писмо е по-скоро причина за отписване, отколкото за
+     * връщане. Само точките — броят въпроси в базата е подвижна цел.
      *
-     * @return array{points:int, available:int, remaining:int}|null
+     * @return array{points:int}|null
      */
     private function quizProgress(QuizProgressService $progress, User $user): ?array
     {
@@ -256,11 +256,7 @@ class WeeklyDigestCommand extends Command
             return null; // няма въпроси в базата — няма какво да рекламираме
         }
 
-        return [
-            'points' => $stats['points'],
-            'available' => $stats['available'],
-            'remaining' => max(0, $stats['available'] - $stats['points']),
-        ];
+        return ['points' => $stats['points']];
     }
 
     /**
