@@ -107,15 +107,26 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Въпросите, на които потребителят вече е отговорил вярно поне веднъж.
-     * Броят им е точките му в куиза.
+     * Всички въпроси, на които потребителят е отговарял — вярно или грешно.
+     * Правилото е един опит на въпрос на седмица; pivot-ът пази кога.
+     *
+     * @return BelongsToMany<QuizQuestion, $this>
+     */
+    public function answeredQuizQuestions(): BelongsToMany
+    {
+        return $this->belongsToMany(QuizQuestion::class, 'quiz_question_user')
+            ->withPivot('answered_at', 'first_correct_at')
+            ->withTimestamps();
+    }
+
+    /**
+     * Подмножеството с верен отговор — точките в куиза се броят оттук.
      *
      * @return BelongsToMany<QuizQuestion, $this>
      */
     public function masteredQuizQuestions(): BelongsToMany
     {
-        return $this->belongsToMany(QuizQuestion::class, 'quiz_question_user')
-            ->withPivot('first_correct_at')
-            ->withTimestamps();
+        return $this->answeredQuizQuestions()
+            ->wherePivotNotNull('first_correct_at');
     }
 }

@@ -76,7 +76,7 @@ it('скрива покорените въпроси от седмичния н�
 
     expect($shown)->toHaveCount(7)
         ->and(array_intersect($shown, array_slice($weeklyIds, 0, 3)))->toBeEmpty()
-        ->and($props['weeklyMastered'])->toBe(3)
+        ->and($props['weeklyAnswered'])->toBe(3)
         ->and($props['weeklyTotal'])->toBe(10);
 });
 
@@ -95,7 +95,7 @@ it('решил всичко за седмицата получава празе�
     $props = $this->actingAs($user)->get('/quiz')->assertOk()->viewData('page')['props'];
 
     expect($props['questions'])->toBeEmpty()
-        ->and($props['weeklyMastered'])->toBe($props['weeklyTotal']);
+        ->and($props['weeklyAnswered'])->toBe($props['weeklyTotal']);
 });
 
 it('гостът вижда пълния набор', function () {
@@ -103,4 +103,60 @@ it('гостът вижда пълния набор', function () {
     Carbon::setTestNow(Carbon::parse('2026-09-01 10:00', 'Europe/Sofia'));
 
     expect(quizIds($this))->toHaveCount(10);
+});
+
+it('грешно отговорен въпрос също изчезва до понеделник', function () {
+    QuizQuestion::factory()->count(12)->create();
+    Carbon::setTestNow(Carbon::parse('2026-09-01 10:00', 'Europe/Sofia'));
+
+    $user = User::factory()->create();
+    $weeklyIds = quizIds($this);
+    $first = QuizQuestion::query()->find($weeklyIds[0]);
+
+    // Грешен отговор: верният + 1 в кръг 1..4.
+    $wrong = ($first->correct_option % 4) + 1;
+    $this->actingAs($user)
+        ->post('/quiz', ['answers' => [['id' => $first->id, 'choice' => $wrong]]])
+        ->assertOk();
+
+    $props = $this->actingAs($user)->get('/quiz')->assertOk()->viewData('page')['props'];
+
+    expect(collect($props['questions'])->pluck('id')->all())->not->toContain($first->id)
+        ->and($props['weeklyAnswered'])->toBe(1)
+        ->and($props['weeklyPoints'])->toBe(0);
+});
+
+it('поправка в същата седмица не носи точка — прегледът разкри отговора', function () {
+    QuizQuestion::factory()->count(12)->create();
+    Carbon::setTestNow(Carbon::parse('2026-09-01 10:00', 'Europe/Sofia'));
+
+    $user = User::factory()->create();
+    $first = QuizQuestion::query()->find(quizIds($this)[0]);
+    $wrong = ($first->correct_option % 4) + 1;
+
+    $this->actingAs($user)->post('/quiz', ['answers' => [['id' => $first->id, 'choice' => $wrong]]]);
+    $this->actingAs($user)->post('/quiz', ['answers' => [['id' => $first->id, 'choice' => $first->correct_option]]]);
+
+    expect($user->fresh()->masteredQuizQuestions()->count())->toBe(0);
+});
+
+it('сгрешен миналата седмица получава нов опит и точка тази', function () {
+    QuizQuestion::factory()->count(5)->create(); // наборът е едни и същи 5 всяка седмица
+    config(['quiz.count' => 5]);
+
+    Carbon::setTestNow(Carbon::parse('2026-08-25 10:00', 'Europe/Sofia')); // седмица 35
+    $user = User::factory()->create();
+    $first = QuizQuestion::query()->find(quizIds($this)[0]);
+    $wrong = ($first->correct_option % 4) + 1;
+    $this->actingAs($user)->post('/quiz', ['answers' => [['id' => $first->id, 'choice' => $wrong]]]);
+
+    Carbon::setTestNow(Carbon::parse('2026-09-01 10:00', 'Europe/Sofia')); // седмица 36
+
+    // Въпросът отново е на екрана…
+    $props = $this->actingAs($user)->get('/quiz')->assertOk()->viewData('page')['props'];
+    expect(collect($props['questions'])->pluck('id')->all())->toContain($first->id);
+
+    // …и верният отговор вече носи точката.
+    $this->actingAs($user)->post('/quiz', ['answers' => [['id' => $first->id, 'choice' => $first->correct_option]]]);
+    expect($user->fresh()->masteredQuizQuestions()->count())->toBe(1);
 });

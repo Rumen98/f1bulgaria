@@ -34,18 +34,33 @@ class QuizController extends Controller
             ->take($count)
             ->values();
 
-        // Покорен въпрос изчезва от екрана: точката е взета и повторното му
-        // показване само подсказва фарм, който не съществува. Решил всичко
-        // за седмицата → празен списък → екранът „чакай понеделник".
-        $masteredIds = $user
-            ? $user->masteredQuizQuestions()
+        // Един опит на въпрос на седмица: отговорен (вярно ИЛИ грешно) въпрос
+        // изчезва до следващия набор, в който попадне. Прегледът разкрива
+        // верните отговори, така че повторен опит би бил преписване.
+        $spentIds = [];
+        $weeklyPoints = 0;
+
+        if ($user !== null) {
+            $weekStart = Carbon::now('Europe/Sofia')->startOfWeek()->utc();
+
+            $pivots = $user->answeredQuizQuestions()
                 ->whereIn('quiz_questions.id', $weekly->pluck('id'))
-                ->pluck('quiz_questions.id')
-                ->all()
-            : [];
+                ->get();
+
+            foreach ($pivots as $answered) {
+                $mastered = $answered->pivot->first_correct_at !== null;
+                $spentThisWeek = $answered->pivot->answered_at !== null
+                    && Carbon::parse($answered->pivot->answered_at)->greaterThanOrEqualTo($weekStart);
+
+                if ($mastered || $spentThisWeek) {
+                    $spentIds[] = $answered->id;
+                    $weeklyPoints += $mastered ? 1 : 0;
+                }
+            }
+        }
 
         $questions = $weekly
-            ->reject(fn (QuizQuestion $q) => in_array($q->id, $masteredIds, true))
+            ->reject(fn (QuizQuestion $q) => in_array($q->id, $spentIds, true))
             ->map(fn (QuizQuestion $q) => [
                 'id' => $q->id,
                 'question' => $q->question,
@@ -60,7 +75,8 @@ class QuizController extends Controller
             'leaderboard' => $progress->leaderboard(),
             'week' => (int) Carbon::now('Europe/Sofia')->isoWeek(),
             'weeklyTotal' => $weekly->count(),
-            'weeklyMastered' => count($masteredIds),
+            'weeklyAnswered' => count($spentIds),
+            'weeklyPoints' => $weeklyPoints,
         ]);
     }
 

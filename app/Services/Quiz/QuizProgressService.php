@@ -22,10 +22,15 @@ use Illuminate\Support\Facades\DB;
 class QuizProgressService
 {
     /**
-     * Записва един изигран куиз: опитът в историята + новите покорени въпроси.
+     * Записва предадените отговори при правило „един опит на въпрос на
+     * седмица": всеки отговор — верен или грешен — изразходва въпроса до
+     * следващия седмичен набор, в който попадне. Точка носи само верен
+     * отговор на неизразходван въпрос; преглед след предаването разкрива
+     * верните отговори, така че повторен опит в същата седмица би бил
+     * преписване, не знание.
      *
      * @param  array<int, array{id: int, is_correct: bool}>  $review  Прегледът от QuizScoringService.
-     * @return int Брой НОВИ покорени въпроса в този опит.
+     * @return int Брой НОВИ точки от това предаване.
      */
     public function record(User $user, array $review): int
     {
@@ -42,35 +47,51 @@ class QuizProgressService
                 'total' => count($review),
             ]);
 
-            $correctIds = array_column(
-                array_filter($review, fn (array $row) => $row['is_correct']),
-                'id',
-            );
-
-            if ($correctIds === []) {
-                return 0;
-            }
-
-            $alreadyMastered = $user->masteredQuizQuestions()
-                ->whereIn('quiz_questions.id', $correctIds)
-                ->pluck('quiz_questions.id')
-                ->all();
-
-            $fresh = array_values(array_diff($correctIds, $alreadyMastered));
-
-            if ($fresh === []) {
-                return 0;
-            }
-
             $now = Carbon::now();
+            $weekStart = Carbon::now('Europe/Sofia')->startOfWeek()->utc();
 
-            $user->masteredQuizQuestions()->attach(
-                collect($fresh)
-                    ->mapWithKeys(fn (int $id) => [$id => ['first_correct_at' => $now]])
-                    ->all(),
-            );
+            $existing = $user->answeredQuizQuestions()
+                ->whereIn('quiz_questions.id', array_column($review, 'id'))
+                ->get()
+                ->keyBy('id');
 
-            return count($fresh);
+            $points = 0;
+
+            foreach ($review as $row) {
+                $pivot = $existing->get($row['id'])?->pivot;
+
+                if ($pivot === null) {
+                    // Първи отговор на въпроса изобщо.
+                    $user->answeredQuizQuestions()->attach($row['id'], [
+                        'answered_at' => $now,
+                        'first_correct_at' => $row['is_correct'] ? $now : null,
+                    ]);
+                    $points += $row['is_correct'] ? 1 : 0;
+
+                    continue;
+                }
+
+                if ($pivot->first_correct_at !== null) {
+                    continue; // точката е взета — нищо ново
+                }
+
+                // Изразходван тази седмица (грешен опит): API-то приема
+                // повторното предаване, но не дава точка — верният отговор
+                // вече е бил разкрит в прегледа.
+                $spentThisWeek = $pivot->answered_at !== null
+                    && Carbon::parse($pivot->answered_at)->greaterThanOrEqualTo($weekStart);
+
+                $award = $row['is_correct'] && ! $spentThisWeek;
+
+                $user->answeredQuizQuestions()->updateExistingPivot($row['id'], [
+                    'answered_at' => $now,
+                    ...($award ? ['first_correct_at' => $now] : []),
+                ]);
+
+                $points += $award ? 1 : 0;
+            }
+
+            return $points;
         });
     }
 

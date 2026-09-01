@@ -18,10 +18,11 @@ const props = defineProps({
     // всеки понеделник.
     week: { type: Number, default: null },
     weeklyTotal: { type: Number, default: 0 },
-    weeklyMastered: { type: Number, default: 0 },
+    weeklyAnswered: { type: Number, default: 0 },
+    weeklyPoints: { type: Number, default: 0 },
 });
 
-const weeklyDone = computed(() => props.weeklyTotal > 0 && props.weeklyMastered >= props.weeklyTotal);
+const weeklyDone = computed(() => props.weeklyTotal > 0 && props.weeklyAnswered >= props.weeklyTotal);
 
 const currentUser = computed(() => usePage().props.auth?.user ?? null);
 
@@ -256,8 +257,8 @@ watch(
             </div>
             <p v-if="week" class="mb-6 text-sm text-zinc-500">
                 Въпросите на седмица <span class="font-semibold text-zinc-300">{{ week }}</span> — еднакви за всички, нови всеки понеделник.
-                <template v-if="weeklyMastered > 0 && !weeklyDone">
-                    Решени: <span class="font-semibold text-emerald-400">{{ weeklyMastered }}/{{ weeklyTotal }}</span> — показваме само останалите.
+                <template v-if="weeklyAnswered > 0 && !weeklyDone">
+                    Отговорени: <span class="font-semibold text-emerald-400">{{ weeklyAnswered }}/{{ weeklyTotal }}</span> — всеки въпрос има един опит.
                 </template>
             </p>
             <div v-else class="mb-4" />
@@ -266,19 +267,20 @@ watch(
                 <QuizProgress :stats="stats" :authenticated="!!currentUser" />
             </div>
 
-            <!-- Решил всичко за седмицата: точката е взета от всеки въпрос —
-                 показването им отново само би подсказвало фарм. КРАЙ до понеделник. -->
+            <!-- Отговорил на всичко за седмицата (вярно или грешно) — един
+                 опит на въпрос, КРАЙ до понеделник. -->
             <section
                 v-if="weeklyDone"
                 class="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center"
             >
-                <p class="text-3xl" aria-hidden="true">🏆</p>
+                <p class="text-3xl" aria-hidden="true">{{ weeklyPoints === weeklyTotal ? '🏆' : '🏁' }}</p>
                 <h2 class="mt-2 font-display text-xl font-black text-white">
-                    Реши всичко за тази седмица
+                    Това беше за тази седмица
                 </h2>
                 <p class="mx-auto mt-1 max-w-md text-sm text-zinc-400">
-                    Взе точка от всичките {{ weeklyTotal }} въпроса на седмица {{ week }}.
-                    Новите идват в понеделник — дотогава виж как стоиш в класацията отдолу.
+                    Взе <span class="font-bold text-emerald-400">{{ weeklyPoints }}</span> от
+                    {{ weeklyTotal }} възможни точки от въпросите на седмица {{ week }}.
+                    Новите идват в понеделник — дотогава виж класацията отдолу.
                 </p>
             </section>
 
