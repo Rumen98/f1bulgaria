@@ -4,7 +4,7 @@ import { computed } from 'vue';
 
 const props = defineProps({
     stats: { type: Object, required: true },
-    // Нови точки от току-що приключилия кръг; null извън режим резултат.
+    // Нови точки от току-що предадените отговори; null извън режим резултат.
     newPoints: { type: Number, default: null },
     authenticated: { type: Boolean, default: false },
 });
@@ -65,15 +65,5 @@ const remaining = computed(() => Math.max(0, props.stats.available - props.stats
             </template>
         </p>
 
-        <dl v-if="stats.attempts" class="mt-3 flex gap-5 border-t border-zinc-800 pt-3 text-xs">
-            <div>
-                <dt class="text-zinc-500">Изиграни кръгове</dt>
-                <dd class="font-display font-black tabular-nums text-zinc-200">{{ stats.attempts }}</dd>
-            </div>
-            <div v-if="stats.best_score !== null">
-                <dt class="text-zinc-500">Най-добър кръг</dt>
-                <dd class="font-display font-black tabular-nums text-zinc-200">{{ stats.best_score }}/{{ stats.best_total }}</dd>
-            </div>
-        </dl>
     </section>
 </template>

@@ -85,8 +85,6 @@ it('показва точките и тавана на страницата на
         ->assertInertia(fn (Assert $page) => $page
             ->where('stats.points', 3)
             ->where('stats.available', 5)
-            ->where('stats.attempts', 1)
-            ->where('stats.best_score', 3)
         );
 });
 

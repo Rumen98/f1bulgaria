@@ -77,20 +77,18 @@ class QuizProgressService
     /**
      * Статистика за таблото на куиза. При гост връща само общия брой въпроси.
      *
-     * @return array{points:int, available:int, attempts:int, best_score:int|null, best_total:int|null}
+     * Нарочно без броене на опити и „най-добър резултат": куизът е седмичен —
+     * отговаряш, събираш точки и чакаш новите въпроси. Историята на опитите
+     * остава в quiz_attempts като данни, но не е част от играта.
+     *
+     * @return array{points:int, available:int}
      */
     public function statsFor(?User $user): array
     {
         $available = QuizQuestion::query()->active()->count();
 
         if ($user === null) {
-            return [
-                'points' => 0,
-                'available' => $available,
-                'attempts' => 0,
-                'best_score' => null,
-                'best_total' => null,
-            ];
+            return ['points' => 0, 'available' => $available];
         }
 
         // Само активни въпроси — деактивиран въпрос не бива да държи точка,
@@ -99,19 +97,7 @@ class QuizProgressService
             ->where('quiz_questions.is_active', true)
             ->count();
 
-        $best = QuizAttempt::query()
-            ->where('user_id', $user->id)
-            ->orderByDesc('score')
-            ->orderByDesc('total')
-            ->first();
-
-        return [
-            'points' => $points,
-            'available' => $available,
-            'attempts' => QuizAttempt::query()->where('user_id', $user->id)->count(),
-            'best_score' => $best?->score,
-            'best_total' => $best?->total,
-        ];
+        return ['points' => $points, 'available' => $available];
     }
 
     /**

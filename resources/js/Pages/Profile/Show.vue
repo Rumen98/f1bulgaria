@@ -9,7 +9,7 @@ import { computed } from 'vue';
 const props = defineProps({
     profile: Object,
     stats: Object,
-    quiz: { type: Object, default: () => ({ points: 0, available: 0, attempts: 0 }) },
+    quiz: { type: Object, default: () => ({ points: 0, available: 0 }) },
     season: Number,
 });
 
@@ -91,9 +91,6 @@ const earnedBadges = computed(() => (props.profile.badges ?? []).filter((b) => b
                             :style="{ width: (quiz.available ? (quiz.points / quiz.available) * 100 : 0) + '%' }"
                         />
                     </div>
-                    <p v-if="quiz.attempts" class="mt-2 text-xs text-zinc-500">
-                        {{ quiz.attempts }} изиграни кръга<template v-if="quiz.best_score !== null">, най-добър {{ quiz.best_score }}/{{ quiz.best_total }}</template>.
-                    </p>
                 </div>
 
                 <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">

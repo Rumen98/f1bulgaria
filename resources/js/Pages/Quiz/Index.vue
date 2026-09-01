@@ -12,7 +12,7 @@ import { computed, reactive, ref, watch } from 'vue';
 const props = defineProps({
     questions: { type: Array, default: () => [] },
     result: { type: Object, default: null }, // != null => режим резултат/ревю
-    stats: { type: Object, default: () => ({ points: 0, available: 0, attempts: 0, best_score: null, best_total: null }) },
+    stats: { type: Object, default: () => ({ points: 0, available: 0 }) },
     leaderboard: { type: Array, default: () => [] },
     // ISO номерът на седмицата — наборът въпроси е един за всички и се сменя
     // всеки понеделник.
@@ -67,7 +67,7 @@ const tier = computed(() => {
     if (p <= 10) {
         return { label: 'В ТОЧКИТЕ', sub: 'Солиден резултат', ring: 'ring-emerald-500/40', glow: 'from-emerald-500/15', text: 'text-emerald-300', emoji: '✅' };
     }
-    return { label: 'ИЗВЪН ТОЧКИТЕ', sub: 'Има какво да наваксаш до следващия кръг', ring: 'ring-zinc-700', glow: 'from-zinc-700/20', text: 'text-zinc-400', emoji: '🏁' };
+    return { label: 'ИЗВЪН ТОЧКИТЕ', sub: 'Новите въпроси идват в понеделник', ring: 'ring-zinc-700', glow: 'from-zinc-700/20', text: 'text-zinc-400', emoji: '🏁' };
 });
 
 // Подиумни стъпала (P2 · P1 · P3) — „ТИ" се показва на своето, ако е топ 3.
@@ -229,11 +229,11 @@ watch(
 
             <div class="mt-6 flex flex-wrap justify-center gap-3">
                 <button type="button" class="rounded-lg bg-red-600 px-6 py-2.5 font-bold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500" @click="restart">
-                    🏁 Нов кръг
+                    Към въпросите на седмицата
                 </button>
             </div>
 
-            <!-- Постоянният прогрес живее ПОД кръга: показва, че резултатът е
+            <!-- Постоянният прогрес живее ПОД резултата: показва, че той е
                  оставил следа, вместо да изчезне с напускането на страницата. -->
             <div class="mt-8">
                 <QuizProgress :stats="stats" :new-points="result.new_points ?? 0" :authenticated="!!currentUser" />
