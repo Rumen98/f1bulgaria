@@ -238,12 +238,6 @@ watch(
                 </button>
             </div>
 
-            <!-- Постоянният прогрес живее ПОД резултата: показва, че той е
-                 оставил следа, вместо да изчезне с напускането на страницата. -->
-            <div class="mt-8">
-                <QuizProgress :stats="stats" :new-points="result.new_points ?? 0" :authenticated="!!currentUser" />
-            </div>
-
             <div class="mt-8">
                 <QuizLeaderboard :rows="leaderboard" :current-user-id="currentUser?.id ?? null" />
             </div>
@@ -257,14 +251,14 @@ watch(
             </div>
             <p v-if="week" class="mb-6 text-sm text-zinc-500">
                 Въпросите на седмица <span class="font-semibold text-zinc-300">{{ week }}</span> — еднакви за всички, нови всеки понеделник.
-                <template v-if="weeklyAnswered > 0 && !weeklyDone">
-                    Отговорени: <span class="font-semibold text-emerald-400">{{ weeklyAnswered }}/{{ weeklyTotal }}</span> — всеки въпрос има един опит.
-                </template>
+
             </p>
             <div v-else class="mb-4" />
 
-            <div class="mb-6">
-                <QuizProgress :stats="stats" :authenticated="!!currentUser" />
+            <!-- За влезлия: просто въпроси. Точките се виждат в класацията
+                 отдолу и в профила. Гостът получава поканата за регистрация. -->
+            <div v-if="!currentUser" class="mb-6">
+                <QuizProgress :stats="stats" :authenticated="false" />
             </div>
 
             <!-- Отговорил на всичко за седмицата (вярно или грешно) — един

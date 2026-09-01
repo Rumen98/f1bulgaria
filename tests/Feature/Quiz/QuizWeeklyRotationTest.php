@@ -105,7 +105,7 @@ it('гостът вижда пълния набор', function () {
     expect(quizIds($this))->toHaveCount(10);
 });
 
-it('грешно отговорен въпрос също изчезва до понеделник', function () {
+it('грешно отговорен въпрос също изчезва', function () {
     QuizQuestion::factory()->count(12)->create();
     Carbon::setTestNow(Carbon::parse('2026-09-01 10:00', 'Europe/Sofia'));
 
@@ -140,7 +140,7 @@ it('поправка в същата седмица не носи точка —
     expect($user->fresh()->masteredQuizQuestions()->count())->toBe(0);
 });
 
-it('сгрешен миналата седмица получава нов опит и точка тази', function () {
+it('отговорен въпрос е изразходван завинаги — и следващата седмица', function () {
     QuizQuestion::factory()->count(5)->create(); // наборът е едни и същи 5 всяка седмица
     config(['quiz.count' => 5]);
 
@@ -152,11 +152,11 @@ it('сгрешен миналата седмица получава нов оп�
 
     Carbon::setTestNow(Carbon::parse('2026-09-01 10:00', 'Europe/Sofia')); // седмица 36
 
-    // Въпросът отново е на екрана…
+    // Въпросът НЕ се показва повече…
     $props = $this->actingAs($user)->get('/quiz')->assertOk()->viewData('page')['props'];
-    expect(collect($props['questions'])->pluck('id')->all())->toContain($first->id);
+    expect(collect($props['questions'])->pluck('id')->all())->not->toContain($first->id);
 
-    // …и верният отговор вече носи точката.
+    // …и дори верен отговор през API-то не носи точка.
     $this->actingAs($user)->post('/quiz', ['answers' => [['id' => $first->id, 'choice' => $first->correct_option]]]);
-    expect($user->fresh()->masteredQuizQuestions()->count())->toBe(1);
+    expect($user->fresh()->masteredQuizQuestions()->count())->toBe(0);
 });

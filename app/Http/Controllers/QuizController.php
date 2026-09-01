@@ -34,28 +34,19 @@ class QuizController extends Controller
             ->take($count)
             ->values();
 
-        // Един опит на въпрос на седмица: отговорен (вярно ИЛИ грешно) въпрос
-        // изчезва до следващия набор, в който попадне. Прегледът разкрива
-        // верните отговори, така че повторен опит би бил преписване.
+        // Един опит на въпрос — завинаги: отговорен (вярно ИЛИ грешно)
+        // въпрос не се показва повече. Точки идват само от нови въпроси.
         $spentIds = [];
         $weeklyPoints = 0;
 
         if ($user !== null) {
-            $weekStart = Carbon::now('Europe/Sofia')->startOfWeek()->utc();
-
             $pivots = $user->answeredQuizQuestions()
                 ->whereIn('quiz_questions.id', $weekly->pluck('id'))
                 ->get();
 
             foreach ($pivots as $answered) {
-                $mastered = $answered->pivot->first_correct_at !== null;
-                $spentThisWeek = $answered->pivot->answered_at !== null
-                    && Carbon::parse($answered->pivot->answered_at)->greaterThanOrEqualTo($weekStart);
-
-                if ($mastered || $spentThisWeek) {
-                    $spentIds[] = $answered->id;
-                    $weeklyPoints += $mastered ? 1 : 0;
-                }
+                $spentIds[] = $answered->id;
+                $weeklyPoints += $answered->pivot->first_correct_at !== null ? 1 : 0;
             }
         }
 

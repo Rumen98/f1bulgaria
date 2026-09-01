@@ -22,12 +22,11 @@ use Illuminate\Support\Facades\DB;
 class QuizProgressService
 {
     /**
-     * Записва предадените отговори при правило „един опит на въпрос на
-     * седмица": всеки отговор — верен или грешен — изразходва въпроса до
-     * следващия седмичен набор, в който попадне. Точка носи само верен
-     * отговор на неизразходван въпрос; преглед след предаването разкрива
-     * верните отговори, така че повторен опит в същата седмица би бил
-     * преписване, не знание.
+     * Записва предадените отговори при правило „един опит на въпрос",
+     * точка: всеки отговор — верен или грешен — изразходва въпроса завинаги.
+     * Прегледът след предаване разкрива верните отговори, така че какъвто и
+     * да е повторен опит би бил преписване, не знание. Точки идват само от
+     * нови въпроси.
      *
      * @param  array<int, array{id: int, is_correct: bool}>  $review  Прегледът от QuizScoringService.
      * @return int Брой НОВИ точки от това предаване.
@@ -48,47 +47,28 @@ class QuizProgressService
             ]);
 
             $now = Carbon::now();
-            $weekStart = Carbon::now('Europe/Sofia')->startOfWeek()->utc();
 
-            $existing = $user->answeredQuizQuestions()
+            $answeredIds = $user->answeredQuizQuestions()
                 ->whereIn('quiz_questions.id', array_column($review, 'id'))
-                ->get()
-                ->keyBy('id');
+                ->pluck('quiz_questions.id')
+                ->all();
 
             $points = 0;
 
             foreach ($review as $row) {
-                $pivot = $existing->get($row['id'])?->pivot;
-
-                if ($pivot === null) {
-                    // Първи отговор на въпроса изобщо.
-                    $user->answeredQuizQuestions()->attach($row['id'], [
-                        'answered_at' => $now,
-                        'first_correct_at' => $row['is_correct'] ? $now : null,
-                    ]);
-                    $points += $row['is_correct'] ? 1 : 0;
-
+                // Отговорен въпрос е отговорен ЗАВИНАГИ — верен или грешен,
+                // втори опит няма (прегледът разкрива отговорите). Повторно
+                // предаване през API-то просто се игнорира.
+                if (in_array($row['id'], $answeredIds, true)) {
                     continue;
                 }
 
-                if ($pivot->first_correct_at !== null) {
-                    continue; // точката е взета — нищо ново
-                }
-
-                // Изразходван тази седмица (грешен опит): API-то приема
-                // повторното предаване, но не дава точка — верният отговор
-                // вече е бил разкрит в прегледа.
-                $spentThisWeek = $pivot->answered_at !== null
-                    && Carbon::parse($pivot->answered_at)->greaterThanOrEqualTo($weekStart);
-
-                $award = $row['is_correct'] && ! $spentThisWeek;
-
-                $user->answeredQuizQuestions()->updateExistingPivot($row['id'], [
+                $user->answeredQuizQuestions()->attach($row['id'], [
                     'answered_at' => $now,
-                    ...($award ? ['first_correct_at' => $now] : []),
+                    'first_correct_at' => $row['is_correct'] ? $now : null,
                 ]);
 
-                $points += $award ? 1 : 0;
+                $points += $row['is_correct'] ? 1 : 0;
             }
 
             return $points;
