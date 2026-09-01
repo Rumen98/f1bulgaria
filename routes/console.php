@@ -68,6 +68,14 @@ Schedule::command('f1:prediction-reminder')
     ->onOneServer()
     ->withoutOverlapping(55);
 
+// „Днес сме на живо" — проверка на 15 мин, но вътрешните пазачи (3-часов
+// прозорец преди старта + newsletter_sends по race_id + флаг + OpenF1
+// креденшъли) го пускат веднъж на състезателна неделя.
+Schedule::command('f1:live-announce')
+    ->everyFifteenMinutes()
+    ->onOneServer()
+    ->withoutOverlapping(14);
+
 // „Пулс" през паузите — проверка всяка сряда 18:00 софийско време.
 // Седмично, а не месечно: закачен за 1-во число пулсът геометрично не може
 // да улучи лятната пауза (1 август/септември винаги опират в guard-овете).

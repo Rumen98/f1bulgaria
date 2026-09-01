@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\Feedback\SurveyPromptService;
+use App\Services\LiveTiming\LiveWindowService;
 use App\Support\Seo;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -41,6 +42,11 @@ class HandleInertiaRequests extends Middleware
             ],
             'teamBrands' => fn () => config('team-brands'),
             'features' => fn () => config('features'),
+            // Тече ли сесия в момента (по разписание, кеш 60 сек) — линкът
+            // „На живо" в навигацията се показва само тогава: постоянен
+            // „На живо" в менюто в сряда обучава хората, че лъже.
+            'liveNow' => fn () => config('features.live_timing')
+                && app(LiveWindowService::class)->isLiveNow(),
             // Заглавието се решава сървърно (App\Support\Seo). Подава се и като
             // prop, за да го приложи клиентът при SPA навигация — така таб
             // заглавието и индексираното от Google съвпадат.

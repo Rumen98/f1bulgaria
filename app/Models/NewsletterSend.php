@@ -20,6 +20,8 @@ class NewsletterSend extends Model
 
     public const TYPE_PREDICTION_REMINDER = 'prediction_reminder';
 
+    public const TYPE_LIVE_COVERAGE = 'live_coverage';
+
     protected $fillable = ['mail_type', 'race_id', 'sent_at'];
 
     protected function casts(): array

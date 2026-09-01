@@ -21,7 +21,9 @@ const showSurveyPrompt = computed(
 // Принцип на разделяне: „живото" (следиш сезона, играеш) е отпред; справочното
 // съдържание без времева стойност живее в „Енциклопедия".
 const primaryNav = [
-    { label: 'На живо', route: 'live', live: true, feature: 'live_timing' },
+    // liveOnly: показва се единствено докато наистина тече сесия (liveNow
+    // от сървъра) — не само при включен флаг.
+    { label: 'На живо', route: 'live', live: true, feature: 'live_timing', liveOnly: true },
     { label: 'Новини', route: 'news.index' },
     { label: 'Календар', route: 'calendar' },
     { label: 'Класиране', route: 'standings' },
@@ -49,7 +51,10 @@ const moreRef = ref(null);
 
 const features = computed(() => page.props.features ?? {});
 // Показваме елемент само ако рутът съществува И (няма feature ИЛИ флагът е включен).
-const visible = (i) => hasRoute(i.route) && (!i.feature || features.value[i.feature]);
+const liveNow = computed(() => Boolean(page.props.liveNow));
+const visible = (i) => hasRoute(i.route)
+    && (!i.feature || features.value[i.feature])
+    && (!i.liveOnly || liveNow.value);
 const primary = computed(() => primaryNav.filter(visible));
 const secondary = computed(() => secondaryNav.filter(visible));
 const allItems = computed(() => [...primary.value, ...secondary.value]);
@@ -64,7 +69,7 @@ const footerColumns = computed(() => [
             { label: 'Новини', route: 'news.index' },
             { label: 'Календар', route: 'calendar' },
             { label: 'Класиране', route: 'standings' },
-            { label: 'На живо', route: 'live', feature: 'live_timing' },
+            { label: 'На живо', route: 'live', feature: 'live_timing', liveOnly: true },
             { label: 'Формула 2', route: 'f2', feature: 'f2' },
         ].filter(visible),
     },
