@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePredictionRequest;
 use App\Http\Resources\PredictionResource;
 use App\Models\Race;
+use App\Services\Badges\BadgeService;
 use App\Services\Predictions\PredictionLockService;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -28,8 +29,12 @@ class PredictionController extends Controller
         ]);
     }
 
-    public function store(StorePredictionRequest $request, Race $race, PredictionLockService $lock): RedirectResponse
-    {
+    public function store(
+        StorePredictionRequest $request,
+        Race $race,
+        PredictionLockService $lock,
+        BadgeService $badges,
+    ): RedirectResponse {
         if ($lock->isLocked($race)) {
             return back()->withErrors([
                 'prediction' => 'Прогнозите за това състезание са заключени.',
@@ -40,6 +45,11 @@ class PredictionController extends Controller
             ['race_id' => $race->id],
             $request->validated(),
         );
+
+        // „Дебют" се дава ТУК, не при неделния синхрон: значката е обратна
+        // връзка за действието и три дни закъснение я обезсмисля. award() е
+        // идемпотентен — редакция на прогноза не прави нищо.
+        $badges->awardDebut($request->user());
 
         return back()->with('success', 'Прогнозата е запазена.');
     }

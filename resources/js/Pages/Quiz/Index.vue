@@ -14,6 +14,9 @@ const props = defineProps({
     result: { type: Object, default: null }, // != null => режим резултат/ревю
     stats: { type: Object, default: () => ({ points: 0, available: 0, attempts: 0, best_score: null, best_total: null }) },
     leaderboard: { type: Array, default: () => [] },
+    // ISO номерът на седмицата — наборът въпроси е един за всички и се сменя
+    // всеки понеделник.
+    week: { type: Number, default: null },
 });
 
 const currentUser = computed(() => usePage().props.auth?.user ?? null);
@@ -243,10 +246,14 @@ watch(
 
         <!-- ═══════════════ РЕЖИМ КУИЗ ═══════════════ -->
         <template v-else>
-            <div class="mb-6 flex items-center gap-2.5">
+            <div class="mb-2 flex items-center gap-2.5">
                 <span class="flag-chip h-6 w-6 rounded" />
                 <h1 class="font-display text-2xl font-black sm:text-3xl">Куизът на Падок<span class="text-red-600">.</span></h1>
             </div>
+            <p v-if="week" class="mb-6 text-sm text-zinc-500">
+                Въпросите на седмица <span class="font-semibold text-zinc-300">{{ week }}</span> — еднакви за всички, нови всеки понеделник.
+            </p>
+            <div v-else class="mb-4" />
 
             <div class="mb-6">
                 <QuizProgress :stats="stats" :authenticated="!!currentUser" />

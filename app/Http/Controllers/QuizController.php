@@ -9,6 +9,7 @@ use App\Models\QuizQuestion;
 use App\Services\Quiz\QuizProgressService;
 use App\Services\Quiz\QuizScoringService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,11 +20,18 @@ class QuizController extends Controller
         $count = (int) config('quiz.count', 10);
         $user = request()->user();
 
+        // Въпросите на СЕДМИЦАТА: един и същ набор за всички, нов всеки
+        // понеделник (ISO седмица, софийско време). Изборът е детерминистичен
+        // — md5(id + седмица) като сортов ключ — така куизът става споделен
+        // седмичен ритуал вместо различна селекция на всяко зареждане, а
+        // хората могат да си сравняват резултатите от един и същ набор.
+        $weekKey = Carbon::now('Europe/Sofia')->isoFormat('GGGG-[W]WW');
+
         $questions = QuizQuestion::query()
             ->active()
-            ->inRandomOrder()
-            ->limit($count)
             ->get()
+            ->sortBy(fn (QuizQuestion $q) => md5($q->id.'|'.$weekKey))
+            ->take($count)
             ->map(fn (QuizQuestion $q) => [
                 'id' => $q->id,
                 'question' => $q->question,
@@ -36,6 +44,7 @@ class QuizController extends Controller
             'result' => null,
             'stats' => $progress->statsFor($user),
             'leaderboard' => $progress->leaderboard(),
+            'week' => (int) Carbon::now('Europe/Sofia')->isoWeek(),
         ]);
     }
 

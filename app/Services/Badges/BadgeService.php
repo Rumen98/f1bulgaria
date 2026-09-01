@@ -35,7 +35,7 @@ class BadgeService
         ],
         'high-scorer' => [
             'name' => 'Снайперист',
-            'description' => 'Събра 60+ точки от едно състезание.',
+            'description' => 'Събра 45+ точки от едно състезание.',
             'icon' => 'heroicon-o-bolt',
         ],
         'pole-master' => [
@@ -50,7 +50,13 @@ class BadgeService
         ],
     ];
 
-    private const HIGH_SCORE_THRESHOLD = 60;
+    /**
+     * Прагът е сверен с текущата схема (виж config/predictions.php):
+     * максимумът е 78 т. (58 подиум + 20 бонуси), а без нито една точна
+     * позиция таванът е 35. 45 иска поне една точна позиция + силни бонуси —
+     * рядко, но постижимо. Старият праг 60 беше от схемата с максимум 98.
+     */
+    private const HIGH_SCORE_THRESHOLD = 45;
 
     private const POLE_MASTER_THRESHOLD = 5;
 
@@ -82,6 +88,15 @@ class BadgeService
         }
 
         return $awarded;
+    }
+
+    /**
+     * „Дебют“ веднага при първата прогноза — не чак при неделния синхрон.
+     * Значката е обратна връзка за действието; три дни закъснение я обезсмисля.
+     */
+    public function awardDebut(User $user): int
+    {
+        return $this->award($user, 'first-prediction');
     }
 
     /**
