@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Mail\NewsPipelineAlertMail;
+use App\Models\NewsletterSend;
 use App\Models\TeamNewsItem;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
@@ -13,23 +14,30 @@ beforeEach(function () {
     config(['app.admin_alert_email' => 'padok@example.test']);
 });
 
-it('мълчи, когато pipeline-ът публикува нормално', function () {
-    TeamNewsItem::factory()->create([
-        'status' => 'auto_published',
-        'title_bg' => 'Прясна новина',
-        'updated_at' => now()->subMinutes(20),
+/** Необработен елемент, който чака от N часа — главата на опашката. */
+function awaitingItem(int $hoursAgo): TeamNewsItem
+{
+    return TeamNewsItem::factory()->create([
+        'status' => 'pending',
+        'title_bg' => null,
+        'classification' => null,
+        'created_at' => now()->subHours($hoursAgo),
     ]);
+}
+
+it('мълчи, когато опашката се източва нормално', function () {
+    awaitingItem(1);
+    TeamNewsItem::factory()->create(['status' => 'auto_published', 'title_bg' => 'Прясна новина']);
 
     $this->artisan('news:health-check')->assertSuccessful();
 
     Mail::assertNothingSent();
 });
 
-it('мълчи в спокоен ден — няма чакащи, значи няма авария', function () {
+it('мълчи в спокоен ден — празна опашка и скорошно вземане', function () {
     TeamNewsItem::factory()->create([
         'status' => 'auto_published',
-        'title_bg' => 'Стара новина',
-        'updated_at' => now()->subHours(8),
+        'title_bg' => 'Новина',
         'created_at' => now()->subHours(2),
     ]);
 
@@ -38,34 +46,43 @@ it('мълчи в спокоен ден — няма чакащи, значи н
     Mail::assertNothingSent();
 });
 
-it('алармира, когато чакащите се трупат, а нищо не се публикува', function () {
-    TeamNewsItem::factory()->create([
-        'status' => 'auto_published',
-        'title_bg' => 'Последната публикувана',
-        'updated_at' => now()->subHours(6),
-    ]);
-
-    TeamNewsItem::factory()->count(3)->create([
-        'status' => 'pending',
-        'title_bg' => null,
-        'classification' => null,
-    ]);
+it('алармира, когато главата на опашката чака часове', function () {
+    awaitingItem(6);
+    awaitingItem(5);
 
     $this->artisan('news:health-check')->assertSuccessful();
 
     Mail::assertSent(NewsPipelineAlertMail::class, function (NewsPipelineAlertMail $mail) {
         return $mail->recovered === false
-            && $mail->status['pending'] === 3
+            && $mail->status['pending'] === 2
+            && str_contains((string) $mail->status['reason'], 'Обогатяването е засякло')
             && $mail->hasTo('padok@example.test');
     });
 });
 
-it('алармира, когато вземането е спряло, макар да няма чакащи', function () {
+it('news:normalize-bg не бива да маскира засякло обогатяване', function () {
+    // Регресия: първата версия мереше max(updated_at) на публикуваните.
+    // news:normalize-bg пипа точно тези редове БЕЗ да минава през LLM, тоест
+    // вдигаше updated_at и pipeline-ът изглеждаше жив, докато е мъртъв.
+    awaitingItem(6);
+
+    $published = TeamNewsItem::factory()->create([
+        'status' => 'auto_published',
+        'title_bg' => 'Стара публикувана',
+        'created_at' => now()->subDays(2),
+    ]);
+    $published->forceFill(['updated_at' => now()])->save();
+
+    $this->artisan('news:health-check')->assertSuccessful();
+
+    Mail::assertSent(NewsPipelineAlertMail::class, fn (NewsPipelineAlertMail $m) => $m->recovered === false);
+});
+
+it('алармира, когато вземането е спряло, макар опашката да е празна', function () {
     TeamNewsItem::factory()->create([
         'status' => 'auto_published',
         'title_bg' => 'Отдавнашна новина',
         'created_at' => now()->subHours(20),
-        'updated_at' => now()->subHours(20),
     ]);
 
     $this->artisan('news:health-check')->assertSuccessful();
@@ -76,12 +93,7 @@ it('алармира, когато вземането е спряло, мака�
 });
 
 it('праща едно писмо на инцидент, не на всяка проверка', function () {
-    TeamNewsItem::factory()->create([
-        'status' => 'auto_published',
-        'title_bg' => 'Последната публикувана',
-        'updated_at' => now()->subHours(6),
-    ]);
-    TeamNewsItem::factory()->create(['status' => 'pending', 'title_bg' => null, 'classification' => null]);
+    awaitingItem(6);
 
     $this->artisan('news:health-check')->assertSuccessful();
     $this->artisan('news:health-check')->assertSuccessful();
@@ -90,36 +102,48 @@ it('праща едно писмо на инцидент, не на всяка �
     Mail::assertSentCount(1);
 });
 
+it('маркерът за инцидент преживява деплой — cache:clear не го трие', function () {
+    // Регресия: маркерът стоеше в Cache::forever, а deploy.sh вика
+    // optimize:clear (включва cache:clear) при cache store „database".
+    // Деплой по време на авария алармираше повторно и губеше завинаги
+    // писмото за възстановяване.
+    awaitingItem(6);
+
+    $this->artisan('news:health-check')->assertSuccessful();
+    Mail::assertSentCount(1);
+
+    Cache::flush();
+
+    $this->artisan('news:health-check')->assertSuccessful();
+
+    Mail::assertSentCount(1);
+    expect(NewsletterSend::where('mail_type', NewsletterSend::TYPE_PIPELINE_ALERT)->count())->toBe(1);
+});
+
 it('съобщава при възстановяване и се въоръжава наново', function () {
-    $published = TeamNewsItem::factory()->create([
-        'status' => 'auto_published',
-        'title_bg' => 'Последната публикувана',
-        'updated_at' => now()->subHours(6),
-    ]);
-    $pending = TeamNewsItem::factory()->create(['status' => 'pending', 'title_bg' => null, 'classification' => null]);
+    $stuck = awaitingItem(6);
 
     $this->artisan('news:health-check')->assertSuccessful();
     Mail::assertSentCount(1);
 
     // Pipeline-ът тръгва: чакащият елемент е обогатен и публикуван.
-    $pending->update(['status' => 'auto_published', 'title_bg' => 'Вече обработена', 'classification' => 'race']);
-    $published->update(['updated_at' => now()]);
+    $stuck->update(['status' => 'auto_published', 'title_bg' => 'Вече обработена', 'classification' => 'race']);
 
     $this->artisan('news:health-check')->assertSuccessful();
 
     Mail::assertSent(NewsPipelineAlertMail::class, fn (NewsPipelineAlertMail $mail) => $mail->recovered === true);
     Mail::assertSentCount(2);
+
+    // Следващ инцидент трябва пак да алармира — журналът е затворен.
+    awaitingItem(7);
+    $this->artisan('news:health-check')->assertSuccessful();
+
+    Mail::assertSentCount(3);
 });
 
 it('не гърми, когато липсва админ имейл', function () {
     config(['app.admin_alert_email' => '']);
-
-    TeamNewsItem::factory()->create([
-        'status' => 'auto_published',
-        'title_bg' => 'Последната публикувана',
-        'updated_at' => now()->subHours(6),
-    ]);
-    TeamNewsItem::factory()->create(['status' => 'pending', 'title_bg' => null, 'classification' => null]);
+    awaitingItem(6);
 
     $this->artisan('news:health-check')->assertSuccessful();
 
@@ -132,43 +156,8 @@ it('мълчи при празна база — нов инсталационе�
     Mail::assertNothingSent();
 });
 
-it('писмото за авария се рендерира без грешка', function () {
-    // Mail::fake() не пипа Blade-а — счупен темплейт минава останалите
-    // тестове и гърми чак при истинско изпращане. Затова рендерираме.
-    $html = (new NewsPipelineAlertMail([
-        'healthy' => false,
-        'reason' => 'Обогатяването е спряло: 12 чакащи новини.',
-        'pending' => 12,
-        'last_published_at' => '2026-09-04 16:00:02',
-        'last_fetched_at' => '2026-09-04 19:47:04',
-        'stale_hours' => 6,
-    ], recovered: false, since: null))->render();
-
-    expect($html)->toContain('Новините спряха')
-        ->and($html)->toContain('Обогатяването е спряло')
-        ->and($html)->toContain('12');
-});
-
-it('писмото за възстановяване се рендерира без грешка', function () {
-    $html = (new NewsPipelineAlertMail([
-        'healthy' => true,
-        'reason' => null,
-        'pending' => 0,
-        'last_published_at' => '2026-09-04 20:10:00',
-        'last_fetched_at' => '2026-09-04 20:05:00',
-        'stale_hours' => null,
-    ], recovered: true, since: '2026-09-03 16:00:00'))->render();
-
-    expect($html)->toContain('пак се публикуват')
-        ->and($html)->toContain('2026-09-03 16:00:00');
-});
-
 it('--force-alert праща писмо и когато pipeline-ът е ЗДРАВ — иначе доставката е непроверима', function () {
-    TeamNewsItem::factory()->create([
-        'status' => 'auto_published',
-        'title_bg' => 'Прясна новина',
-        'updated_at' => now()->subMinutes(10),
-    ]);
+    TeamNewsItem::factory()->create(['status' => 'auto_published', 'title_bg' => 'Прясна новина']);
 
     $this->artisan('news:health-check --force-alert')->assertSuccessful();
 
@@ -179,42 +168,51 @@ it('--force-alert праща писмо и когато pipeline-ът е ЗДР�
     });
 });
 
-it('тестовото писмо не носи заглавието на истинска авария', function () {
-    $test = new NewsPipelineAlertMail(['healthy' => true, 'reason' => null, 'pending' => 0,
-        'last_published_at' => null, 'last_fetched_at' => null, 'stale_hours' => null], test: true);
-    $real = new NewsPipelineAlertMail(['healthy' => false, 'reason' => 'спряло', 'pending' => 5,
-        'last_published_at' => null, 'last_fetched_at' => null, 'stale_hours' => 6]);
-
-    expect($test->envelope()->subject)->toBe('Падок — тест на алармата за новините')
-        ->and($real->envelope()->subject)->toBe('Падок — ВНИМАНИЕ: новините спряха');
-});
-
-it('тестовото писмо се рендерира без грешка', function () {
-    $html = (new NewsPipelineAlertMail([
-        'healthy' => true,
-        'reason' => null,
-        'pending' => 1,
-        'last_published_at' => '2026-09-04 20:25:55',
-        'last_fetched_at' => '2026-09-04 20:30:00',
-        'stale_hours' => null,
-    ], test: true))->render();
-
-    expect($html)->toContain('Тест на алармата')
-        ->and($html)->toContain('здраво');
-});
-
-it('--force-alert не вдига флага за инцидент', function () {
-    TeamNewsItem::factory()->create([
-        'status' => 'auto_published',
-        'title_bg' => 'Прясна новина',
-        'updated_at' => now()->subMinutes(10),
-    ]);
+it('--force-alert не отваря инцидент в журнала', function () {
+    TeamNewsItem::factory()->create(['status' => 'auto_published', 'title_bg' => 'Прясна новина']);
 
     $this->artisan('news:health-check --force-alert')->assertSuccessful();
-
-    // Второто пускане без флага трябва да мълчи — тестът не бива да оставя
-    // системата да мисли, че тече инцидент.
     $this->artisan('news:health-check')->assertSuccessful();
 
     Mail::assertSentCount(1);
+    expect(NewsletterSend::where('mail_type', NewsletterSend::TYPE_PIPELINE_ALERT)->count())->toBe(0);
+});
+
+it('тестовото писмо не носи заглавието на истинска авария', function () {
+    $status = ['healthy' => true, 'reason' => null, 'pending' => 0,
+        'oldest_pending_at' => null, 'last_fetched_at' => null, 'stale_hours' => null];
+
+    expect((new NewsPipelineAlertMail($status, test: true))->envelope()->subject)
+        ->toBe('Падок — тест на алармата за новините')
+        ->and((new NewsPipelineAlertMail([...$status, 'healthy' => false, 'reason' => 'спряло']))->envelope()->subject)
+        ->toBe('Падок — ВНИМАНИЕ: новините спряха');
+});
+
+it('писмото за авария се рендерира без грешка', function () {
+    // Mail::fake() не пипа Blade-а — счупен темплейт минава останалите
+    // тестове и гърми чак при истинско изпращане. Затова рендерираме.
+    $html = (new NewsPipelineAlertMail([
+        'healthy' => false,
+        'reason' => 'Обогатяването е засякло: 12 чакащи новини.',
+        'pending' => 12,
+        'oldest_pending_at' => '2026-09-04 16:00:02',
+        'last_fetched_at' => '2026-09-04 19:47:04',
+        'stale_hours' => 6,
+    ], recovered: false, since: null))->render();
+
+    expect($html)->toContain('Новините спряха')
+        ->and($html)->toContain('Обогатяването е засякло')
+        ->and($html)->toContain('12');
+});
+
+it('писмата за възстановяване и за тест се рендерират без грешка', function () {
+    $status = ['healthy' => true, 'reason' => null, 'pending' => 0,
+        'oldest_pending_at' => null, 'last_fetched_at' => '2026-09-04 20:05:00', 'stale_hours' => null];
+
+    expect((new NewsPipelineAlertMail($status, recovered: true, since: '2026-09-03 16:00:00'))->render())
+        ->toContain('пак се публикуват')
+        ->toContain('2026-09-03 16:00:00')
+        ->and((new NewsPipelineAlertMail($status, test: true))->render())
+        ->toContain('Тест на алармата')
+        ->toContain('здраво');
 });

@@ -22,6 +22,20 @@ class NewsletterSend extends Model
 
     public const TYPE_LIVE_COVERAGE = 'live_coverage';
 
+    /**
+     * Оперативни аларми за news pipeline-а (news:health-check). Не са
+     * бюлетин и не стигат до абонати — журналът се ползва само за да се
+     * помни дали в момента тече инцидент.
+     *
+     * Живеят тук, а не в кеша: `deploy.sh` вика `optimize:clear`, което
+     * включва `cache:clear`, и при cache store `database` изтрива маркера.
+     * Деплой по време на авария иначе алармира втори път и губи завинаги
+     * писмото за възстановяване.
+     */
+    public const TYPE_PIPELINE_ALERT = 'pipeline_alert';
+
+    public const TYPE_PIPELINE_RECOVERED = 'pipeline_recovered';
+
     protected $fillable = ['mail_type', 'race_id', 'sent_at'];
 
     protected function casts(): array
