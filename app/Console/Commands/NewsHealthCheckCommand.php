@@ -22,7 +22,7 @@ use Throwable;
  */
 class NewsHealthCheckCommand extends Command
 {
-    protected $signature = 'news:health-check {--force-alert : Праща писмото дори ако вече е алармирано (за проверка на доставката)}';
+    protected $signature = 'news:health-check {--force-alert : Праща тестово писмо веднага, независимо от състоянието (проверка на доставката)}';
 
     protected $description = 'Проверява дали news pipeline-ът още публикува и алармира по имейл при спиране.';
 
@@ -32,6 +32,17 @@ class NewsHealthCheckCommand extends Command
     public function handle(NewsPipelineHealth $health): int
     {
         $status = $health->check();
+
+        // Ръчна проверка на доставката — праща писмо ВЕДНАГА, независимо от
+        // състоянието. Без това единственият начин да разбереш дали алармата
+        // изобщо стига (и дали не влиза в спам) е да изчакаш истинска авария,
+        // тоест научаваш го точно когато не бива.
+        if ($this->option('force-alert')) {
+            $this->send($status, recovered: false, since: null, test: true);
+
+            return self::SUCCESS;
+        }
+
         $alreadyAlerted = Cache::get(self::ALERT_KEY);
 
         if ($status['healthy']) {
@@ -51,7 +62,7 @@ class NewsHealthCheckCommand extends Command
 
         // Един имейл на инцидент, не на всеки час — иначе алармата се
         // превръща в шум и спира да се чете.
-        if ($alreadyAlerted !== null && ! $this->option('force-alert')) {
+        if ($alreadyAlerted !== null) {
             $this->line('Вече е алармирано на '.$alreadyAlerted.' — пропускам писмото.');
 
             return self::SUCCESS;
@@ -66,7 +77,7 @@ class NewsHealthCheckCommand extends Command
     /**
      * @param  array<string, mixed>  $status
      */
-    private function send(array $status, bool $recovered, ?string $since): void
+    private function send(array $status, bool $recovered, ?string $since, bool $test = false): void
     {
         $email = (string) config('app.admin_alert_email', '');
 
@@ -77,8 +88,12 @@ class NewsHealthCheckCommand extends Command
         }
 
         try {
-            Mail::to($email)->send(new NewsPipelineAlertMail($status, $recovered, $since));
-            $this->info(($recovered ? 'Известие за възстановяване' : 'Аларма').' изпратена до '.$email);
+            Mail::to($email)->send(new NewsPipelineAlertMail($status, $recovered, $since, $test));
+            $this->info(match (true) {
+                $test => 'Тестово писмо изпратено до '.$email.' — виж и папката за спам.',
+                $recovered => 'Известие за възстановяване изпратено до '.$email,
+                default => 'Аларма изпратена до '.$email,
+            });
         } catch (Throwable $e) {
             // Провалът на самата аларма не бива да чупи графика — но трябва
             // да остане в лога, иначе мълчим двойно.

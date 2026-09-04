@@ -1,5 +1,22 @@
 @component('mail::message')
-@if ($recovered)
+@if ($test)
+# Тест на алармата
+
+Това писмо е пуснато ръчно с `news:health-check --force-alert`. Щом го четеш, доставката работи — а ако си го намерил в спама, добави подателя в контактите си, иначе истинската аларма ще отиде на същото място.
+
+@component('mail::table')
+| Показател | Стойност |
+| :--- | ---: |
+| Състояние в момента | {{ $status['healthy'] ? 'здраво' : 'АВАРИЯ' }} |
+| Чакащи новини | {{ $status['pending'] }} |
+| Последна публикация | {{ $status['last_published_at'] ?? 'няма' }} |
+| Последна взета новина | {{ $status['last_fetched_at'] ?? 'няма' }} |
+@endcomponent
+
+@if (! $status['healthy'])
+> ⚠️ {{ $status['reason'] }}
+@endif
+@elseif ($recovered)
 # Новините пак се публикуват
 
 Pipeline-ът се възстанови сам.

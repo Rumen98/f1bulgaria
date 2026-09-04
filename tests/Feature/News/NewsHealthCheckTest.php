@@ -162,3 +162,59 @@ it('писмото за възстановяване се рендерира б�
     expect($html)->toContain('пак се публикуват')
         ->and($html)->toContain('2026-09-03 16:00:00');
 });
+
+it('--force-alert праща писмо и когато pipeline-ът е ЗДРАВ — иначе доставката е непроверима', function () {
+    TeamNewsItem::factory()->create([
+        'status' => 'auto_published',
+        'title_bg' => 'Прясна новина',
+        'updated_at' => now()->subMinutes(10),
+    ]);
+
+    $this->artisan('news:health-check --force-alert')->assertSuccessful();
+
+    Mail::assertSent(NewsPipelineAlertMail::class, function (NewsPipelineAlertMail $mail) {
+        return $mail->test === true
+            && $mail->status['healthy'] === true
+            && $mail->hasTo('padok@example.test');
+    });
+});
+
+it('тестовото писмо не носи заглавието на истинска авария', function () {
+    $test = new NewsPipelineAlertMail(['healthy' => true, 'reason' => null, 'pending' => 0,
+        'last_published_at' => null, 'last_fetched_at' => null, 'stale_hours' => null], test: true);
+    $real = new NewsPipelineAlertMail(['healthy' => false, 'reason' => 'спряло', 'pending' => 5,
+        'last_published_at' => null, 'last_fetched_at' => null, 'stale_hours' => 6]);
+
+    expect($test->envelope()->subject)->toBe('Падок — тест на алармата за новините')
+        ->and($real->envelope()->subject)->toBe('Падок — ВНИМАНИЕ: новините спряха');
+});
+
+it('тестовото писмо се рендерира без грешка', function () {
+    $html = (new NewsPipelineAlertMail([
+        'healthy' => true,
+        'reason' => null,
+        'pending' => 1,
+        'last_published_at' => '2026-09-04 20:25:55',
+        'last_fetched_at' => '2026-09-04 20:30:00',
+        'stale_hours' => null,
+    ], test: true))->render();
+
+    expect($html)->toContain('Тест на алармата')
+        ->and($html)->toContain('здраво');
+});
+
+it('--force-alert не вдига флага за инцидент', function () {
+    TeamNewsItem::factory()->create([
+        'status' => 'auto_published',
+        'title_bg' => 'Прясна новина',
+        'updated_at' => now()->subMinutes(10),
+    ]);
+
+    $this->artisan('news:health-check --force-alert')->assertSuccessful();
+
+    // Второто пускане без флага трябва да мълчи — тестът не бива да оставя
+    // системата да мисли, че тече инцидент.
+    $this->artisan('news:health-check')->assertSuccessful();
+
+    Mail::assertSentCount(1);
+});
