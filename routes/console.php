@@ -193,6 +193,25 @@ Schedule::command('channel:post')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
+// Пази от ТИХ отказ. На 03-04.09.2026 доставчикът спря да сервира модела,
+// всяка LLM заявка връщаше 403, NewsEnricher я гълташе като warning и
+// оставяше реда pending. Командата връщаше SUCCESS, cron изглеждаше здрав,
+// sitemap-ът се обновяваше — пайплайнът мълча 24 часа и разбрахме по
+// застоялите новини на сайта.
+//
+// Проверката гледа резултата (публикува ли се още), а не конкретна грешка,
+// за да хване и причини, които още не сме виждали. Праща един имейл на
+// инцидент и един при възстановяване; изпращането е синхронно, защото
+// мъртъв queue worker е точно една от авариите, за които трябва да се обади.
+//
+// :50 — извън всички news слотове (:00/:30 fetch, :05/:35 enrich,
+// :15/:45 normalize, :20 publish-pending, :25 generate-articles).
+Schedule::command('news:health-check')
+    ->hourlyAt(50)
+    ->onOneServer()
+    ->withoutOverlapping(55)
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
 // Дневен отчет за активността към админ имейла — накрая на деня (софийско).
 Schedule::command('report:daily-activity')
     ->dailyAt('23:55')
