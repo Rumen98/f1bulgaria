@@ -121,6 +121,19 @@ Schedule::command('news:enrich --limit=25')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
+// Машинна поправка на имена и транслитерации след обогатяването. По-малките
+// модели грешат имена по два начина: пишат едно и също име различно в
+// съседни статии, и понякога ПРЕВЕЖДАТ фамилия като нарицателно
+// („Leclerc" -> „Лекар"). Промптът го забранява, това е мрежата отдолу.
+//
+// Слотът е нарочен: news:enrich върви в :05/:35 и трае ~8 мин на партида от
+// 25, а channel:enqueue-news е в :23/:53 — поправката минава между двете, за
+// да не тръгне сгрешено име към Telegram канала. Само база, без LLM.
+Schedule::command('news:normalize-bg')
+    ->cron('15,45 * * * *')
+    ->withoutOverlapping(10)
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
 // Осигурителна мрежа: обогатени, но незавършили публикация елементи (напр.
 // грешка при featured_image) се публикуват тук, вместо да висят pending.
 Schedule::command('news:publish-pending')
