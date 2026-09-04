@@ -6,6 +6,7 @@ namespace App\Services\News\Llm;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use JsonException;
@@ -196,7 +197,7 @@ class MistralClient implements LlmClient
         $config = config('services.mistral');
 
         if (blank($config['key'])) {
-            throw new LlmException('Липсва MISTRAL_API_KEY в конфигурацията.');
+            throw new LlmUnavailableException('Липсва MISTRAL_API_KEY в конфигурацията.');
         }
 
         try {
@@ -212,10 +213,23 @@ class MistralClient implements LlmClient
             $json = $e->response->json();
             $apiMessage = data_get($json, 'message') ?? data_get($json, 'detail.0.msg', '');
             $detail = is_string($apiMessage) && $apiMessage !== '' ? ' '.Str::limit($apiMessage, 200) : '';
+            $status = $e->response->status();
+            $message = "Mistral API върна {$status}.{$detail}";
 
-            throw new LlmException("Mistral API върна {$e->response->status()}.{$detail}", previous: $e);
+            // 429 с нулев лимит НЕ е задръстване, а „тарифата ти не отпуска
+            // нито една заявка за този модел" — точно формата, която аварията
+            // от 03.09 прие. Повтарянето никога няма да помогне.
+            if (in_array($status, [401, 402, 403, 404], strict: true) || $this->hasZeroQuota($e->response)) {
+                throw new LlmUnavailableException($message, previous: $e);
+            }
+
+            if ($status === 429 || $e->response->serverError()) {
+                throw new LlmUnavailableException($message, permanent: false, previous: $e);
+            }
+
+            throw new LlmException($message, previous: $e);
         } catch (ConnectionException) {
-            throw new LlmException('Мрежова грешка при връзка с Mistral API.');
+            throw new LlmUnavailableException('Мрежова грешка при връзка с Mistral API.', permanent: false);
         }
 
         return (array) $response->json();
@@ -244,7 +258,37 @@ class MistralClient implements LlmClient
             return true;
         }
 
-        return $exception instanceof RequestException
-            && ($exception->response->serverError() || $exception->response->status() === 429);
+        if (! $exception instanceof RequestException) {
+            return false;
+        }
+
+        // Нулева квота не се оправя с чакане — три опита с backoff тук са
+        // само 4.5 изгубени секунди на елемент, всеки цикъл, завинаги.
+        if ($this->hasZeroQuota($exception->response)) {
+            return false;
+        }
+
+        return $exception->response->serverError() || $exception->response->status() === 429;
+    }
+
+    /**
+     * Тарифата отпуска нула заявки за този модел.
+     *
+     * Mistral сигнализира това като 429 с `x-ratelimit-limit-req-minute: 0`
+     * — за разлика от 403 при напълно спрян модел. Проверката е is_numeric,
+     * а не само cast: `(int) 'unlimited'` също е 0 и без пазача всеки
+     * нечислов хедър би изглеждал като изчерпана квота.
+     */
+    private function hasZeroQuota(Response $response): bool
+    {
+        foreach (['x-ratelimit-limit-req-minute', 'x-ratelimit-limit-req-day'] as $header) {
+            $value = $response->header($header);
+
+            if (is_numeric($value) && (int) $value === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

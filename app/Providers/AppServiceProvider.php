@@ -4,12 +4,14 @@ namespace App\Providers;
 
 use App\Listeners\AuthEventSubscriber;
 use App\Services\News\Llm\AnthropicClient;
+use App\Services\News\Llm\FallbackLlmClient;
 use App\Services\News\Llm\LlmClient;
 use App\Services\News\Llm\MistralClient;
 use App\Support\Seo;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -29,13 +31,43 @@ class AppServiceProvider extends ServiceProvider
         // може смяната (напр. при изчерпан Anthropic бюджет) да е .env промяна.
         $this->app->bind(LlmClient::class, function (Application $app): LlmClient {
             $driver = (string) config('news.llm_driver', 'anthropic');
+            $primary = $this->makeLlmDriver($app, $driver);
 
-            return match ($driver) {
-                'anthropic' => $app->make(AnthropicClient::class),
-                'mistral' => $app->make(MistralClient::class),
-                default => throw new InvalidArgumentException("Непознат news.llm_driver: {$driver}"),
-            };
+            $fallbackDriver = (string) config('news.llm_fallback_driver', '');
+
+            if ($fallbackDriver === '') {
+                return $primary;
+            }
+
+            // Резервен, равен на основния, не е fallback — а мълчаливо
+            // изключен fallback. Случва се точно при препоръчания авариен ход
+            // (смяна на NEWS_LLM_DRIVER), затова оставя следа в лога вместо
+            // да изчезне без дума.
+            if ($fallbackDriver === $driver) {
+                Log::warning("news.llm_fallback_driver съвпада с основния ({$driver}) — fallback-ът е неактивен.");
+
+                return $primary;
+            }
+
+            return new FallbackLlmClient(
+                $primary,
+                $this->makeLlmDriver($app, $fallbackDriver),
+                $driver,
+                $fallbackDriver,
+            );
         });
+    }
+
+    /**
+     * @throws InvalidArgumentException при непознат драйвер
+     */
+    private function makeLlmDriver(Application $app, string $driver): LlmClient
+    {
+        return match ($driver) {
+            'anthropic' => $app->make(AnthropicClient::class),
+            'mistral' => $app->make(MistralClient::class),
+            default => throw new InvalidArgumentException("Непознат LLM драйвер: {$driver}"),
+        };
     }
 
     /**

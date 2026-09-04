@@ -90,3 +90,65 @@ it('е идемпотентна — второто пускане не пром�
     expect($item->refresh()->title_bg)->toBe($afterFirst)
         ->and($afterFirst)->toBe('Леклер и Хамилтън в Зандворт');
 });
+
+it('сваля пълния член до кратък след предлог', function () {
+    $item = TeamNewsItem::factory()->create([
+        'title_bg' => 'Леклер изтри соцмедиите по време на трудният 2026 сезон',
+        'summary_bg' => 'Говори се за новият регламент и за храмът на скоростта.',
+    ]);
+
+    $this->artisan('news:normalize-bg')->assertSuccessful();
+
+    $item->refresh();
+    expect($item->title_bg)->toBe('Леклер изтри соцмедиите по време на трудния 2026 сезон')
+        ->and($item->summary_bg)->toBe('Говори се за новия регламент и за храма на скоростта.');
+});
+
+it('НЕ пипа пълния член в позиция на подлог', function () {
+    // Обратната посока не се прави: там членът е падежният маркер и
+    // сгрешена добавка би внесла нова грешка в публикуван текст.
+    $item = TeamNewsItem::factory()->create([
+        'title_bg' => 'Храмът на скоростта може да бъде по-бавен',
+        'summary_bg' => 'Новият технически регламент влиза в сила. Сезонът беше труден.',
+    ]);
+
+    $this->artisan('news:normalize-bg')->assertSuccessful();
+
+    $item->refresh();
+    expect($item->title_bg)->toBe('Храмът на скоростта може да бъде по-бавен')
+        ->and($item->summary_bg)->toBe('Новият технически регламент влиза в сила. Сезонът беше труден.');
+});
+
+it('не чупи вече правилния кратък член, нито думи без член', function () {
+    $item = TeamNewsItem::factory()->create([
+        'title_bg' => 'По време на трудния сезон Верстапен спечели в Монца',
+        'summary_bg' => 'Без болид, без гуми и с екип от петима души.',
+    ]);
+
+    $this->artisan('news:normalize-bg')->assertSuccessful();
+
+    $item->refresh();
+    expect($item->title_bg)->toBe('По време на трудния сезон Верстапен спечели в Монца')
+        ->and($item->summary_bg)->toBe('Без болид, без гуми и с екип от петима души.');
+});
+
+it('справя се със съставни прилагателни с „най-“', function () {
+    $item = TeamNewsItem::factory()->create([
+        'title_bg' => 'Победа на най-бързият болид от сезона',
+    ]);
+
+    $this->artisan('news:normalize-bg')->assertSuccessful();
+
+    expect($item->refresh()->title_bg)->toBe('Победа на най-бързия болид от сезона');
+});
+
+it('не пипа собствени имена след предлог', function () {
+    // Целевата дума е само с малки букви — имената остават непокътнати.
+    $item = TeamNewsItem::factory()->create([
+        'title_bg' => 'Разговор с Леклер и с Норис в Монца',
+    ]);
+
+    $this->artisan('news:normalize-bg')->assertSuccessful();
+
+    expect($item->refresh()->title_bg)->toBe('Разговор с Леклер и с Норис в Монца');
+});
