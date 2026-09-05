@@ -131,3 +131,58 @@ describe('страници', function () {
         $this->get(route('news.show', $item->slug))->assertOk();
     });
 });
+
+describe('наваксване назад', function () {
+    it('маркира стари статии, чието заглавие го споменава', function () {
+        // Разпознаването при вземането важи само за новите. Архивът е влязъл
+        // преди колонката да съществува и кътът му стартираше празен.
+        $old = TeamNewsItem::factory()->create([
+            'status' => 'auto_published',
+            'title_original' => 'Tsolov takes pole in Monza',
+            'title_bg' => 'Цолов взе пола в Монца',
+            'is_tsolov' => false,
+        ]);
+
+        $this->artisan('news:flag-tsolov')->assertSuccessful();
+
+        expect($old->refresh()->is_tsolov)->toBeTrue();
+    });
+
+    it('намира го и когато само българското заглавие носи името', function () {
+        $item = TeamNewsItem::factory()->create([
+            'status' => 'auto_published',
+            'title_original' => 'Bulgarian rookie impresses at Monza',
+            'title_bg' => 'Цолов впечатли в Монца',
+            'is_tsolov' => false,
+        ]);
+
+        $this->artisan('news:flag-tsolov')->assertSuccessful();
+
+        expect($item->refresh()->is_tsolov)->toBeTrue();
+    });
+
+    it('не пипа чуждите новини', function () {
+        $other = TeamNewsItem::factory()->create([
+            'status' => 'auto_published',
+            'title_original' => 'Verstappen wins in Monza',
+            'title_bg' => 'Верстапен спечели в Монца',
+            'is_tsolov' => false,
+        ]);
+
+        $this->artisan('news:flag-tsolov')->assertSuccessful();
+
+        expect($other->refresh()->is_tsolov)->toBeFalse();
+    });
+
+    it('--dry-run не променя нищо', function () {
+        $item = TeamNewsItem::factory()->create([
+            'status' => 'auto_published',
+            'title_original' => 'Tsolov wins again',
+            'is_tsolov' => false,
+        ]);
+
+        $this->artisan('news:flag-tsolov --dry-run')->assertSuccessful();
+
+        expect($item->refresh()->is_tsolov)->toBeFalse();
+    });
+});
