@@ -79,7 +79,7 @@ class NewsAggregationService
                 // Разпознава се тук, върху оригиналния текст, преди LLM-ът да
                 // го е пипал: детерминистично, безплатно и работи дори когато
                 // доставчикът на модела е паднал.
-                'is_tsolov' => $this->tsolov->matches($item->titleOriginal, $item->contentSnippet),
+                'is_tsolov' => $this->tsolov->matchesTitle($item->titleOriginal),
                 'published_at' => $item->publishedAt,
                 'status' => NewsStatus::Pending->value,
             ]);

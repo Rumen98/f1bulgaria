@@ -20,24 +20,32 @@ function tsolovF2Item(array $overrides = []): TeamNewsItem
 }
 
 describe('разпознаване', function () {
-    it('хваща фамилията на латиница и на кирилица', function () {
+    it('хваща фамилията в заглавието, на латиница и на кирилица', function () {
         $detector = new TsolovDetector;
 
-        expect($detector->matches('Tsolov completed his first F1 test'))->toBeTrue()
-            ->and($detector->matches('Никола Цолов води в шампионата'))->toBeTrue()
-            ->and($detector->matches(null, 'Mentioned deep in the body: Nikola Tsolov'))->toBeTrue();
+        expect($detector->matchesTitle('Tsolov completed his first F1 test'))->toBeTrue()
+            ->and($detector->matchesTitle('Никола Цолов води в шампионата'))->toBeTrue();
     });
 
     it('не се подвежда по други новини', function () {
         $detector = new TsolovDetector;
 
-        expect($detector->matches('Verstappen wins the Italian Grand Prix'))->toBeFalse()
-            ->and($detector->matches(null, null))->toBeFalse()
-            ->and($detector->matches(''))->toBeFalse();
+        expect($detector->matchesTitle('Verstappen wins the Italian Grand Prix'))->toBeFalse()
+            ->and($detector->matchesTitle(null))->toBeFalse()
+            ->and($detector->matchesTitle(''))->toBeFalse();
     });
 
     it('не хваща фамилията вътре в друга дума', function () {
-        expect((new TsolovDetector)->matches('Kartsolov is a different person'))->toBeFalse();
+        expect((new TsolovDetector)->matchesTitle('Kartsolov is a different person'))->toBeFalse();
+    });
+
+    it('НЕ хваща статия, в която той е само ред от таблица', function () {
+        // Реален случай от продъкшън: „2026 F2 championship standings after
+        // Monza Sprint Race" беше маркирана като новина за него, защото
+        // името му е в класирането в тялото. Всяко класиране и всеки списък
+        // с резултати го съдържа — кътът му щеше да е таблици, не истории.
+        expect((new TsolovDetector)->matchesTitle('2026 F2 championship standings after Monza Sprint Race'))
+            ->toBeFalse();
     });
 });
 

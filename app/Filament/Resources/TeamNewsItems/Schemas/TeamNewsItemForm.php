@@ -10,6 +10,7 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
 
@@ -37,6 +38,18 @@ class TeamNewsItemForm
                     ->label('Резюме (BG)')
                     ->rows(5)
                     ->maxLength(400),
+            ]),
+
+            Grid::make(2)->schema([
+                Toggle::make('is_tsolov')
+                    ->label('Новина за Никола Цолов')
+                    // Автоматично се вдига само когато името е в заглавието.
+                    // Ключът е за статиите, където той е темата, но името го
+                    // няма („Red Bull junior completes first F1 test").
+                    ->helperText('Показва се в неговия кът. Вдига се автоматично, ако името е в заглавието.'),
+                Toggle::make('is_f1_related')
+                    ->label('Новина от Формула 1')
+                    ->helperText('Изключено = само в кътa на Цолов, извън главната емисия.'),
             ]),
 
             Grid::make(3)->schema([
