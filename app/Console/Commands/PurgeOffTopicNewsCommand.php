@@ -62,7 +62,7 @@ class PurgeOffTopicNewsCommand extends Command
     public function handle(): int
     {
         $query = TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->inMainFeed()
             ->where(function (Builder $builder): void {
                 foreach (self::OFF_TOPIC_TERMS as $term) {
                     $builder->orWhere('title_original', 'like', "%{$term}%")

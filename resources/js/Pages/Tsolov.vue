@@ -8,7 +8,19 @@ import { computed } from 'vue';
 const props = defineProps({
     profile: { type: Object, required: true },
     f2: { type: Object, default: null },
+    news: { type: Array, default: () => [] },
 });
+
+// Датата се показва в софийско време — базата пази UTC.
+const formatDate = (iso) =>
+    iso
+        ? new Date(iso).toLocaleDateString('bg-BG', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              timeZone: 'Europe/Sofia',
+          })
+        : null;
 
 const age = computed(() => {
     if (!props.profile.birth_date) {
@@ -133,6 +145,31 @@ const tsolovShare = computed(() => {
                         <p class="text-zinc-200">{{ m.event }}</p>
                         <p v-if="m.championship" class="text-sm text-amber-400"><span aria-hidden="true">🏆</span> {{ m.championship }}</p>
                     </div>
+                </Card>
+            </div>
+        </section>
+
+        <!-- Новини за него. Пълният архив, вкл. Ф2 — главната емисия на
+             сайта е само за Формула 1, така че Ф2 статиите живеят само тук. -->
+        <section v-if="news.length" class="mx-auto mt-8 max-w-3xl">
+            <h2 class="mb-4 font-display text-lg font-bold text-white">Новини за Цолов</h2>
+            <div class="space-y-3">
+                <Card v-for="item in news" :key="item.slug">
+                    <Link :href="`/news/${item.slug}`" class="block group">
+                        <div class="flex flex-wrap items-baseline gap-2">
+                            <time v-if="item.published_at" :datetime="item.published_at" class="text-xs text-zinc-500">
+                                {{ formatDate(item.published_at) }}
+                            </time>
+                            <span
+                                v-if="!item.is_f1"
+                                class="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400"
+                            >
+                                Формула 2
+                            </span>
+                        </div>
+                        <p class="mt-1 font-semibold text-zinc-100 group-hover:text-emerald-400">{{ item.title }}</p>
+                        <p v-if="item.summary" class="mt-1 line-clamp-2 text-sm text-zinc-400">{{ item.summary }}</p>
+                    </Link>
                 </Card>
             </div>
         </section>

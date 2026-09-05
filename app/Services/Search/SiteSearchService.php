@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Search;
 
-use App\Enums\NewsStatus;
 use App\Models\Constructor;
 use App\Models\Driver;
 use App\Models\Race;
@@ -199,7 +198,7 @@ class SiteSearchService
     private function news(string $term): array
     {
         return TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->published()
             ->whereNotNull('title_bg')
             ->where(function (Builder $query) use ($term): void {
                 $query->where('title_bg', 'like', "%{$term}%")

@@ -16,7 +16,10 @@ use Illuminate\Support\Facades\Log;
  */
 class NewsAggregationService
 {
-    public function __construct(private readonly RssFetcher $fetcher) {}
+    public function __construct(
+        private readonly RssFetcher $fetcher,
+        private readonly TsolovDetector $tsolov,
+    ) {}
 
     /**
      * @return array<int, array{source:string, fetched:int, new:int, duplicates:int, errors:string|null}>
@@ -73,6 +76,10 @@ class NewsAggregationService
                 'external_guid' => $item->externalGuid,
                 'title_original' => $item->titleOriginal,
                 'content_snippet' => $item->contentSnippet,
+                // Разпознава се тук, върху оригиналния текст, преди LLM-ът да
+                // го е пипал: детерминистично, безплатно и работи дори когато
+                // доставчикът на модела е паднал.
+                'is_tsolov' => $this->tsolov->matches($item->titleOriginal, $item->contentSnippet),
                 'published_at' => $item->publishedAt,
                 'status' => NewsStatus::Pending->value,
             ]);

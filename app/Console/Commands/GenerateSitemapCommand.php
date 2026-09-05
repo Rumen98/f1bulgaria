@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\NewsStatus;
 use App\Models\ConstructorCanonical;
 use App\Models\DriverCanonical;
 use App\Models\Race;
@@ -67,7 +66,7 @@ class GenerateSitemapCommand extends Command
     private function newsUrls(): Collection
     {
         return TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->published()
             ->orderByDesc('published_at')
             ->get(['slug', 'published_at', 'updated_at'])
             ->map(fn (TeamNewsItem $item) => [

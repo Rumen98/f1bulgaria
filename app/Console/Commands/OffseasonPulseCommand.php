@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\NewsStatus;
 use App\Mail\OffseasonPulseMail;
 use App\Models\NewsletterSend;
 use App\Models\Race;
@@ -155,7 +154,7 @@ class OffseasonPulseCommand extends Command
     private function buildTopNews(): array
     {
         return TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->inMainFeed()
             ->where('published_at', '>=', now()->subDays(self::NEWS_DAYS))
             ->orderByDesc('importance_score')
             ->orderByDesc('published_at')

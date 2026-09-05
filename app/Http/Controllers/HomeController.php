@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\NewsStatus;
 use App\Models\RaceSession;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
@@ -159,7 +158,7 @@ class HomeController extends Controller
     private function topNews()
     {
         return TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->inMainFeed()
             ->whereNotNull('title_bg')
             ->with('constructor')
             // Най-важната първо: началната я показва като голяма карта,

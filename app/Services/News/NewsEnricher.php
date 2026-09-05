@@ -73,7 +73,12 @@ class NewsEnricher
                 // Извън темата: глобалните емисии носят и MotoGP, NASCAR, WEC,
                 // рали. Спираме ги преди публикация — не си струва да плащаме
                 // и за пълна статия по тях.
-                if (! $result->isF1Related) {
+                //
+                // Изключение: Никола Цолов. Той кара във Формула 2, тоест по
+                // този тест новините за него са „извън темата" и досега биха
+                // били отхвърляни. Кътът му ги иска всичките, затова минават
+                // нататък — а `is_f1_related` пази главната емисия чиста.
+                if (! $result->isF1Related && ! $item->is_tsolov) {
                     $item->update([
                         'title_bg' => $result->titleBg,
                         'summary_bg' => $result->summaryBg,
@@ -112,6 +117,7 @@ class NewsEnricher
                     $item->unsetRelation('constructor');
                     $item->update([
                         'featured_image' => $this->imageResolver->resolve($item),
+                        'is_f1_related' => $result->isF1Related,
                         'status' => NewsStatus::AutoPublished->value,
                     ]);
 
@@ -168,7 +174,7 @@ class NewsEnricher
     public function generateExtendedArticles(int $limit = 10, ?Closure $onItem = null): array
     {
         $items = TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->published()
             ->whereNull('full_article_bg')
             ->whereNotNull('title_bg')
             // Прясно публикуваните може още да са в inline генерация от паралелен

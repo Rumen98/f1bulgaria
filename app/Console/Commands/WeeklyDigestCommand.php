@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\NewsStatus;
 use App\Mail\WeeklyDigestMail;
 use App\Models\F2Driver;
 use App\Models\F2Result;
@@ -330,7 +329,7 @@ class WeeklyDigestCommand extends Command
     private function buildTopNews(): array
     {
         return TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->inMainFeed()
             ->where('published_at', '>=', now()->subDays(self::FRESHNESS_DAYS))
             ->orderByDesc('importance_score')
             ->orderByDesc('published_at')

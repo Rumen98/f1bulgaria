@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\NewsStatus;
 use App\Models\TeamNewsItem;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
@@ -22,7 +21,7 @@ class FeedController extends Controller
     public function __invoke(): Response
     {
         $items = TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->inMainFeed()
             ->whereNotNull('published_at')
             ->orderByDesc('published_at')
             ->limit(self::LIMIT)
