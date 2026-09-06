@@ -10,9 +10,9 @@ function localizer(): RaceNameLocalizer
 }
 
 it('превежда известните състезания по jolpica_id', function () {
-    expect(localizer()->localize('albert_park', 'Australian Grand Prix'))->toBe('Гран При на Австралия')
-        ->and(localizer()->localize('monaco', 'Monaco Grand Prix'))->toBe('Гран При на Монако')
-        ->and(localizer()->localize('spa', 'Belgian Grand Prix'))->toBe('Гран При на Белгия');
+    expect(localizer()->localize('albert_park', 'Australian Grand Prix'))->toBe('Гран при на Австралия')
+        ->and(localizer()->localize('monaco', 'Monaco Grand Prix'))->toBe('Гран при на Монако')
+        ->and(localizer()->localize('spa', 'Belgian Grand Prix'))->toBe('Гран при на Белгия');
 });
 
 it('пада към оригиналното име за непознати/липсващи', function () {

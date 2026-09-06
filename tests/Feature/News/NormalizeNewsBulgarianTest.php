@@ -152,3 +152,16 @@ it('не пипа собствени имена след предлог', functi
 
     expect($item->refresh()->title_bg)->toBe('Разговор с Леклер и с Норис в Монца');
 });
+
+it('поправя „Гран При“ на „Гран при“ — главна е само първата дума', function () {
+    $item = TeamNewsItem::factory()->create([
+        'title_bg' => 'Верстапен спечели Гран При на Италия',
+        'summary_bg' => 'Следващото Гран При е в Сингапур.',
+    ]);
+
+    $this->artisan('news:normalize-bg')->assertSuccessful();
+
+    $item->refresh();
+    expect($item->title_bg)->toBe('Верстапен спечели Гран при на Италия')
+        ->and($item->summary_bg)->toBe('Следващото Гран при е в Сингапур.');
+});

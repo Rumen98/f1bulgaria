@@ -28,7 +28,7 @@ it('обновява редактиран текст при re-seed без да 
         protected function questions(): array
         {
             $questions = parent::questions();
-            $questions[0]['question'] = 'Кой пилот има най-много победи в Гран При във Формула 1?';
+            $questions[0]['question'] = 'Кой пилот има най-много победи в Гран при във Формула 1?';
 
             return $questions;
         }
@@ -38,7 +38,7 @@ it('обновява редактиран текст при re-seed без да 
     expect(QuizQuestion::count())->toBe($count)
         ->and(QuizQuestion::query()->where('code', 'most-wins')->count())->toBe(1)
         ->and(QuizQuestion::query()->firstWhere('code', 'most-wins')->question)
-        ->toBe('Кой пилот има най-много победи в Гран При във Формула 1?');
+        ->toBe('Кой пилот има най-много победи в Гран при във Формула 1?');
 });
 
 it('деактивация от админа преживява re-seed', function () {

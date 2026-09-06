@@ -12,7 +12,7 @@ use App\Mail\OffseasonPulseMail;
  */
 function pulseCountdown(): array
 {
-    return ['race' => 'Гран При на Нидерландия', 'when' => '23.08, 16:00', 'days' => 11];
+    return ['race' => 'Гран при на Нидерландия', 'when' => '23.08, 16:00', 'days' => 11];
 }
 
 it('води потребител с акаунт към прогнозата за следващия кръг', function () {
@@ -23,7 +23,7 @@ it('води потребител с акаунт към прогнозата з
     ))->render();
 
     expect($html)->toContain(route('predictions.index'))
-        ->and($html)->toContain('Гран При на Нидерландия')
+        ->and($html)->toContain('Гран при на Нидерландия')
         ->and($html)->not->toContain(url('/register'));
 });
 

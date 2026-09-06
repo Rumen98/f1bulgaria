@@ -129,7 +129,7 @@ it('опцията --force заобикаля guard-овете', function () {
 it('рендерира отброяването, новините и отписването', function () {
     $mail = new OffseasonPulseMail(
         [['title' => 'Лятна сага', 'url' => 'https://padok.bg/news/lyatna-saga']],
-        countdown: ['race' => 'Гран При на Нидерландия', 'when' => 'Нд, 23.08 — 16:00 ч.', 'days' => 14],
+        countdown: ['race' => 'Гран при на Нидерландия', 'when' => 'Нд, 23.08 — 16:00 ч.', 'days' => 14],
         standings: [['position' => 1, 'driver' => 'Ландо Норис', 'points' => 250.0]],
         unsubscribeToken: 'tok-pr',
     );

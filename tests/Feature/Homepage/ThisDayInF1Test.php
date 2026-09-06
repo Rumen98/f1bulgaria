@@ -18,8 +18,8 @@ it('връща историческите състезания на дадена
     $senna = Driver::factory()->create(['season_id' => $s1->id, 'first_name' => 'Ayrton', 'last_name' => 'Senna', 'slug' => 'ayrton-senna']);
     $hamilton = Driver::factory()->create(['season_id' => $s2->id, 'constructor_id' => $team->id, 'first_name' => 'Lewis', 'last_name' => 'Hamilton', 'slug' => 'lewis-hamilton']);
 
-    $r1 = Race::factory()->create(['season_id' => $s1->id, 'name' => 'Гран При на Монако', 'jolpica_id' => 'monaco', 'race_datetime_utc' => Carbon::create(1990, 7, 15, 14)]);
-    $r2 = Race::factory()->create(['season_id' => $s2->id, 'name' => 'Гран При на Испания', 'jolpica_id' => 'spain', 'race_datetime_utc' => Carbon::create(2020, 7, 15, 14)]);
+    $r1 = Race::factory()->create(['season_id' => $s1->id, 'name' => 'Гран при на Монако', 'jolpica_id' => 'monaco', 'race_datetime_utc' => Carbon::create(1990, 7, 15, 14)]);
+    $r2 = Race::factory()->create(['season_id' => $s2->id, 'name' => 'Гран при на Испания', 'jolpica_id' => 'spain', 'race_datetime_utc' => Carbon::create(2020, 7, 15, 14)]);
     $other = Race::factory()->create(['season_id' => $s2->id, 'race_datetime_utc' => Carbon::create(2020, 7, 16, 14)]); // друг ден
 
     Result::factory()->position(1)->create(['race_id' => $r1->id, 'driver_id' => $senna->id]);

@@ -49,14 +49,14 @@ it('/live показва no-session състояние когато няма с�
     Http::fake(['*' => Http::response([])]);
 
     $season = Season::factory()->current()->create();
-    Race::factory()->create(['season_id' => $season->id, 'name' => 'Гран При на Бахрейн', 'race_datetime_utc' => Carbon::now()->addDays(5)]);
+    Race::factory()->create(['season_id' => $season->id, 'name' => 'Гран при на Бахрейн', 'race_datetime_utc' => Carbon::now()->addDays(5)]);
 
     $this->get('/live')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Live/Index')
             ->where('session', null)
-            ->where('nextRace.name', 'Гран При на Бахрейн'));
+            ->where('nextRace.name', 'Гран при на Бахрейн'));
 });
 
 it('/live/refresh връща JSON със standings', function () {

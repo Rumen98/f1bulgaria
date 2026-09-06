@@ -70,7 +70,7 @@ it('чисти вече публикувани новини извън тема�
     $f1 = TeamNewsItem::factory()->create([
         'title_original' => 'Hamilton warns Ferrari before Monza',
         'title_bg' => 'Хамилтън предупреждава Ферари',
-        'summary_bg' => 'Преди Гран При на Италия.',
+        'summary_bg' => 'Преди Гран при на Италия.',
         'status' => NewsStatus::AutoPublished->value,
     ]);
 
