@@ -72,11 +72,6 @@ echo "→ Рестарт на SSR демона"
 $ARTISAN inertia:stop-ssr || true
 supervisorctl restart padok-ssr
 
-echo "→ Рестарт на queue worker-а"
-# Worker-ът също държи кода в паметта от старта си — без това новите job-ове
-# се обработват от стария код.
-$ARTISAN queue:restart || true
-
 echo "→ Проверка"
 sleep 3
 $ARTISAN inertia:check-ssr
@@ -90,35 +85,18 @@ else
     echo "  Провери: supervisorctl status padok-ssr; tail storage/logs/ssr.log"
 fi
 
-# --- Queue worker -------------------------------------------------------
-# Научено по трудния начин: на 30.07.2026 MySQL мигна за секунда, worker-ът
-# опита 5 рестарта в рамките на 2 секунди, systemd удари StartLimitBurst и се
-# отказа ЗАВИНАГИ. 13 дни всички бюлетини се трупаха в `jobs` — без грешка,
-# без ред в лога, а командите продължаваха да рапортуват „поставено в
-# опашката". Открихме го случайно. Затова се проверява при всеки деплой.
+# --- Опашка: премахната -------------------------------------------------
+# Бюлетините се пращат СИНХРОННО (виж трейта SendsBulkMail). Нищо в кода
+# не подава работа на опашката — нула ->queue() извиквания, нула ShouldQueue
+# класове.
 #
-# Устойчивостта е в drop-in-а (RestartSec + StartLimitIntervalSec=0);
-# тук само крещим, ако все пак е паднал.
-echo "→ Проверка на queue worker-а"
-if systemctl is-active --quiet padok-queue; then
-    echo "  padok-queue работи ✓"
-else
-    echo "  ВНИМАНИЕ: padok-queue НЕ работи — нито едно писмо няма да излезе!"
-    echo "  Причина:  journalctl -u padok-queue -n 50 --no-pager"
-    echo "  Вдигане:  systemctl reset-failed padok-queue && systemctl start padok-queue"
-fi
-
-# „Процесът е жив" не значи „опашката се движи" — точно както при SSR.
-pending=$($ARTISAN tinker --execute 'echo DB::table("jobs")->count();' 2>/dev/null | tr -dc '0-9' || true)
-failed=$($ARTISAN tinker --execute 'echo DB::table("failed_jobs")->count();' 2>/dev/null | tr -dc '0-9' || true)
-echo "  Опашка: ${pending:-?} чакащи, ${failed:-?} провалени"
-
-if [ "${pending:-0}" -gt 50 ]; then
-    echo "  ВНИМАНИЕ: опашката е натрупана — worker-ът вероятно не дренира."
-fi
-
-if [ "${failed:-0}" -gt 0 ]; then
-    echo "  ВНИМАНИЕ: има провалени job-ове — виж ги с: php artisan queue:failed"
-fi
+# Проверката тук стоеше заради 13-те дни мълчание през 07.2026, но след
+# синхронното пращане пазеше нещо неизползвано и крещеше на всеки деплой:
+# `queue:restart` убива worker-а, systemd го вдига след RestartSec, а
+# проверката питаше 3 секунди по-късно и виждаше дупката. Предупреждение,
+# което лъже, учи да се игнорира и следващото.
+#
+# Ако някога пак потрябва опашка: върни `queue:restart` тук И проверката,
+# но с изчакване, не с фиксиран sleep.
 
 echo "✓ Готово"
