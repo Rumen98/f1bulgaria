@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SendsBulkMail;
 use App\Mail\OffseasonPulseMail;
 use App\Models\NewsletterSend;
 use App\Models\Race;
@@ -14,11 +15,12 @@ use App\Services\Standings\StandingsService;
 use App\Support\DriverName;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
 class OffseasonPulseCommand extends Command
 {
+    use SendsBulkMail;
+
     protected $signature = 'f1:offseason-pulse {--force : Пропуска guard-овете за ръчен пуск}';
 
     protected $description = 'Месечен бюлетин през паузите: топ новини от периода + отброяване до следващия кръг.';
@@ -122,7 +124,7 @@ class OffseasonPulseCommand extends Command
         $recipients = $audience->users();
 
         foreach ($recipients as $user) {
-            Mail::to($user)->queue(new OffseasonPulseMail(
+            $this->sendMail($user, new OffseasonPulseMail(
                 $news,
                 $countdown,
                 $topDrivers,
@@ -133,7 +135,7 @@ class OffseasonPulseCommand extends Command
         $subscribers = $audience->subscribersWithoutAccount($recipients);
 
         foreach ($subscribers as $subscriber) {
-            Mail::to($subscriber->email)->queue(new OffseasonPulseMail(
+            $this->sendMail($subscriber->email, new OffseasonPulseMail(
                 $news,
                 $countdown,
                 $topDrivers,
@@ -141,7 +143,9 @@ class OffseasonPulseCommand extends Command
             ));
         }
 
-        $this->info("Пулсът е поставен в опашката: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
+        $this->info("Пулсът е изпратен: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
+
+        $this->reportMailOutcome();
 
         return self::SUCCESS;
     }

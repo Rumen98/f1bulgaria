@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SendsBulkMail;
 use App\Mail\WeeklyDigestMail;
 use App\Models\F2Driver;
 use App\Models\F2Result;
@@ -22,11 +23,12 @@ use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
 class WeeklyDigestCommand extends Command
 {
+    use SendsBulkMail;
+
     protected $signature = 'f1:weekly-digest
         {--race= : ID на състезание (по подразбиране — последното изминало; заобикаля 7-дневния прозорец за ръчен re-send)}
         {--any-hour : Праща и извън приличния часови прозорец (за ръчно пускане)}';
@@ -126,7 +128,7 @@ class WeeklyDigestCommand extends Command
         foreach ($recipients as $user) {
             $stats = $this->decorateStats($leaderboard->userStats($user, $season), $user, $fullBoard);
 
-            Mail::to($user)->queue(new WeeklyDigestMail(
+            $this->sendMail($user, new WeeklyDigestMail(
                 $race,
                 $recap,
                 $board,
@@ -144,7 +146,7 @@ class WeeklyDigestCommand extends Command
         $subscribers = $audience->subscribersWithoutAccount($recipients);
 
         foreach ($subscribers as $subscriber) {
-            Mail::to($subscriber->email)->queue(new WeeklyDigestMail(
+            $this->sendMail($subscriber->email, new WeeklyDigestMail(
                 $race,
                 $recap,
                 $board,
@@ -156,7 +158,9 @@ class WeeklyDigestCommand extends Command
             ));
         }
 
-        $this->info("Дайджестът е поставен в опашката: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
+        $this->info("Дайджестът е изпратен: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
+
+        $this->reportMailOutcome();
 
         return self::SUCCESS;
     }

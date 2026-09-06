@@ -29,8 +29,8 @@ it('праща на всички и поства в канала', function () {
 
     $this->artisan('padok:quiz-monday')->assertSuccessful();
 
-    Mail::assertQueued(QuizWeeklyMail::class, 2);
-    Mail::assertQueued(QuizWeeklyMail::class, fn ($mail) => $mail->hasTo($user->email));
+    Mail::assertSent(QuizWeeklyMail::class, 2);
+    Mail::assertSent(QuizWeeklyMail::class, fn ($mail) => $mail->hasTo($user->email));
 });
 
 it('не дублира в същата седмица', function () {
@@ -40,7 +40,7 @@ it('не дублира в същата седмица', function () {
     $this->artisan('padok:quiz-monday')->assertSuccessful();
     $this->artisan('padok:quiz-monday')->assertSuccessful();
 
-    Mail::assertQueued(QuizWeeklyMail::class, 1);
+    Mail::assertSent(QuizWeeklyMail::class, 1);
 });
 
 it('мълчи без активни въпроси и при изключен флаг', function () {
@@ -73,7 +73,7 @@ it('писмото носи куиза и функцията на седмица
 
     $this->artisan('padok:quiz-monday')->assertSuccessful();
 
-    Mail::assertQueued(QuizWeeklyMail::class, function (QuizWeeklyMail $mail) use ($user) {
+    Mail::assertSent(QuizWeeklyMail::class, function (QuizWeeklyMail $mail) use ($user) {
         if (! $mail->hasTo($user->email)) {
             return false;
         }
@@ -94,7 +94,7 @@ it('абонатът без акаунт получава покана за ре
 
     $this->artisan('padok:quiz-monday')->assertSuccessful();
 
-    Mail::assertQueued(QuizWeeklyMail::class, function (QuizWeeklyMail $mail) {
+    Mail::assertSent(QuizWeeklyMail::class, function (QuizWeeklyMail $mail) {
         $html = $mail->render();
 
         return str_contains($html, 'Регистрирай се и играй')
@@ -110,5 +110,5 @@ it('провал на Telegram не проваля писмата', function () 
 
     $this->artisan('padok:quiz-monday')->assertSuccessful();
 
-    Mail::assertQueued(QuizWeeklyMail::class, 1);
+    Mail::assertSent(QuizWeeklyMail::class, 1);
 });

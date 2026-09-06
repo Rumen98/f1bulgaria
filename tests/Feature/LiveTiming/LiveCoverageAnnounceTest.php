@@ -36,8 +36,8 @@ it('праща веднъж на кръг в прозореца преди ст�
     $this->artisan('f1:live-announce')->assertSuccessful();
     $this->artisan('f1:live-announce')->assertSuccessful();
 
-    Mail::assertQueued(LiveCoverageMail::class, 1);
-    Mail::assertQueued(LiveCoverageMail::class, fn ($mail) => $mail->hasTo($user->email));
+    Mail::assertSent(LiveCoverageMail::class, 1);
+    Mail::assertSent(LiveCoverageMail::class, fn ($mail) => $mail->hasTo($user->email));
 });
 
 it('мълчи извън прозореца', function () {
@@ -85,7 +85,7 @@ it('писмото обяснява тайминга и има unsubscribe', fun
 
     $this->artisan('f1:live-announce')->assertSuccessful();
 
-    Mail::assertQueued(LiveCoverageMail::class, function (LiveCoverageMail $mail) use ($user) {
+    Mail::assertSent(LiveCoverageMail::class, function (LiveCoverageMail $mail) use ($user) {
         if (! $mail->hasTo($user->email)) {
             return false;
         }

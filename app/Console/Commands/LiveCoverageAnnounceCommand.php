@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SendsBulkMail;
 use App\Mail\LiveCoverageMail;
 use App\Models\NewsletterSend;
 use App\Models\Race;
@@ -12,7 +13,6 @@ use App\Services\LiveTiming\OpenF1TokenManager;
 use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Races\RaceNameLocalizer;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\URL;
  */
 class LiveCoverageAnnounceCommand extends Command
 {
+    use SendsBulkMail;
+
     protected $signature = 'f1:live-announce
         {--race= : ID на състезание (ръчен пуск, заобикаля прозореца)}
         {--force : Праща дори ако вече е пращано за този кръг}
@@ -87,7 +89,7 @@ class LiveCoverageAnnounceCommand extends Command
             ->copy()->setTimezone('Europe/Sofia')->format('H:i').' ч.';
 
         foreach ($recipients as $user) {
-            Mail::to($user)->queue(new LiveCoverageMail(
+            $this->sendMail($user, new LiveCoverageMail(
                 $race,
                 $raceName,
                 $startAt,
@@ -96,7 +98,7 @@ class LiveCoverageAnnounceCommand extends Command
         }
 
         foreach ($subscribers as $subscriber) {
-            Mail::to($subscriber->email)->queue(new LiveCoverageMail(
+            $this->sendMail($subscriber->email, new LiveCoverageMail(
                 $race,
                 $raceName,
                 $startAt,
@@ -104,7 +106,9 @@ class LiveCoverageAnnounceCommand extends Command
             ));
         }
 
-        $this->info("Писмото е в опашката: {$recipients->count()} потребители + {$subscribers->count()} абонати.");
+        $this->info("Писмото е изпратено: {$recipients->count()} потребители + {$subscribers->count()} абонати.");
+
+        $this->reportMailOutcome();
 
         return self::SUCCESS;
     }

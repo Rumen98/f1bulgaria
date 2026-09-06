@@ -20,9 +20,9 @@ it('праща на потребителите и на бюлетинните а
 
     $this->artisan('padok:announce-features')->assertSuccessful();
 
-    Mail::assertQueued(FeatureAnnouncementMail::class, 2);
-    Mail::assertQueued(FeatureAnnouncementMail::class, fn ($mail) => $mail->hasTo($user->email));
-    Mail::assertQueued(FeatureAnnouncementMail::class, fn ($mail) => $mail->hasTo($subscriber->email));
+    Mail::assertSent(FeatureAnnouncementMail::class, 2);
+    Mail::assertSent(FeatureAnnouncementMail::class, fn ($mail) => $mail->hasTo($user->email));
+    Mail::assertSent(FeatureAnnouncementMail::class, fn ($mail) => $mail->hasTo($subscriber->email));
 });
 
 it('прескача банати и спрели имейлите потребители', function () {
@@ -40,7 +40,7 @@ it('не праща втори път при повторен пуск', functio
     $this->artisan('padok:announce-features')->assertSuccessful();
     $this->artisan('padok:announce-features')->assertSuccessful();
 
-    Mail::assertQueued(FeatureAnnouncementMail::class, 1);
+    Mail::assertSent(FeatureAnnouncementMail::class, 1);
 });
 
 it('force пуска повторно', function () {
@@ -49,7 +49,7 @@ it('force пуска повторно', function () {
     $this->artisan('padok:announce-features')->assertSuccessful();
     $this->artisan('padok:announce-features', ['--force' => true])->assertSuccessful();
 
-    Mail::assertQueued(FeatureAnnouncementMail::class, 2);
+    Mail::assertSent(FeatureAnnouncementMail::class, 2);
 });
 
 it('dry-run не праща и не маркира', function () {
@@ -72,7 +72,7 @@ it('сочи към следващия кръг с отворени прогно
 
     $this->artisan('padok:announce-features')->assertSuccessful();
 
-    Mail::assertQueued(FeatureAnnouncementMail::class, function (FeatureAnnouncementMail $mail) use ($race) {
+    Mail::assertSent(FeatureAnnouncementMail::class, function (FeatureAnnouncementMail $mail) use ($race) {
         return $mail->nextRace !== null
             && str_contains($mail->nextRace['url'], (string) $race->id)
             && $mail->nextRace['deadline'] !== null;
@@ -85,7 +85,7 @@ it('пада към класирането без предстоящ кръг', 
 
     $this->artisan('padok:announce-features')->assertSuccessful();
 
-    Mail::assertQueued(FeatureAnnouncementMail::class, fn (FeatureAnnouncementMail $mail) => $mail->nextRace === null);
+    Mail::assertSent(FeatureAnnouncementMail::class, fn (FeatureAnnouncementMail $mail) => $mail->nextRace === null);
 });
 
 it('писмото на потребител рендерира с one-click unsubscribe и без регистрационно CTA', function () {
@@ -94,7 +94,7 @@ it('писмото на потребител рендерира с one-click uns
 
     $this->artisan('padok:announce-features')->assertSuccessful();
 
-    Mail::assertQueued(FeatureAnnouncementMail::class, function (FeatureAnnouncementMail $mail) use ($user) {
+    Mail::assertSent(FeatureAnnouncementMail::class, function (FeatureAnnouncementMail $mail) use ($user) {
         if (! $mail->hasTo($user->email)) {
             return false;
         }
@@ -113,7 +113,7 @@ it('писмото на абонат кани към регистрация', fu
 
     $this->artisan('padok:announce-features')->assertSuccessful();
 
-    Mail::assertQueued(FeatureAnnouncementMail::class, function (FeatureAnnouncementMail $mail) {
+    Mail::assertSent(FeatureAnnouncementMail::class, function (FeatureAnnouncementMail $mail) {
         $html = $mail->render();
 
         return str_contains($html, 'Включи се в играта')

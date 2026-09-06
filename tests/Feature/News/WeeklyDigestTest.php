@@ -41,8 +41,8 @@ it('праща дайджеста на потребители И на бюлет
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 
-    Mail::assertQueued(WeeklyDigestMail::class, fn ($mail) => $mail->hasTo('igrach@example.bg') && $mail->userStats !== null);
-    Mail::assertQueued(WeeklyDigestMail::class, fn ($mail) => $mail->hasTo('abonat@example.bg')
+    Mail::assertSent(WeeklyDigestMail::class, fn ($mail) => $mail->hasTo('igrach@example.bg') && $mail->userStats !== null);
+    Mail::assertSent(WeeklyDigestMail::class, fn ($mail) => $mail->hasTo('abonat@example.bg')
         && $mail->userStats === null
         && $mail->unsubscribeToken === 'tok-abonat');
 });
@@ -59,7 +59,7 @@ it('не дублира имейл, който е и потребител, и а
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 
-    Mail::assertQueuedCount(1);
+    Mail::assertSentCount(1);
 });
 
 it('не праща нищо, ако последното състезание е по-старо от 14 дни (пауза/междусезоние)', function () {
@@ -82,7 +82,7 @@ it('наваксва неизпратен кръг до 14 дни назад (к
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 
-    Mail::assertQueued(WeeklyDigestMail::class, fn ($mail) => $mail->hasTo('igrach@example.bg'));
+    Mail::assertSent(WeeklyDigestMail::class, fn ($mail) => $mail->hasTo('igrach@example.bg'));
 });
 
 it('не праща втори път за същия кръг (send-tracking)', function () {
@@ -93,7 +93,7 @@ it('не праща втори път за същия кръг (send-tracking)',
     $this->artisan('f1:weekly-digest')->assertSuccessful();
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 
-    Mail::assertQueuedCount(1);
+    Mail::assertSentCount(1);
 });
 
 it('пропуска кръг само със спринт резултати (неделното състезание още тече)', function () {
@@ -144,7 +144,7 @@ it('потребителската версия носи signed линк за с
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 
-    Mail::assertQueued(WeeklyDigestMail::class, fn ($mail) => $mail->userUnsubscribeUrl !== null
+    Mail::assertSent(WeeklyDigestMail::class, fn ($mail) => $mail->userUnsubscribeUrl !== null
         && str_contains($mail->userUnsubscribeUrl, '/newsletter/email-stop/'));
 });
 
@@ -156,7 +156,7 @@ it('опцията --race заобикаля 7-дневния прозорец (
 
     $this->artisan('f1:weekly-digest', ['--race' => $this->race->id])->assertSuccessful();
 
-    Mail::assertQueuedCount(1);
+    Mail::assertSentCount(1);
 });
 
 it('пропуска отписаните абонати', function () {
@@ -206,7 +206,7 @@ it('включва Ф2 секцията при кръг на Цолов през
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 
-    Mail::assertQueued(WeeklyDigestMail::class, fn ($mail) => $mail->f2 !== null
+    Mail::assertSent(WeeklyDigestMail::class, fn ($mail) => $mail->f2 !== null
         && $mail->f2['race'] === 'Будапеща, Унгария'
         && $mail->f2['standings_position'] === 2
         && $mail->f2['results'] === [['session' => 'Главно състезание', 'position' => 3, 'status' => 'Finished']]);
@@ -235,7 +235,7 @@ it('пропуска Ф2 секцията без кръг през послед�
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 
-    Mail::assertQueued(WeeklyDigestMail::class, fn ($mail) => $mail->f2 === null);
+    Mail::assertSent(WeeklyDigestMail::class, fn ($mail) => $mail->f2 === null);
 });
 
 it('включва топ новини само от последната седмица и само публични', function () {
@@ -252,7 +252,7 @@ it('включва топ новини само от последната сед
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 
-    Mail::assertQueued(WeeklyDigestMail::class, fn ($mail) => count($mail->news) === 1
+    Mail::assertSent(WeeklyDigestMail::class, fn ($mail) => count($mail->news) === 1
         && $mail->news[0]['title'] === 'Голям трансфер');
 });
 
@@ -269,7 +269,7 @@ it('личната статистика включва позиция в лиг�
 
     $this->artisan('f1:weekly-digest')->assertSuccessful();
 
-    Mail::assertQueued(WeeklyDigestMail::class, fn ($mail) => ($mail->userStats['rank'] ?? null) === 1
+    Mail::assertSent(WeeklyDigestMail::class, fn ($mail) => ($mail->userStats['rank'] ?? null) === 1
         && $mail->userStats['players'] === 1
         && $mail->userStats['new_badges'] === ['Точен мерник']);
 });

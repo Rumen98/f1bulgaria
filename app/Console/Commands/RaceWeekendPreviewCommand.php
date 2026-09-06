@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SendsBulkMail;
 use App\Mail\RaceWeekendPreviewMail;
 use App\Models\Driver;
 use App\Models\Race;
@@ -16,11 +17,12 @@ use App\Support\DriverName;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
 class RaceWeekendPreviewCommand extends Command
 {
+    use SendsBulkMail;
+
     protected $signature = 'f1:race-preview {--race= : ID на състезание (заобикаля 7-дневния прозорец за ръчен пуск)}';
 
     protected $description = 'Изпраща петъчен preview на състезателния уикенд: програма в софийско време, залог в класирането и CTA за прогноза.';
@@ -61,7 +63,7 @@ class RaceWeekendPreviewCommand extends Command
         $recipients = $audience->users();
 
         foreach ($recipients as $user) {
-            Mail::to($user)->queue(new RaceWeekendPreviewMail(
+            $this->sendMail($user, new RaceWeekendPreviewMail(
                 $race,
                 $program,
                 $stake,
@@ -73,7 +75,7 @@ class RaceWeekendPreviewCommand extends Command
         $subscribers = $audience->subscribersWithoutAccount($recipients);
 
         foreach ($subscribers as $subscriber) {
-            Mail::to($subscriber->email)->queue(new RaceWeekendPreviewMail(
+            $this->sendMail($subscriber->email, new RaceWeekendPreviewMail(
                 $race,
                 $program,
                 $stake,
@@ -82,7 +84,9 @@ class RaceWeekendPreviewCommand extends Command
             ));
         }
 
-        $this->info("Preview-то е поставено в опашката: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
+        $this->info("Preview-то е изпратено: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
+
+        $this->reportMailOutcome();
 
         return self::SUCCESS;
     }

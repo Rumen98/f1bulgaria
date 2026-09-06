@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SendsBulkMail;
 use App\Mail\QuizWeeklyMail;
 use App\Models\NewsletterSend;
 use App\Models\QuizQuestion;
@@ -11,7 +12,6 @@ use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Telegram\TelegramClient;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\URL;
  */
 class QuizWeeklyAnnounceCommand extends Command
 {
+    use SendsBulkMail;
+
     protected $signature = 'padok:quiz-monday
         {--dry-run : Само отчита кой би получил писмо}
         {--force : Праща дори ако тази седмица вече е обявена}';
@@ -83,7 +85,7 @@ class QuizWeeklyAnnounceCommand extends Command
         $spotlight = $this->spotlight($week);
 
         foreach ($recipients as $user) {
-            Mail::to($user)->queue(new QuizWeeklyMail(
+            $this->sendMail($user, new QuizWeeklyMail(
                 week: $week,
                 spotlight: $spotlight,
                 userUnsubscribeUrl: URL::signedRoute('newsletter.user-unsubscribe', ['user' => $user->id]),
@@ -91,7 +93,7 @@ class QuizWeeklyAnnounceCommand extends Command
         }
 
         foreach ($subscribers as $subscriber) {
-            Mail::to($subscriber->email)->queue(new QuizWeeklyMail(
+            $this->sendMail($subscriber->email, new QuizWeeklyMail(
                 week: $week,
                 spotlight: $spotlight,
                 unsubscribeToken: $subscriber->unsubscribe_token,
@@ -101,6 +103,8 @@ class QuizWeeklyAnnounceCommand extends Command
         $this->postToChannel($telegram, $week);
 
         $this->info("Обявено: {$recipients->count()} потребители + {$subscribers->count()} абонати + каналът.");
+
+        $this->reportMailOutcome();
 
         return self::SUCCESS;
     }
