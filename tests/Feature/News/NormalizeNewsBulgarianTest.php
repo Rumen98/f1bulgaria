@@ -34,8 +34,8 @@ it('поправя преведена фамилия: Лекар → Лекле�
     $this->artisan('news:normalize-bg')->assertSuccessful();
 
     $item->refresh();
-    expect($item->title_bg)->toBe('Ръсел блокира Леклер в Монца')
-        ->and($item->summary_bg)->toBe('Леклер остана зад Ръсел.');
+    expect($item->title_bg)->toBe('Ръсел блокира Льоклер в Монца')
+        ->and($item->summary_bg)->toBe('Льоклер остана зад Ръсел.');
 });
 
 it('НЕ пипа „Лекарят" — границата на думата пази истинското съществително', function () {
@@ -61,7 +61,7 @@ it('нормализира и тялото на статията, и анали�
     $this->artisan('news:normalize-bg')->assertSuccessful();
 
     $item->refresh();
-    expect($item->full_article_bg)->toBe('Леклер финишира трети, а Хамилтън беше пети.')
+    expect($item->full_article_bg)->toBe('Льоклер финишира трети, а Хамилтън беше пети.')
         ->and($item->our_analysis_bg)->toBe('Алпин губи темпо в Зандворт.');
 });
 
@@ -74,7 +74,7 @@ it('нормализира ключовите факти, без да чупи J
     $this->artisan('news:normalize-bg')->assertSuccessful();
 
     expect($item->refresh()->key_facts)->toBe([
-        'Леклер стартира втори',
+        'Льоклер стартира втори',
         'Хамилтън отпадна в 12-а обиколка',
     ]);
 });
@@ -88,19 +88,19 @@ it('е идемпотентна — второто пускане не пром�
     $this->artisan('news:normalize-bg')->assertSuccessful();
 
     expect($item->refresh()->title_bg)->toBe($afterFirst)
-        ->and($afterFirst)->toBe('Леклер и Хамилтън в Зандворт');
+        ->and($afterFirst)->toBe('Льоклер и Хамилтън в Зандворт');
 });
 
 it('сваля пълния член до кратък след предлог', function () {
     $item = TeamNewsItem::factory()->create([
-        'title_bg' => 'Леклер изтри соцмедиите по време на трудният 2026 сезон',
+        'title_bg' => 'Льоклер изтри соцмедиите по време на трудният 2026 сезон',
         'summary_bg' => 'Говори се за новият регламент и за храмът на скоростта.',
     ]);
 
     $this->artisan('news:normalize-bg')->assertSuccessful();
 
     $item->refresh();
-    expect($item->title_bg)->toBe('Леклер изтри соцмедиите по време на трудния 2026 сезон')
+    expect($item->title_bg)->toBe('Льоклер изтри соцмедиите по време на трудния 2026 сезон')
         ->and($item->summary_bg)->toBe('Говори се за новия регламент и за храма на скоростта.');
 });
 
@@ -145,12 +145,12 @@ it('справя се със съставни прилагателни с „н�
 it('не пипа собствени имена след предлог', function () {
     // Целевата дума е само с малки букви — имената остават непокътнати.
     $item = TeamNewsItem::factory()->create([
-        'title_bg' => 'Разговор с Леклер и с Норис в Монца',
+        'title_bg' => 'Разговор с Льоклер и с Норис в Монца',
     ]);
 
     $this->artisan('news:normalize-bg')->assertSuccessful();
 
-    expect($item->refresh()->title_bg)->toBe('Разговор с Леклер и с Норис в Монца');
+    expect($item->refresh()->title_bg)->toBe('Разговор с Льоклер и с Норис в Монца');
 });
 
 it('поправя „Гран При“ на „Гран при“ — главна е само първата дума', function () {

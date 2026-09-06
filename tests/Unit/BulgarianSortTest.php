@@ -42,23 +42,23 @@ function sortBulgarian(array $names): array
 }
 
 it('подрежда кирилицата по българската азбука', function () {
-    expect(sortBulgarian(['Ферстапен', 'Албон', 'Хамилтън', 'Юки Цунода', 'Шарл Льоклер']))
-        ->toBe(['Албон', 'Ферстапен', 'Хамилтън', 'Шарл Льоклер', 'Юки Цунода']);
+    expect(sortBulgarian(['Верстапен', 'Албон', 'Хамилтън', 'Юки Цунода', 'Шарл Льоклер']))
+        ->toBe(['Албон', 'Верстапен', 'Хамилтън', 'Шарл Льоклер', 'Юки Цунода']);
 });
 
 it('слага кирилицата преди латиницата', function () {
-    expect(sortBulgarian(['Zhou Guanyu', 'Ферстапен', 'Alexander Albon', 'Албон']))
-        ->toBe(['Албон', 'Ферстапен', 'Alexander Albon', 'Zhou Guanyu']);
+    expect(sortBulgarian(['Zhou Guanyu', 'Верстапен', 'Alexander Albon', 'Албон']))
+        ->toBe(['Албон', 'Верстапен', 'Alexander Albon', 'Zhou Guanyu']);
 });
 
 it('пази същия ред и без intl', function () {
-    $names = ['Zhou Guanyu', 'Ферстапен', 'Alexander Albon', 'Албон', 'Хамилтън'];
+    $names = ['Zhou Guanyu', 'Верстапен', 'Alexander Albon', 'Албон', 'Хамилтън'];
 
     $withIntl = sortBulgarian($names);
     $withoutIntl = withoutIntlCollator(fn () => sortBulgarian($names));
 
     expect($withoutIntl)->toBe($withIntl)
-        ->and($withoutIntl)->toBe(['Албон', 'Ферстапен', 'Хамилтън', 'Alexander Albon', 'Zhou Guanyu']);
+        ->and($withoutIntl)->toBe(['Албон', 'Верстапен', 'Хамилтън', 'Alexander Albon', 'Zhou Guanyu']);
 });
 
 it('приравнява латинските диакритики към базовата буква и без intl', function () {
