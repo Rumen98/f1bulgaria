@@ -17,6 +17,7 @@ use App\Models\Result;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
 use App\Models\User;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Mail;
 
 beforeEach(function () {
@@ -310,4 +311,34 @@ it('абонатската версия рендерира без лична с�
     expect($html)->toContain('Отпиши се')
         ->and($html)->toContain('newsletter/unsubscribe/tok-render')
         ->and($html)->not->toContain('Твоята статистика');
+});
+
+describe('пращане в мига, в който резултатите дойдат', function () {
+    it('върви ежечасно, а не в един фиксиран неделен час', function () {
+        // Фиксираният час беше единствен изстрел: Jolpica закъснее ли, рекапът
+        // се пропуска, а следващият кръг го изяжда (подредба по най-нов).
+        $event = collect(app(Schedule::class)->events())
+            ->first(fn ($e) => str_contains((string) $e->command, 'f1:weekly-digest'));
+
+        expect($event)->not->toBeNull()
+            ->and($event->expression)->toBe('0 * * * *')
+            ->and($event->timezone)->toBe('Europe/Sofia');
+    });
+
+    it('мълчи посред нощ, за да не буди хората', function () {
+        $this->travelTo(Carbon\Carbon::parse('2026-09-07 03:00', 'Europe/Sofia'));
+
+        $this->artisan('f1:weekly-digest')
+            ->expectsOutputToContain('Извън приличния часови прозорец')
+            ->assertSuccessful();
+    });
+
+    it('--any-hour заобикаля прозореца за ръчно пускане', function () {
+        $this->travelTo(Carbon\Carbon::parse('2026-09-07 03:00', 'Europe/Sofia'));
+
+        // Стига до нормалните гардове, вместо да излезе на часа.
+        $this->artisan('f1:weekly-digest --any-hour')
+            ->doesntExpectOutputToContain('Извън приличния часови прозорец')
+            ->assertSuccessful();
+    });
 });
