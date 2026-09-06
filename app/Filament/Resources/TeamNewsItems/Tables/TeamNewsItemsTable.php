@@ -108,7 +108,7 @@ class TeamNewsItemsTable
                     ->label('Re-enrich')
                     ->icon('heroicon-o-arrow-path')
                     ->requiresConfirmation()
-                    ->modalDescription('Нулира ВСИЧКИ български полета (включително пълната статия и анализа) и връща статус "Чакаща". Следващият news:enrich цикъл ще ги генерира наново.')
+                    ->modalDescription('Нулира ВСИЧКИ български полета (включително пълната статия и анализа) и връща статус „Чакаща“. Следващият news:enrich цикъл ще ги генерира наново.')
                     ->action(fn (TeamNewsItem $record) => $record->update([
                         'title_bg' => null,
                         'summary_bg' => null,

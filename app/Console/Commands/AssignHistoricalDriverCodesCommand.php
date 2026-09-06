@@ -24,7 +24,7 @@ class AssignHistoricalDriverCodesCommand extends Command
         }
 
         $this->table(
-            ['Обновени реда', 'Нови кодове', 'Преизползвани', 'Колизии'],
+            ['Обновени редове', 'Нови кодове', 'Преизползвани', 'Колизии'],
             [[$stats['updated'], $stats['generated'], $stats['reused'], $stats['collisions']]],
         );
 

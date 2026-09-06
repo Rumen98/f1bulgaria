@@ -68,7 +68,7 @@ const goToSeason = (e) => {
                         <span v-if="team.first_year" class="text-zinc-600">·</span>
                         <span v-if="team.first_year" class="tabular-nums">{{ team.first_year }}–{{ team.last_year }}</span>
                         <span class="text-zinc-600">·</span>
-                        <span class="tabular-nums">{{ stats.wins }} победи</span>
+                        <span class="tabular-nums">{{ stats.wins }} {{ stats.wins === 1 ? 'победа' : 'победи' }}</span>
                     </div>
                     <p class="mt-3 max-w-2xl text-sm text-zinc-400">{{ team.description }}</p>
                 </div>

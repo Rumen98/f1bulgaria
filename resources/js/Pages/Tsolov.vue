@@ -98,7 +98,7 @@ const tsolovShare = computed(() => {
             </picture>
 
             <!-- Заглавието е запечено в дизайна на банера — h1 остава само за SEO/четци. -->
-            <h1 class="sr-only">{{ profile.name }} — Българската надежда във Формула 2</h1>
+            <h1 class="sr-only">{{ profile.name }} — българската надежда във Формула 2</h1>
         </section>
 
         <!-- Ключови факти под банера (бяха в overlay-а, сега не се бият с дизайна) -->
@@ -208,7 +208,7 @@ const tsolovShare = computed(() => {
                 </div>
                 <p class="mt-1.5 text-center text-xs text-zinc-500">
                     <template v-if="pointsGap === 0">Равни точки с {{ rivalName }}</template>
-                    <template v-else-if="tsolovLeads">Цолов води с {{ pointsGap }} точки</template>
+                    <template v-else-if="tsolovLeads">Цолов води с {{ pointsGap }} {{ pointsGap === 1 ? 'точка' : 'точки' }}</template>
                     <template v-else>Цолов изостава с {{ pointsGap }} точки от {{ rivalName }}</template>
                 </p>
             </div>

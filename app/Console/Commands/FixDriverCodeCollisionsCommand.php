@@ -22,7 +22,7 @@ class FixDriverCodeCollisionsCommand extends Command
         }
 
         $this->table(
-            ['Открити колизии', 'Преразпределени реда'],
+            ['Открити колизии', 'Преразпределени редове'],
             [[$stats['collisions'], $stats['reassigned']]],
         );
 

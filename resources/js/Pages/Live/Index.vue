@@ -105,7 +105,7 @@ const nextRaceCountdown = computed(() => {
     }
     const days = Math.floor(diff / 86400000);
     const hours = Math.floor((diff % 86400000) / 3600000);
-    return days > 0 ? `${days} дни ${hours} ч` : `${hours} ч`;
+    return days > 0 ? `${days} ${days === 1 ? 'ден' : 'дни'} ${hours} ч` : `${hours} ч`;
 });
 </script>
 

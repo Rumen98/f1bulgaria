@@ -71,7 +71,7 @@ class DriversController extends Controller
 
         app(Seo::class)
             ->title($displayName)
-            ->description("Статистика и кариера на {$displayName} във Формула 1 — победи, подиуми, поул позиции, класиране по сезони и резултати. ".DriverName::both($canonical->slug, $latin).'.')
+            ->description("Статистика и кариера на {$displayName} във Формула 1 — победи, подиуми, пол позиции, класиране по сезони и резултати. ".DriverName::both($canonical->slug, $latin).'.')
             ->image(filled($canonical->photo_url) ? $canonical->photo_url : null)
             ->canonical(route('drivers.show', $slug))
             ->schema([

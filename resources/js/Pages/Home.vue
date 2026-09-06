@@ -77,7 +77,7 @@ const restNews = computed(() => props.topNews.slice(1));
                     </template>
                     <template v-else>
                         <template v-if="predictionCta.deadline">
-                            Заключва се {{ predictionCta.deadline }}<template v-if="predictionCta.days > 0"> — остават {{ predictionCta.days }} дни</template>.
+                            Заключва се {{ predictionCta.deadline }}<template v-if="predictionCta.days > 0"> — {{ predictionCta.days === 1 ? 'остава 1 ден' : `остават ${predictionCta.days} дни` }}</template>.
                         </template>
                         Стигат ти три имена за подиума.
                     </template>

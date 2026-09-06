@@ -40,7 +40,7 @@ const posClass = (pos) => ({
                         <th class="px-4 py-2.5">Пилот</th>
                         <th class="px-4 py-2.5 text-center">Победи</th>
                         <th class="px-4 py-2.5 text-center">Pole</th>
-                        <th class="px-4 py-2.5 text-right">Старта</th>
+                        <th class="px-4 py-2.5 text-right">Стартове</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-800/60">
