@@ -34,7 +34,7 @@ class HomeController extends Controller
         $hero = $resolver->resolve();
 
         return Inertia::render('Home', [
-            'hero' => $this->heroProp($hero),
+            'hero' => $this->heroProp($hero, $locks),
             'liveSession' => $this->liveSession($openF1, $tokens),
             'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
             'topNews' => $this->topNews(),
@@ -185,9 +185,18 @@ class HomeController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function heroProp(HeroRaceContext $ctx): array
+    private function heroProp(HeroRaceContext $ctx, PredictionLockService $locks): array
     {
+        // Двата флага идват от ЧАСОВНИКА, не от резултатите. Победителят се
+        // появява чак когато Jolpica публикува, а тя закъснява — дотогава
+        // hero-то твърдеше „Уикендът тече" и канеше хората да прогнозират
+        // кръг, който вече е изкаран и заключен.
+        $raceStarted = $ctx->race?->race_datetime_utc !== null
+            && Carbon::now()->greaterThanOrEqualTo($ctx->race->race_datetime_utc);
+
         return [
+            'race_started' => $raceStarted,
+            'predictions_locked' => $ctx->race !== null && $locks->isLocked($ctx->race),
             'state' => $ctx->state->value,
             'circuit_slug' => $ctx->circuitSlug,
             'countdown_to' => $ctx->countdownTo?->toIso8601String(),

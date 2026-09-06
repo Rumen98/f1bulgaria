@@ -18,6 +18,19 @@ const ctaLabel = computed(() => {
         return 'Виж резултатите →';
     }
 
+    // ВАЖНО: не чакаме победителя. Той идва от Jolpica, която публикува със
+    // закъснение, и дотогава бутонът канеше да подадеш прогноза за кръг,
+    // който вече е изкаран. Часовникът знае истината веднага.
+    if (props.hero?.race_started) {
+        return 'Виж кръга →';
+    }
+
+    // Прогнозите се заключват 5 мин преди квалификацията. След това формата
+    // не приема — покана към нея е по-лоша от никаква покана.
+    if (props.hero?.predictions_locked) {
+        return 'Виж програмата →';
+    }
+
     return currentUser.value ? 'Подай прогноза →' : 'Прогнозирай подиума →';
 });
 
@@ -40,11 +53,23 @@ const trackSvg = computed(() => {
 const sessions = computed(() => props.hero?.sessions ?? []);
 const winner = computed(() => props.hero?.winner ?? null);
 
-const kicker = computed(() => ({
-    active: 'Уикендът тече',
-    upcoming: 'Следващо състезание',
-    off_season: 'Извън сезона',
-})[props.hero?.state] ?? '');
+const kicker = computed(() => {
+    // „Уикендът тече" стоеше и след финала, защото състоянието остава active
+    // до 5 часа след старта. Часът на състезанието е по-надежден от това
+    // дали резултатите вече са синхронизирани.
+    if (props.hero?.state === 'active') {
+        if (props.hero?.winner) {
+            return 'Уикендът приключи';
+        }
+
+        return props.hero?.race_started ? 'Състезанието тече' : 'Уикендът тече';
+    }
+
+    return {
+        upcoming: 'Следващо състезание',
+        off_season: 'Извън сезона',
+    }[props.hero?.state] ?? '';
+});
 
 const { days, hours, minutes, seconds, finished } = useCountdown(() => props.hero?.countdown_to ?? null);
 
