@@ -39,8 +39,7 @@
 
 @include('mail.partials.community')
 
-До скоро на пистата! 🏁<br>
-Екипът на Падок
+До скоро на пистата! 🏁<br> Екипът на Падок
 
 @if ($unsubscribeToken)
 <small>Получаваш този имейл като абонат на бюлетина на Падок. [Отпиши се]({{ route('newsletter.unsubscribe', $unsubscribeToken) }})</small>
