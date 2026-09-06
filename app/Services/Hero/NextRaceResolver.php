@@ -26,6 +26,18 @@ class NextRaceResolver
      */
     private const POST_RACE_HOURS = 5;
 
+    /**
+     * След колко часа от старта състезанието СИГУРНО е свършило.
+     *
+     * Регламентът дава максимум 2 часа каране и 3 часа общо със спиранията,
+     * тоест при 3 часа никога не твърдим „приключи", докато още се кара.
+     *
+     * Мери се по часовника нарочно. Победителят идва от Jolpica, а тя
+     * закъснява с часове — дотогава hero-то показваше „Състезанието тече"
+     * за кръг, изкаран отдавна. Часовникът знае истината веднага.
+     */
+    private const RACE_DURATION_HOURS = 3;
+
     public function resolve(): HeroRaceContext
     {
         $now = CarbonImmutable::now();
@@ -96,15 +108,27 @@ class NextRaceResolver
 
         $next = $upcoming->first();
 
+        $started = $this->raceStarted($race, $now);
+        $finished = $this->raceFinished($race, $now);
+
         return new HeroRaceContext(
             state: HeroState::Active,
             race: $race,
             circuitSlug: $race->jolpica_id,
             countdownTo: $next ? CarbonImmutable::parse($next->scheduled_at_utc) : null,
-            countdownLabel: $next ? $this->sessionLabel($next->type) : 'Уикендът е в ход',
+            // „Уикендът е в ход" стоеше и след финала, защото няма следваща
+            // сесия, към която да се брои.
+            countdownLabel: match (true) {
+                $next !== null => $this->sessionLabel($next->type),
+                $finished => 'Уикендът приключи',
+                $started => 'Състезанието тече',
+                default => 'Уикендът е в ход',
+            },
             nextSession: $next,
             sessions: $upcoming,
             winner: $this->winnerFor($race),
+            raceStarted: $started,
+            raceFinished: $finished,
         );
     }
 
@@ -134,6 +158,20 @@ class NextRaceResolver
             ->where('position', 1)
             ->with('driver')
             ->first()?->driver;
+    }
+
+    public function raceStarted(Race $race, CarbonImmutable $now): bool
+    {
+        return $race->race_datetime_utc !== null
+            && $now->greaterThanOrEqualTo($race->race_datetime_utc);
+    }
+
+    public function raceFinished(Race $race, CarbonImmutable $now): bool
+    {
+        return $race->race_datetime_utc !== null
+            && $now->greaterThanOrEqualTo(
+                CarbonImmutable::parse($race->race_datetime_utc)->addHours(self::RACE_DURATION_HOURS)
+            );
     }
 
     private function sessionLabel(SessionType $type): string

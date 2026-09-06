@@ -9,6 +9,7 @@ use App\Models\Season;
 use App\Models\TeamNewsItem;
 use App\Services\Hero\HeroRaceContext;
 use App\Services\Hero\NextRaceResolver;
+use App\Services\Hero\PostRaceWinnerResolver;
 use App\Services\Homepage\ThisDayInF1Service;
 use App\Services\LiveTiming\OpenF1Client;
 use App\Services\LiveTiming\OpenF1TokenManager;
@@ -185,17 +186,35 @@ class HomeController extends Controller
     /**
      * @return array<string, mixed>
      */
+    /**
+     * Име на победителя: от нашите резултати, иначе от OpenF1 след финала.
+     */
+    private function winnerName(HeroRaceContext $ctx): ?array
+    {
+        if ($ctx->winner !== null) {
+            return ['name' => DriverName::display($ctx->winner->slug, $ctx->winner->fullName())];
+        }
+
+        // Питаме OpenF1 само след като часовникът каже, че е свършило —
+        // иначе бихме дърпали класиране на още течащо състезание.
+        if (! $ctx->raceFinished || $ctx->race === null) {
+            return null;
+        }
+
+        $name = app(PostRaceWinnerResolver::class)->displayName($ctx->race);
+
+        return $name !== null ? ['name' => $name] : null;
+    }
+
     private function heroProp(HeroRaceContext $ctx, PredictionLockService $locks): array
     {
-        // Двата флага идват от ЧАСОВНИКА, не от резултатите. Победителят се
-        // появява чак когато Jolpica публикува, а тя закъснява — дотогава
-        // hero-то твърдеше „Уикендът тече" и канеше хората да прогнозират
-        // кръг, който вече е изкаран и заключен.
-        $raceStarted = $ctx->race?->race_datetime_utc !== null
-            && Carbon::now()->greaterThanOrEqualTo($ctx->race->race_datetime_utc);
-
+        // Флаговете идват от ЧАСОВНИКА, не от резултатите. Победителят се
+        // появява чак когато Jolpica публикува, а тя закъснява с часове —
+        // дотогава hero-то твърдеше „Състезанието тече" за кръг, изкаран
+        // отдавна, и канеше хората да прогнозират нещо заключено.
         return [
-            'race_started' => $raceStarted,
+            'race_started' => $ctx->raceStarted,
+            'race_finished' => $ctx->raceFinished,
             'predictions_locked' => $ctx->race !== null && $locks->isLocked($ctx->race),
             'state' => $ctx->state->value,
             'circuit_slug' => $ctx->circuitSlug,
@@ -219,9 +238,10 @@ class HomeController extends Controller
                 'at_sofia' => $s->scheduled_at_utc
                     ?->copy()->setTimezone('Europe/Sofia')->format('d.m H:i'),
             ])->values(),
-            'winner' => $ctx->winner
-                ? ['name' => DriverName::display($ctx->winner->slug, $ctx->winner->fullName())]
-                : null,
+            // Jolpica първо (авторитетна), OpenF1 само за да не чакаме часове
+            // с празно hero. И двете са само за показване — точките се
+            // начисляват единствено от синхрона с Jolpica.
+            'winner' => $this->winnerName($ctx),
         ];
     }
 }
