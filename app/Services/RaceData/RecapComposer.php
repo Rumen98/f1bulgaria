@@ -27,6 +27,9 @@ class RecapComposer
     /** Позиции, места и малки бройки, които са легитимни във всеки текст. */
     private const FREE_INTEGERS_UP_TO = 30;
 
+    /** Опити за разказа: вторият получава списък с отхвърлените числа. */
+    private const ATTEMPTS = 2;
+
     public function __construct(private readonly LlmClient $llm) {}
 
     /**
@@ -176,49 +179,61 @@ class RecapComposer
             $bullets,
         ));
 
-        try {
-            $response = $this->llm->completeWithTool(
-                $system,
-                $user,
-                'write_race_recap',
-                [
-                    'type' => 'object',
-                    'properties' => [
-                        'paragraphs' => [
-                            'type' => 'array',
-                            'items' => ['type' => 'string', 'maxLength' => 700],
-                            'minItems' => 3,
-                            'maxItems' => 3,
-                        ],
-                    ],
-                    'required' => ['paragraphs'],
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'paragraphs' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string', 'maxLength' => 700],
+                    'minItems' => 3,
+                    'maxItems' => 3,
                 ],
-                1024,
-            );
-        } catch (Throwable $e) {
-            Log::warning('Рекап: LLM разказът се провали, падаме към шаблон', ['error' => $e->getMessage()]);
+            ],
+            'required' => ['paragraphs'],
+        ];
 
-            return null;
+        // Два опита. Първият излиза празен изненадващо често, защото моделът
+        // смята нещо наум — сбор, разлика, средно — и полученото число го няма
+        // в подадените факти. Вместо да изхвърлим целия разказ, казваме му кое
+        // точно число е измислено и го караме да напише абзаца без него.
+        for ($attempt = 1; $attempt <= self::ATTEMPTS; $attempt++) {
+            try {
+                $response = $this->llm->completeWithTool($system, $user, 'write_race_recap', $schema, 1024);
+            } catch (Throwable $e) {
+                Log::warning('Рекап: LLM разказът се провали, падаме към шаблон', ['error' => $e->getMessage()]);
+
+                return null;
+            }
+
+            $paragraphs = array_values(array_filter(
+                array_map('trim', (array) ($response['input']['paragraphs'] ?? [])),
+                fn ($p) => is_string($p) && $p !== '',
+            ));
+
+            if (count($paragraphs) !== 3) {
+                Log::warning('Рекап: моделът върна друг брой абзаци', ['count' => count($paragraphs)]);
+
+                return null;
+            }
+
+            $invented = $this->inventedNumbers(implode(' ', $paragraphs), $facts);
+
+            if ($invented === []) {
+                return $paragraphs;
+            }
+
+            Log::warning('Рекап: моделът върна числа, които ги няма във фактите', [
+                'numbers' => $invented,
+                'attempt' => $attempt,
+            ]);
+
+            $user .= "\n\nПРЕДИШНИЯТ ТИ ОПИТ БЕШЕ ОТХВЪРЛЕН. Съдържаше числа, които ги няма във фактите: "
+                .implode(', ', $invented)
+                .'. Не смятай нищо наум — нито сборове, нито разлики, нито средни. Ползвай само числата, изброени по-горе, '
+                .'а където ти трябва друго, го опиши с думи.';
         }
 
-        $paragraphs = array_values(array_filter(
-            array_map('trim', (array) ($response['input']['paragraphs'] ?? [])),
-            fn ($p) => is_string($p) && $p !== '',
-        ));
-
-        if (count($paragraphs) !== 3) {
-            return null;
-        }
-
-        $invented = $this->inventedNumbers(implode(' ', $paragraphs), $facts);
-
-        if ($invented !== []) {
-            Log::warning('Рекап: моделът върна числа, които ги няма във фактите', ['numbers' => $invented]);
-
-            return null;
-        }
-
-        return $paragraphs;
+        return null;
     }
 
     /**

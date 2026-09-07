@@ -7,6 +7,7 @@ namespace App\Services\RaceData;
 use App\Services\LiveTiming\OpenF1Client;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -47,6 +48,13 @@ class LapTelemetryBuilder
         $laps = $this->chosenLaps($bundle);
 
         if ($laps === []) {
+            // Тихото отпадане на телеметрията беше реален проблем на прода:
+            // двете най-ефектни графики липсваха, а в лога нямаше нищо.
+            Log::warning('Телеметрия: няма обиколка с date_start и валидно време', [
+                'session' => $keys->race,
+                'laps' => $bundle->laps->count(),
+            ]);
+
             return ['telemetry' => [], 'track_map' => null];
         }
 
@@ -63,9 +71,16 @@ class LapTelemetryBuilder
 
             $to = $from->copy()->addSeconds((float) $lap['lap_duration'] + self::TAIL_SECONDS);
 
-            $car = $this->client->getCarData($keys->race, $driver, $from->toIso8601String(), $to->toIso8601String());
+            $car = $this->client->getCarData($keys->race, $driver, $from, $to);
 
             if ($car->count() < 20) {
+                Log::warning('Телеметрия: car_data върна твърде малко записи', [
+                    'session' => $keys->race,
+                    'driver' => $driver,
+                    'lap' => $lap['lap_number'] ?? null,
+                    'records' => $car->count(),
+                ]);
+
                 continue;
             }
 
@@ -82,7 +97,15 @@ class LapTelemetryBuilder
                 'points' => $this->resample($samples),
             ];
 
-            $location = $this->client->getLocation($keys->race, $driver, $from->toIso8601String(), $to->toIso8601String());
+            $location = $this->client->getLocation($keys->race, $driver, $from, $to);
+
+            if ($location->count() < 20) {
+                Log::info('Телеметрия: location върна твърде малко записи — картата по скорост отпада', [
+                    'session' => $keys->race,
+                    'driver' => $driver,
+                    'records' => $location->count(),
+                ]);
+            }
 
             if ($location->count() >= 20) {
                 $paths[] = [

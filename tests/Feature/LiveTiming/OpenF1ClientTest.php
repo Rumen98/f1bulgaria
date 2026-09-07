@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Services\LiveTiming\OpenF1Client;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -126,4 +127,58 @@ it('НЕ праща Authorization когато няма кредитали', fun
     client()->getLatestLaps(9999);
 
     Http::assertSent(fn ($request) => ! $request->hasHeader('Authorization'));
+});
+
+it('праща оператора в името на параметъра, без да го кодира двойно', function () {
+    Http::fake(['*car_data*' => Http::response([])]);
+
+    client()->getCarData(
+        11361,
+        12,
+        Carbon::parse('2026-09-06T14:53:23+00:00'),
+        Carbon::parse('2026-09-06T14:54:47+00:00'),
+    );
+
+    Http::assertSent(function ($request) {
+        $url = urldecode((string) $request->url());
+
+        // http_build_query превръщаше „date>=" в „date%3E%3D=" — с още едно
+        // кодирано равно — и OpenF1 връщаше 404. Заявката трябва да носи
+        // оператора точно веднъж.
+        return str_contains($url, 'date>=2026-09-06T14:53:23Z')
+            && str_contains($url, 'date<=2026-09-06T14:54:47Z')
+            && ! str_contains($url, '>==');
+    });
+});
+
+it('превежда часовете в UTC, преди да ги прати', function () {
+    Http::fake(['*location*' => Http::response([])]);
+
+    client()->getLocation(
+        11361,
+        12,
+        Carbon::parse('2026-09-06T17:53:23+03:00'),
+        Carbon::parse('2026-09-06T17:54:47+03:00'),
+    );
+
+    // Софийско 17:53 е 14:53 UTC. Часовата зона не бива да се качва в „+",
+    // защото в query низ това значи интервал.
+    Http::assertSent(fn ($request) => str_contains(urldecode((string) $request->url()), 'date>=2026-09-06T14:53:23Z'));
+});
+
+it('повтаря при 429 и се отказва след третия опит', function () {
+    Http::fake(['*stints*' => Http::response('rate limited', 429)]);
+
+    expect(client()->getFinishedStints(11361))->toBeEmpty();
+
+    // Три опита общо — повече само удължават агонията.
+    Http::assertSentCount(3);
+});
+
+it('не повтаря при 404 — то няма да се оправи от само себе си', function () {
+    Http::fake(['*stints*' => Http::response('not found', 404)]);
+
+    expect(client()->getFinishedStints(11361))->toBeEmpty();
+
+    Http::assertSentCount(1);
 });

@@ -20,6 +20,34 @@ use Throwable;
  */
 class OpenF1Client
 {
+    /** Опити при 429. Повече от три само удължават агонията. */
+    private const MAX_ATTEMPTS = 3;
+
+    /** Изчакване след 429, умножено по номера на опита. */
+    private const RETRY_BACKOFF_MS = 1500;
+
+    /**
+     * Най-малкото разстояние между две заявки.
+     *
+     * Лимитът на OpenF1 е 3 заявки/сек на безплатния тир и 6 на платения. Един
+     * рекап прави шестнайсет заявки за секунди и без това разстояние ги
+     * изстрелва наведнъж — точно това докара 429 на championship_drivers,
+     * championship_teams и intervals при първото пускане на прода.
+     *
+     * Стойността е с резерв и струва под четири секунди на рекап.
+     */
+    private const MIN_INTERVAL_MS = 220;
+
+    /**
+     * Кога тръгна последната заявка, за целия процес.
+     *
+     * Статично нарочно: клиентът не е singleton и в един рекап участват по
+     * няколко негови копия (fetcher, telemetry builder). Ако разстоянието се
+     * пазеше в инстанция, всяко копие щеше да брои отделно и лимитът пак щеше
+     * да се удря.
+     */
+    private static ?float $lastRequestAt = null;
+
     private string $baseUrl;
 
     private int $timeout;
@@ -357,7 +385,7 @@ class OpenF1Client
      *
      * @return Collection<int, array<string, mixed>>
      */
-    public function getCarData(int $sessionKey, int $driverNumber, string $from, string $to): Collection
+    public function getCarData(int $sessionKey, int $driverNumber, Carbon $from, Carbon $to): Collection
     {
         return $this->window('car_data', $sessionKey, $driverNumber, $from, $to);
     }
@@ -372,7 +400,7 @@ class OpenF1Client
      *
      * @return Collection<int, array<string, mixed>>
      */
-    public function getLocation(int $sessionKey, int $driverNumber, string $from, string $to): Collection
+    public function getLocation(int $sessionKey, int $driverNumber, Carbon $from, Carbon $to): Collection
     {
         return $this->window('location', $sessionKey, $driverNumber, $from, $to);
     }
@@ -411,16 +439,29 @@ class OpenF1Client
      *
      * @return Collection<int, array<string, mixed>>
      */
-    private function window(string $endpoint, int $sessionKey, int $driverNumber, string $from, string $to): Collection
+    private function window(string $endpoint, int $sessionKey, int $driverNumber, Carbon $from, Carbon $to): Collection
     {
-        $key = "openf1:hist:{$endpoint}:{$sessionKey}:{$driverNumber}:".md5($from.$to);
+        // Query-то се сглобява РЪЧНО и се подава като низ. Причината е конкретна
+        // и струваше един тих провал на прода: операторът е част от ИМЕТО на
+        // параметъра („date>="), а http_build_query го кодира до „date%3E%3D=",
+        // тоест с още едно кодирано равно. OpenF1 не разпознава това име и
+        // връща 404 — телеметрията и картата по скорост просто липсваха.
+        //
+        // Подаден като низ, Guzzle не пипа заявката отвъд „>“ → „%3E“, което
+        // API-то декодира правилно. Часовете са в Zulu формат, за да няма „+“
+        // в стойността.
+        $stamp = fn (Carbon $at): string => $at->utc()->format('Y-m-d\TH:i:s\Z');
+        $query = sprintf(
+            'session_key=%d&driver_number=%d&date>=%s&date<=%s',
+            $sessionKey,
+            $driverNumber,
+            $stamp($from),
+            $stamp($to),
+        );
 
-        return $this->remembered($key, fn () => $this->get($endpoint, [
-            'session_key' => $sessionKey,
-            'driver_number' => $driverNumber,
-            'date>=' => $from,
-            'date<=' => $to,
-        ])
+        $key = "openf1:hist:{$endpoint}:{$sessionKey}:{$driverNumber}:".md5($query);
+
+        return $this->remembered($key, fn () => $this->get($endpoint, $query)
             ->filter(fn ($r) => is_array($r) && isset($r['date']))
             ->values());
     }
@@ -464,41 +505,91 @@ class OpenF1Client
     /**
      * Изпълнява GET заявка защитено. Връща празна колекция при всяка грешка.
      *
-     * @param  array<string, mixed>  $query
+     * `$query` може да е масив (обичайният случай) или готов НИЗ — низът се
+     * ползва там, където операторът е част от името на параметъра и не бива да
+     * минава през http_build_query. Виж window().
+     *
+     * @param  array<string, mixed>|string  $query
      * @return Collection<int, mixed>
      */
-    private function get(string $endpoint, array $query): Collection
+    private function get(string $endpoint, array|string $query): Collection
     {
         try {
-            $request = Http::acceptJson()->timeout($this->timeout);
+            for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
+                $this->throttle();
 
-            // OpenF1 изисква OAuth2 Bearer токен по време на живи сесии (иначе 401).
-            $token = $this->tokens->getToken();
-            if ($token !== null) {
-                $request = $request->withToken($token);
+                $request = Http::acceptJson()->timeout($this->timeout);
+
+                // OpenF1 изисква OAuth2 Bearer токен по време на живи сесии (иначе 401).
+                $token = $this->tokens->getToken();
+                if ($token !== null) {
+                    $request = $request->withToken($token);
+                }
+
+                $response = $request->get("{$this->baseUrl}/{$endpoint}", $query);
+
+                // 401 → токенът може да е изтекъл; изчистваме го за следващия опит.
+                if ($response->status() === 401) {
+                    $this->tokens->forget();
+                }
+
+                // 429 е единственото, което си струва да се повтори: рекапът
+                // прави шестнайсет заявки за секунди и лимитът е 6/сек.
+                // Останалите грешки няма да се оправят от само себе си.
+                if ($response->status() === 429 && $attempt < self::MAX_ATTEMPTS) {
+                    usleep(self::RETRY_BACKOFF_MS * $attempt * 1000);
+
+                    continue;
+                }
+
+                if (! $response->successful()) {
+                    Log::warning('OpenF1 заявка неуспешна', [
+                        'endpoint' => $endpoint,
+                        'status' => $response->status(),
+                        'attempts' => $attempt,
+                    ]);
+
+                    return collect();
+                }
+
+                $data = $response->json();
+
+                return is_array($data) ? collect($data) : collect();
             }
 
-            $response = $request->get("{$this->baseUrl}/{$endpoint}", $query);
-
-            // 401 → токенът може да е изтекъл; изчистваме го за следващия опит.
-            if ($response->status() === 401) {
-                $this->tokens->forget();
-            }
-
-            if (! $response->successful()) {
-                Log::warning('OpenF1 заявка неуспешна', ['endpoint' => $endpoint, 'status' => $response->status()]);
-
-                return collect();
-            }
-
-            $data = $response->json();
-
-            return is_array($data) ? collect($data) : collect();
+            return collect();
         } catch (Throwable $e) {
             Log::warning('OpenF1 заявка хвърли изключение', ['endpoint' => $endpoint, 'error' => $e->getMessage()]);
 
             return collect();
         }
+    }
+
+    /**
+     * Разрежда заявките, за да не се удря лимитът на OpenF1.
+     *
+     * Изчаква само толкова, колкото не е минало от предишната заявка — при
+     * бавен отговор изобщо не спи.
+     */
+    private function throttle(): void
+    {
+        // В тестовете заявките са фалшиви и няма кой да ни ограничи — спането
+        // там само удължава набора (наблюдавано: 5 секунди стават 70).
+        if (app()->runningUnitTests()) {
+            return;
+        }
+
+        $interval = self::MIN_INTERVAL_MS / 1000;
+
+        if (self::$lastRequestAt !== null) {
+            $elapsed = microtime(true) - self::$lastRequestAt;
+
+            if ($elapsed < $interval) {
+                usleep((int) (($interval - $elapsed) * 1_000_000));
+            }
+        }
+
+        self::$lastRequestAt = microtime(true);
     }
 
     private function parseDate(?string $value): ?Carbon
