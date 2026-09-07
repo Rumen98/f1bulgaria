@@ -125,9 +125,14 @@ class LapTelemetryBuilder
      * телеметрията става, а картата не.
      *
      * Затова при празен отговор се пробва още веднъж — с най-бързата обиколка
-     * от ПЪРВАТА половина на състезанието, където покритието почти винаги го
+     * от ПЪРВАТА половина на състезанието, където покритието обикновено го
      * има. Един допълнителен опит, не повече: всяка заявка струва секунда
      * заради разстоянието срещу лимита.
+     *
+     * Резервният вариант не спасява всичко и това е приемливо. Монако 2026
+     * например има 50-минутна дупка от 13:09:42 — реалното покритие през
+     * състезанието е около седем минути и никоя разумна евристика няма да го
+     * налучка. Тогава картата просто липсва, а логът казва защо.
      *
      * @param  array<string, mixed>  $lap
      * @param  array<int, array<string, mixed>>  $samples
@@ -162,7 +167,7 @@ class LapTelemetryBuilder
                 ];
             }
 
-            Log::info('Телеметрия: location няма записи за тази обиколка', [
+            Log::warning('Телеметрия: location няма записи за тази обиколка', [
                 'session' => $keys->race,
                 'driver' => $driver,
                 'lap' => $candidate['lap_number'] ?? null,
@@ -210,8 +215,20 @@ class LapTelemetryBuilder
         }
 
         $to = $from->copy()->addSeconds((float) $lap['lap_duration'] + self::TAIL_SECONDS);
+        $car = $this->client->getCarData($keys->race, $driver, $from, $to);
 
-        return $this->withDistance($this->client->getCarData($keys->race, $driver, $from, $to));
+        if ($car->isEmpty()) {
+            // Без скорости няма с какво да се оцвети линията и картата отпада
+            // мълчаливо. Логва се, защото това е втората най-честа причина да
+            // липсва — след липсващите позиции.
+            Log::warning('Телеметрия: няма скорости за резервната обиколка', [
+                'session' => $keys->race,
+                'driver' => $driver,
+                'lap' => $lap['lap_number'] ?? null,
+            ]);
+        }
+
+        return $this->withDistance($car);
     }
 
     /**
