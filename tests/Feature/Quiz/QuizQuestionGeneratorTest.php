@@ -145,3 +145,86 @@ it('top-up генерира при изтънял басейн', function () {
 
     expect(QuizQuestion::query()->count())->toBe(3);
 });
+
+it('дописва на кръгове, докато стигне искания брой записани', function () {
+    config(['quiz.generate_batch' => 10, 'quiz.generate_max_rounds' => 3]);
+
+    $draftPrompts = [];
+
+    $llm = $this->mock(LlmClient::class);
+    $llm->shouldReceive('completeWithTool')
+        ->withArgs(function (...$args) use (&$draftPrompts) {
+            if ($args[2] !== 'draft_quiz_questions') {
+                return false;
+            }
+
+            $draftPrompts[] = $args[1];
+
+            return true;
+        })
+        ->andReturn(
+            draftResponse([
+                candidate(),
+                candidate([
+                    'question' => 'Колко завоя има пистата в Монако?',
+                    'options' => ['12', '15', '19', '23'],
+                    'correct_option' => 3,
+                ]),
+            ]),
+            draftResponse([
+                candidate([
+                    'question' => 'Кой е първият световен шампион във Формула 1?',
+                    'options' => ['Джузепе Фарина', 'Хуан Мануел Фанджо', 'Алберто Аскари', 'Майк Хоторн'],
+                    'correct_option' => 1,
+                ]),
+            ]),
+        );
+
+    $llm->shouldReceive('completeWithTool')
+        ->withArgs(fn (...$args) => $args[2] === 'answer_quiz_question')
+        ->andReturn(
+            verifierResponse(2), verifierResponse(2),   // първи кандидат: минава
+            verifierResponse(1),                        // втори: проверителят сочи друго → отказ
+            verifierResponse(1), verifierResponse(1),   // трети (втори кръг): минава
+        );
+
+    $this->artisan('padok:generate-quiz-questions', ['--count' => 2])->assertSuccessful();
+
+    expect(QuizQuestion::query()->count())->toBe(2)
+        ->and($draftPrompts)->toHaveCount(2)
+        // Отпадналият въпрос не е в базата — вторият кръг трябва да го получи
+        // изрично, иначе моделът го предлага пак и се плаща за същия отказ.
+        ->and($draftPrompts[1])->toContain('Колко завоя има пистата в Монако?');
+});
+
+it('спира веднага, ако кръгът върне нула чернови', function () {
+    config(['quiz.generate_max_rounds' => 4]);
+
+    $llm = $this->mock(LlmClient::class);
+    $llm->shouldReceive('completeWithTool')->once()
+        ->withArgs(fn (...$args) => $args[2] === 'draft_quiz_questions')
+        ->andReturn(draftResponse([]));
+
+    $this->artisan('padok:generate-quiz-questions', ['--count' => 3])->assertSuccessful();
+
+    expect(QuizQuestion::query()->count())->toBe(0);
+});
+
+it('top-up иска само липсващото до целта, не цял пакет', function () {
+    config(['quiz.pool_target' => 12, 'quiz.generate_batch' => 10, 'quiz.generate_max_rounds' => 1]);
+    QuizQuestion::factory()->count(11)->create();
+
+    $llm = $this->mock(LlmClient::class);
+    $llm->shouldReceive('completeWithTool')->once()
+        ->withArgs(fn (...$args) => $args[2] === 'draft_quiz_questions'
+            // липсва 1 → искаме 2 чернови с резерв, не 10
+            && str_contains($args[1], 'Напиши 2 нови въпроса'))
+        ->andReturn(draftResponse([candidate()]));
+    $llm->shouldReceive('completeWithTool')->twice()
+        ->withArgs(fn (...$args) => $args[2] === 'answer_quiz_question')
+        ->andReturn(verifierResponse(2));
+
+    $this->artisan('padok:generate-quiz-questions', ['--top-up' => true])->assertSuccessful();
+
+    expect(QuizQuestion::query()->count())->toBe(12);
+});

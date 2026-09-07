@@ -33,24 +33,34 @@ class QuizQuestionGenerator
     public function __construct(private readonly LlmClient $llm) {}
 
     /**
-     * @return array{drafted:int, saved:int, rejected:int, duplicates:int, reasons:array<int, string>}
+     * ЕДИН кръг: изважда $count чернови и записва оцелелите. Дали трябва още
+     * един кръг решава командата — виж GenerateQuizQuestionsCommand.
+     *
+     * @param  array<int, string>  $avoid  Въпроси, отпаднали в предишен кръг. Те не
+     *                                     влизат в базата, затова без този списък
+     *                                     моделът предлага същите отново.
+     * @return array{drafted:int, saved:int, rejected:int, duplicates:int, reasons:array<int, string>, tried:array<int, string>}
      */
-    public function generate(int $count): array
+    public function generate(int $count, array $avoid = []): array
     {
-        $stats = ['drafted' => 0, 'saved' => 0, 'rejected' => 0, 'duplicates' => 0, 'reasons' => []];
+        $stats = ['drafted' => 0, 'saved' => 0, 'rejected' => 0, 'duplicates' => 0, 'reasons' => [], 'tried' => []];
 
         $existing = QuizQuestion::query()->pluck('question');
         $existingNormalized = $existing
             ->map(fn (string $q) => $this->normalize($q))
             ->flip();
 
-        $candidates = $this->draft($count, $existing->all());
+        $candidates = $this->draft($count, [...$existing->all(), ...$avoid]);
         $stats['drafted'] = count($candidates);
 
         foreach ($candidates as $candidate) {
             if (! $this->isWellFormed($candidate)) {
                 $stats['rejected']++;
                 $stats['reasons'][] = 'невалидна структура: '.($candidate['question'] ?? '(без въпрос)');
+
+                if (filled($candidate['question'] ?? null)) {
+                    $stats['tried'][] = (string) $candidate['question'];
+                }
 
                 continue;
             }
@@ -66,6 +76,7 @@ class QuizQuestionGenerator
             if ($verdict !== null) {
                 $stats['rejected']++;
                 $stats['reasons'][] = "{$candidate['question']} — {$verdict}";
+                $stats['tried'][] = (string) $candidate['question'];
 
                 continue;
             }
