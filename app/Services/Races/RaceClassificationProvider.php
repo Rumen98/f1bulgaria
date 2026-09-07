@@ -90,7 +90,7 @@ class RaceClassificationProvider
 
     public function raceName(Race $race): string
     {
-        return $this->raceNames->localize($race->jolpica_id, $race->name);
+        return $this->raceNames->forRace($race);
     }
 
     /**

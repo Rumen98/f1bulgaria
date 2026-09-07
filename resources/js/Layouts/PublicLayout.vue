@@ -27,6 +27,10 @@ const primaryNav = [
     { label: 'Новини', route: 'news.index' },
     { label: 'Календар', route: 'calendar' },
     { label: 'Класиране', route: 'standings' },
+    // „Данни" стои до класирането, защото отговаря на следващия въпрос след
+    // резултата: защо е станало така. В „Енциклопедия" би се загубило —
+    // материалът има срок и се чете в дните след кръга.
+    { label: 'Данни', route: 'racedata.index', feature: 'data_recap' },
     // Prediction league-ът е ядро на общността — стои в основната лента.
     { label: 'Прогнози', route: 'leaderboard' },
     { label: 'Куиз', route: 'quiz', feature: 'quiz' },
@@ -42,6 +46,8 @@ const secondaryNav = [
     { label: 'Сравни', route: 'compare.index', feature: 'compare' },
     { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'История', route: 'history', feature: 'history' },
+    // „Инженерство" стои до „Речник": и двете обясняват, вместо да отчитат.
+    { label: 'Инженерство', route: 'engineering.index', feature: 'engineering' },
     { label: 'Речник', route: 'terminology' },
 ];
 
@@ -69,6 +75,7 @@ const footerColumns = computed(() => [
             { label: 'Новини', route: 'news.index' },
             { label: 'Календар', route: 'calendar' },
             { label: 'Класиране', route: 'standings' },
+            { label: 'Данни', route: 'racedata.index', feature: 'data_recap' },
             { label: 'На живо', route: 'live', feature: 'live_timing', liveOnly: true },
             { label: 'Формула 2', route: 'f2', feature: 'f2' },
         ].filter(visible),
@@ -82,6 +89,7 @@ const footerColumns = computed(() => [
             { label: 'Сравни', route: 'compare.index', feature: 'compare' },
             { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
             { label: 'История', route: 'history', feature: 'history' },
+            { label: 'Инженерство', route: 'engineering.index', feature: 'engineering' },
             { label: 'Речник', route: 'terminology' },
         ].filter(visible),
     },

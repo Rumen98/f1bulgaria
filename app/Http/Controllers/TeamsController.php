@@ -168,7 +168,7 @@ class TeamsController extends Controller
             ->limit(5)
             ->get()
             ->map(fn (Race $race) => [
-                'race' => app(RaceNameLocalizer::class)->localize($race->jolpica_id, $race->name),
+                'race' => app(RaceNameLocalizer::class)->forRace($race),
                 // id и slug пътуват, за да станат редовете линкове — иначе
                 // страницата на отбор е сляпа улица към състезания и пилоти.
                 'race_id' => $race->id,

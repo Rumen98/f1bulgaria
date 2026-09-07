@@ -12,6 +12,8 @@ dataset('v2 routes', [
     'f2' => ['/f2', 'f2'],
     'history' => ['/istoria', 'history'],
     'rivalries' => ['/rivalries', 'rivalries'],
+    'data_recap' => ['/danni', 'data_recap'],
+    'engineering' => ['/inzhenerstvo', 'engineering'],
 ]);
 
 it('връща 404 за V2 рут при изключен флаг', function (string $url, string $flag) {

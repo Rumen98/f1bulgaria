@@ -8,6 +8,7 @@ use App\Http\Controllers\CircuitsController;
 use App\Http\Controllers\CommentsController;
 use App\Http\Controllers\CompareController;
 use App\Http\Controllers\DriversController;
+use App\Http\Controllers\EngineeringController;
 use App\Http\Controllers\F2CalendarController;
 use App\Http\Controllers\F2Controller;
 use App\Http\Controllers\F2DriversController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicProfileController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\RaceController;
+use App\Http\Controllers\RaceDataController;
 use App\Http\Controllers\RivalriesController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StandingsController;
@@ -112,6 +114,22 @@ Route::middleware('feature:rivalries')->group(function () {
         Route::post('/rivalries', [RivalriesController::class, 'store'])->name('rivalries.store');
     });
     Route::get('/rivalries/{slug}', [RivalriesController::class, 'show'])->name('rivalries.show');
+});
+
+// „Инженерство“ — обяснителната рубрика за техниката. Съдържанието е в
+// config/engineering-content.php, затова няма нито модел, нито таблица.
+Route::middleware('feature:engineering')->group(function () {
+    Route::get('/inzhenerstvo', [EngineeringController::class, 'index'])->name('engineering.index');
+    Route::get('/inzhenerstvo/{slug}', [EngineeringController::class, 'show'])
+        ->where('slug', '[a-z0-9-]+')
+        ->name('engineering.show');
+});
+
+// „Данни“ — рекапът от OpenF1 след всяко състезание. Латиница-транслитерация
+// на адреса, както /terminologiya, /istoria и /tarsene.
+Route::middleware('feature:data_recap')->group(function () {
+    Route::get('/danni', [RaceDataController::class, 'index'])->name('racedata.index');
+    Route::get('/danni/{race}', [RaceDataController::class, 'show'])->name('racedata.show');
 });
 
 Route::middleware('feature:quiz')->group(function () {

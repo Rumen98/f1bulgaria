@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\ConstructorCanonical;
 use App\Models\DriverCanonical;
 use App\Models\Race;
+use App\Models\RaceDataRecap;
 use App\Models\Rivalry;
 use App\Models\TeamNewsItem;
 use Carbon\CarbonInterface;
@@ -98,6 +99,8 @@ class GenerateSitemapCommand extends Command
             'f2' => ['f2'],
             'live_timing' => ['live'],
             'quiz' => ['quiz'],
+            'data_recap' => ['racedata.index'],
+            'engineering' => ['engineering.index'],
         ];
         foreach ($featureStatic as $flag => $routes) {
             if (config("features.{$flag}")) {
@@ -132,6 +135,23 @@ class GenerateSitemapCommand extends Command
             $urls = $urls->concat(
                 Rivalry::query()->pluck('slug')
                     ->map(fn ($s) => ['loc' => route('rivalries.show', $s), 'lastmod' => null])
+            );
+        }
+        if (config('features.engineering')) {
+            $urls = $urls->concat(
+                collect(config('engineering-content.topics', []))
+                    ->map(fn (array $t) => ['loc' => route('engineering.show', $t['slug']), 'lastmod' => null])
+            );
+        }
+        if (config('features.data_recap')) {
+            // Само готовите: рут без рекап връща 404 и не бива да влиза в
+            // sitemap-а — това е точно сигналът, който хаби crawl бюджет.
+            $urls = $urls->concat(
+                RaceDataRecap::query()->ready()->get(['race_id', 'updated_at'])
+                    ->map(fn (RaceDataRecap $r) => [
+                        'loc' => route('racedata.show', $r->race_id),
+                        'lastmod' => $r->updated_at,
+                    ])
             );
         }
 

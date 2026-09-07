@@ -23,6 +23,8 @@ const props = defineProps({
     preview: { type: Object, default: null },
     neighbours: { type: Object, default: () => ({ prev: null, next: null }) },
     otherPredictions: { type: Array, default: () => [] },
+    // Има ли готов анализ на данните за този кръг (страницата му е /danni/{race}).
+    hasDataRecap: { type: Boolean, default: false },
 });
 
 const user = computed(() => usePage().props.auth?.user);
@@ -115,6 +117,20 @@ const showsTime = computed(() => active.value?.rows.some((r) => r.time));
                         </tbody>
                     </table>
                 </TableShell>
+
+                <!-- Класацията казва КОЙ е спечелил; анализът казва защо.
+                     Линк, не втора секция: графиките искат цялата ширина. -->
+                <Link
+                    v-if="hasDataRecap && hasRoute('racedata.show')"
+                    :href="route('racedata.show', race.id)"
+                    class="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 transition duration-200 hover:border-red-600/50 hover:bg-zinc-900"
+                >
+                    <span>
+                        <span class="block font-medium text-white">Какво казват данните</span>
+                        <span class="block text-sm text-zinc-500">Стратегии, темпо по обиколки и спечелени позиции</span>
+                    </span>
+                    <span class="shrink-0 text-red-500" aria-hidden="true">→</span>
+                </Link>
             </div>
 
             <aside class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">

@@ -121,7 +121,7 @@ class DriversController extends Controller
                     // Българското име и id-то на кръга: дотук таблицата
                     // показваше английско име и не водеше никъде.
                     'race' => $r->race
-                        ? app(RaceNameLocalizer::class)->localize($r->race->jolpica_id, $r->race->name)
+                        ? app(RaceNameLocalizer::class)->forRace($r->race)
                         : null,
                     'race_id' => $r->race?->id,
                     'position' => $r->position,

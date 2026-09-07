@@ -211,6 +211,256 @@ class OpenF1Client
         });
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Исторически данни (приключила сесия)
+    |--------------------------------------------------------------------------
+    |
+    | OpenF1 смята данните за „живи“ от 30 минути преди началото до 30 минути
+    | след края на сесия. Извън този прозорец те са исторически: безплатни, без
+    | автентикация и НЕИЗМЕННИ. Затова методите тук ползват 24-часов кеш вместо
+    | секундите на живите — рекапът се сглобява веднъж и повторното пускане на
+    | командата не хаби лимита (3 заявки/сек, 30/мин на безплатния тир).
+    |
+    | Не ползвай тези методи по време на сесия: ще заключат стар отговор за цял
+    | ден. За живото има отделни методи по-горе.
+    |
+    */
+
+    /**
+     * Обиколките на приключила сесия — същият endpoint като getLatestLaps(),
+     * но с дълъг кеш и отделен ключ.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getFinishedLaps(int $sessionKey): Collection
+    {
+        return $this->historical('laps', $sessionKey, fn ($r) => isset($r['driver_number'], $r['lap_number']));
+    }
+
+    /**
+     * Стинтовете на приключила сесия (състав, начална и крайна обиколка,
+     * възраст на гумата при поставяне).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getFinishedStints(int $sessionKey): Collection
+    {
+        return $this->historical('stints', $sessionKey, fn ($r) => isset($r['driver_number']));
+    }
+
+    /**
+     * Пилотите в сесията — име, номер, отбор и цвят на отбора (hex без диез).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getFinishedDrivers(int $sessionKey): Collection
+    {
+        return $this->historical('drivers', $sessionKey, fn ($r) => isset($r['driver_number']));
+    }
+
+    /**
+     * Влизания в пит лейна.
+     *
+     * ВНИМАНИЕ: през сезон 2026 `stop_duration` е null навсякъде — времето на
+     * стоене не съществува в данните. `lane_duration` (цялото време в лейна) е
+     * налично, но е замърсено от червени флагове: реалните стойности са 12-35
+     * секунди, а спрелите зад червен флаг излизат с хиляди. Филтрирай.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getPitStops(int $sessionKey): Collection
+    {
+        return $this->historical('pit', $sessionKey, fn ($r) => isset($r['driver_number'], $r['lap_number']));
+    }
+
+    /**
+     * Съобщенията на дирекцията — safety car, флагове, наказания.
+     *
+     * Оттук излизат прозорците на неутрализация, които всички останали графики
+     * трябва да изрежат: обиколка зад safety car не е показател за темпо.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getRaceControl(int $sessionKey): Collection
+    {
+        return $this->historical('race_control', $sessionKey, fn ($r) => isset($r['date']));
+    }
+
+    /**
+     * Метеото над пистата — по един запис в минута, покрива и часа преди старта.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getWeather(int $sessionKey): Collection
+    {
+        return $this->historical('weather', $sessionKey, fn ($r) => isset($r['date']));
+    }
+
+    /**
+     * Стартовата решетка.
+     *
+     * ВНИМАНИЕ: пита се със session_key на КВАЛИФИКАЦИЯТА, не на състезанието —
+     * с ключа на състезанието endpoint-ът връща празно.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getStartingGrid(int $qualifyingSessionKey): Collection
+    {
+        return $this->historical('starting_grid', $qualifyingSessionKey, fn ($r) => isset($r['driver_number']));
+    }
+
+    /**
+     * Смени на позиции по време на състезанието.
+     *
+     * Наборът включва и размени от питстопове и наказания след финала, затова
+     * не го наричай „изпреварвания“ пред потребителя.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getOvertakes(int $sessionKey): Collection
+    {
+        return $this->historical('overtakes', $sessionKey, fn ($r) => isset($r['overtaking_driver_number']));
+    }
+
+    /**
+     * Шампионатът при пилотите преди и след състезанието (beta endpoint).
+     * Съществува само за състезателни сесии.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getChampionshipDrivers(int $sessionKey): Collection
+    {
+        return $this->historical('championship_drivers', $sessionKey, fn ($r) => isset($r['driver_number']));
+    }
+
+    /**
+     * Шампионатът при конструкторите преди и след състезанието (beta endpoint).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getChampionshipTeams(int $sessionKey): Collection
+    {
+        return $this->historical('championship_teams', $sessionKey, fn ($r) => isset($r['team_name']));
+    }
+
+    /**
+     * Телеметрия на болида в ТЕСЕН времеви прозорец — скорост, газ, спирачка,
+     * предавка, обороти на ~3,7 Hz.
+     *
+     * Прозорецът е задължителен и това не е удобство: цялото състезание за
+     * един пилот е ~24 000 записа, а за двадесет и двама е половин милион.
+     * Една обиколка е ~325 записа и 37 KB. Тегли обиколки, не състезания.
+     *
+     * ВНИМАНИЕ: през сезон 2026 полето `drs` е null навсякъде — регламентът
+     * махна DRS, така че от този endpoint не може да се извади DRS графика.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getCarData(int $sessionKey, int $driverNumber, string $from, string $to): Collection
+    {
+        return $this->window('car_data', $sessionKey, $driverNumber, $from, $to);
+    }
+
+    /**
+     * Позиция на болида по трасето (x, y, z) в тесен прозорец, ~3,7 Hz.
+     *
+     * Координатната система е същата като на очертанието от MultiViewer, така
+     * че двете се наслагват без преобразуване. Документацията предупреждава,
+     * че няма странична точност — не се вижда от коя страна на пистата е
+     * болидът, така че става за линия по трасето, не за анализ на траектория.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getLocation(int $sessionKey, int $driverNumber, string $from, string $to): Collection
+    {
+        return $this->window('location', $sessionKey, $driverNumber, $from, $to);
+    }
+
+    /**
+     * Изоставането от лидера и от предния на всеки ~4 секунди.
+     *
+     * Цяло състезание е ~22 000 записа и 3 MB. Дърпа се веднъж след кръга и от
+     * него се извеждат само числа (най-дългата близка битка) — суровите редове
+     * не се пазят.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getRaceIntervals(int $sessionKey): Collection
+    {
+        return $this->historical('intervals', $sessionKey, fn ($r) => isset($r['driver_number'], $r['date']));
+    }
+
+    /**
+     * Радио разговорите. Документацията предупреждава, че през 2026 покритието
+     * е рухнало и повечето събития нямат нито един запис — затова липсата тук
+     * е нормално състояние, не грешка.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getTeamRadio(int $sessionKey): Collection
+    {
+        return $this->historical('team_radio', $sessionKey, fn ($r) => isset($r['driver_number'], $r['recording_url']));
+    }
+
+    /**
+     * Заявка за един пилот в тесен времеви прозорец.
+     *
+     * OpenF1 носи оператора в ИМЕТО на параметъра („date>“), не в стойността —
+     * затова ключовете изглеждат странно, но точно така се филтрира.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function window(string $endpoint, int $sessionKey, int $driverNumber, string $from, string $to): Collection
+    {
+        $key = "openf1:hist:{$endpoint}:{$sessionKey}:{$driverNumber}:".md5($from.$to);
+
+        return $this->remembered($key, fn () => $this->get($endpoint, [
+            'session_key' => $sessionKey,
+            'driver_number' => $driverNumber,
+            'date>=' => $from,
+            'date<=' => $to,
+        ])
+            ->filter(fn ($r) => is_array($r) && isset($r['date']))
+            ->values());
+    }
+
+    /**
+     * Обща обвивка за исторически заявки: дълъг кеш и общ филтър за форма.
+     *
+     * @param  callable(array<string, mixed>): bool  $keep
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function historical(string $endpoint, int $sessionKey, callable $keep): Collection
+    {
+        return $this->remembered(
+            "openf1:hist:{$endpoint}:{$sessionKey}",
+            fn () => $this->get($endpoint, ['session_key' => $sessionKey])
+                ->filter(fn ($r) => is_array($r) && $keep($r))
+                ->values(),
+        );
+    }
+
+    /**
+     * Кеш за 24 часа — освен когато е изключен.
+     *
+     * Изключва се при наваксване назад: тогава всеки отговор се чете точно
+     * веднъж, а кешът по подразбиране е в базата и седемдесет уикенда биха
+     * налели стотици мегабайти в таблицата `cache` без никаква полза.
+     * Виж config/race-data.php.
+     *
+     * @param  callable(): Collection<int, mixed>  $fetch
+     * @return Collection<int, mixed>
+     */
+    private function remembered(string $key, callable $fetch): Collection
+    {
+        if (! config('race-data.cache_historical', true)) {
+            return $fetch();
+        }
+
+        return Cache::remember($key, now()->addDay(), $fetch);
+    }
+
     /**
      * Изпълнява GET заявка защитено. Връща празна колекция при всяка грешка.
      *

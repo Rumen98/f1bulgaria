@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\RaceDataRecap;
 use App\Models\RaceSession;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
@@ -19,6 +20,7 @@ use App\Services\Races\RaceNameLocalizer;
 use App\Support\DriverName;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -38,6 +40,7 @@ class HomeController extends Controller
             'hero' => $this->heroProp($hero, $locks),
             'liveSession' => $this->liveSession($openF1, $tokens),
             'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
+            'dataRecap' => $this->latestDataRecap(),
             'topNews' => $this->topNews(),
             'predictionCta' => $this->predictionCta($hero, $locks),
             // Не е optional/defer нарочно: и двете биха го скрили при първо
@@ -45,6 +48,49 @@ class HomeController extends Controller
             // me() излиза с null преди която и да е заявка.
             'me' => $this->me($leaderboard),
         ]);
+    }
+
+    /**
+     * Последният рекап с данни — блокът с числата над новините.
+     *
+     * Стои на началната, а не само в /danni, по проста причина: разделът е нов
+     * и никой не го знае, а материалът има срок. Дните след кръга са единствените,
+     * в които го търсят.
+     *
+     * Кешът е кратък: рекапът се сменя веднъж на две седмици, но началната е
+     * най-натоварената страница и не бива да прави още една заявка на посещение.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function latestDataRecap(): ?array
+    {
+        if (! config('features.data_recap')) {
+            return null;
+        }
+
+        return Cache::remember('home:data-recap', now()->addMinutes(10), function (): ?array {
+            $recap = RaceDataRecap::query()
+                ->ready()
+                ->with('race:id,round,name,jolpica_id,circuit,race_datetime_utc')
+                ->latest('generated_at')
+                ->first();
+
+            if ($recap?->race === null) {
+                return null;
+            }
+
+            return [
+                'race_id' => $recap->race->id,
+                'race' => $recap->race->name_bg,
+                'round' => $recap->race->round,
+                'headline' => $recap->headline,
+                // Три точки: колкото се четат, преди човек да реши дали да влезе.
+                'bullets' => array_slice((array) ($recap->facts['bullets'] ?? []), 0, 3),
+                'winner' => $recap->facts['winner'] ?? null,
+                'top_speed' => $recap->facts['top_speed'] ?? null,
+                'fastest_lap' => $recap->facts['fastest_lap'] ?? null,
+            ];
+        });
     }
 
     /**
@@ -226,7 +272,7 @@ class HomeController extends Controller
             'race' => $ctx->race ? [
                 'id' => $ctx->race->id,
                 'round' => $ctx->race->round,
-                'name' => app(RaceNameLocalizer::class)->localize($ctx->race->jolpica_id, $ctx->race->name),
+                'name' => app(RaceNameLocalizer::class)->forRace($ctx->race),
                 'circuit' => $ctx->race->circuit,
                 'country' => $ctx->race->country,
                 'race_at_sofia' => $ctx->race->race_datetime_utc

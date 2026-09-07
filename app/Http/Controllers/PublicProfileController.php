@@ -101,7 +101,7 @@ class PublicProfileController extends Controller
             ->mapWithKeys(fn (Driver $d) => [$d->id => DriverName::display($d->slug, $d->fullName())]);
 
         return $predictions->map(fn ($p) => [
-            'race' => app(RaceNameLocalizer::class)->localize($p->race->jolpica_id, $p->race->name),
+            'race' => app(RaceNameLocalizer::class)->forRace($p->race),
             'round' => $p->race->round,
             'points' => $p->score?->points,
             'breakdown' => $p->score?->breakdown_json,

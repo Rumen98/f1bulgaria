@@ -2,6 +2,7 @@
 import TableShell from '@/Components/UI/TableShell.vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { podiumClass } from '@/utils/racing';
+import { tyre } from '@/utils/tyres';
 import { Link } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -74,15 +75,12 @@ const cutoffs = computed(() => session.value?.cutoffs ?? []);
 
 const posClass = (p) => podiumClass(p) || 'text-zinc-500';
 
+// Съставите живеят в @/utils/tyres — същият цвят се ползва и от лентите със
+// стратегията в „Данни". Тук се превежда само до формата, която таблицата чака.
 const tire = (compound) => {
-    const map = {
-        SOFT: { l: 'S', c: 'text-red-500 border-red-500' },
-        MEDIUM: { l: 'M', c: 'text-yellow-400 border-yellow-400' },
-        HARD: { l: 'H', c: 'text-zinc-200 border-zinc-200' },
-        INTERMEDIATE: { l: 'I', c: 'text-emerald-400 border-emerald-400' },
-        WET: { l: 'W', c: 'text-sky-400 border-sky-400' },
-    };
-    return map[compound] ?? null;
+    const t = tyre(compound);
+
+    return t ? { l: t.letter, c: `${t.text} ${t.border}` } : null;
 };
 
 const fmtSector = (v) => (v ? v.toFixed(3) : '—');

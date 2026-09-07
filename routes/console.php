@@ -218,6 +218,22 @@ Schedule::command('news:health-check')
     ->withoutOverlapping(55)
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
+// Рекапът с данни от OpenF1 след състезание.
+//
+// На всеки час, защото прозорецът в самата команда (3-36 часа след старта)
+// решава кога има работа — така пропуснат час се наваксва сам, вместо да
+// изгуби кръга. Извън състезателен уикенд заявката е една към базата и нула
+// към OpenF1.
+//
+// :47 — свободна минута: :00/:30, :05/:35, :15/:45, :20, :25, :50 и
+// :08/:23/:38/:53 са заети от новинарския конвейер и канала.
+Schedule::command('padok:race-data-recap')
+    ->hourlyAt(47)
+    ->onOneServer()
+    ->withoutOverlapping(45)
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
 // Дневен отчет за активността към админ имейла — накрая на деня (софийско).
 Schedule::command('report:daily-activity')
     ->dailyAt('23:55')

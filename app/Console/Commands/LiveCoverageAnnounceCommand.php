@@ -84,7 +84,7 @@ class LiveCoverageAnnounceCommand extends Command
             'sent_at' => now(),
         ]);
 
-        $raceName = app(RaceNameLocalizer::class)->localize($race->jolpica_id, $race->name);
+        $raceName = app(RaceNameLocalizer::class)->forRace($race);
         $startAt = $race->race_datetime_utc
             ->copy()->setTimezone('Europe/Sofia')->format('H:i').' ч.';
 

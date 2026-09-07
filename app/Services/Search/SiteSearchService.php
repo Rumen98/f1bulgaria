@@ -51,7 +51,9 @@ class SiteSearchService
             ['key' => 'teams', 'label' => 'Отбори', 'items' => $this->teams($term)],
             ['key' => 'races', 'label' => 'Състезания', 'items' => $this->races($term)],
             ['key' => 'circuits', 'label' => 'Писти', 'items' => $this->circuits($term)],
+            ['key' => 'racedata', 'label' => 'Данни', 'items' => $this->raceData($term)],
             ['key' => 'news', 'label' => 'Новини', 'items' => $this->news($term)],
+            ['key' => 'engineering', 'label' => 'Инженерство', 'items' => $this->engineering($term)],
             ['key' => 'glossary', 'label' => 'Речник', 'items' => $this->glossary($term)],
         ])
             ->filter(fn (array $group) => $group['items'] !== [])
@@ -151,10 +153,87 @@ class SiteSearchService
             ->limit(self::PER_GROUP)
             ->get()
             ->map(fn (Race $race) => [
-                'title' => $this->raceNames->localize($race->jolpica_id, $race->name),
+                'title' => $this->raceNames->forRace($race),
                 'subtitle' => $race->circuit,
                 'meta' => $race->season?->year !== null ? (string) $race->season->year : null,
                 'url' => route('races.show', $race->id),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Темите от рубриката „Инженерство“.
+     *
+     * Търси се и в заглавията на секциите, защото човек пише „порпойзинг“, а
+     * това е подзаглавие вътре в тема, не име на тема.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function engineering(string $term): array
+    {
+        if (! config('features.engineering')) {
+            return [];
+        }
+
+        $needle = mb_strtolower($term);
+        $systems = config('engineering-content.systems', []);
+
+        return collect(config('engineering-content.topics', []))
+            ->filter(function (array $topic) use ($needle): bool {
+                $haystack = mb_strtolower(implode(' ', [
+                    $topic['title'],
+                    $topic['teaser'],
+                    ...collect($topic['sections'] ?? [])->pluck('heading')->all(),
+                ]));
+
+                return str_contains($haystack, $needle);
+            })
+            ->take(self::PER_GROUP)
+            ->map(fn (array $topic) => [
+                'title' => $topic['title'],
+                'subtitle' => $topic['teaser'],
+                'meta' => $systems[$topic['system']] ?? null,
+                'url' => route('engineering.show', $topic['slug']),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Анализите на данните. Търси се по същите полета като състезанията —
+     * човек пише „Монца“, не „рекап“.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function raceData(string $term): array
+    {
+        if (! config('features.data_recap')) {
+            return [];
+        }
+
+        $bgIds = $this->matchingConfigKeys('race-names-bg', $term);
+
+        return Race::query()
+            ->whereHas('dataRecap', fn (Builder $q) => $q->whereNotNull('generated_at'))
+            ->where(function (Builder $query) use ($term, $bgIds): void {
+                $query->where('name', 'like', "%{$term}%")
+                    ->orWhere('circuit', 'like', "%{$term}%")
+                    ->orWhere('country', 'like', "%{$term}%");
+
+                if ($bgIds !== []) {
+                    $query->orWhereIn('jolpica_id', $bgIds);
+                }
+            })
+            ->with('season')
+            ->orderByDesc('race_datetime_utc')
+            ->limit(self::PER_GROUP)
+            ->get()
+            ->map(fn (Race $race) => [
+                'title' => 'Данните от '.$this->raceNames->forRace($race),
+                'subtitle' => $race->circuit,
+                'meta' => $race->season?->year !== null ? (string) $race->season->year : null,
+                'url' => route('racedata.show', $race->id),
             ])
             ->values()
             ->all();

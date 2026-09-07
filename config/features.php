@@ -24,4 +24,12 @@ return [
     'live_timing' => env('FEATURE_LIVE_TIMING', false),
     'this_day' => env('FEATURE_THIS_DAY', false),
     'quiz' => env('FEATURE_QUIZ', false),
+
+    // „Данни“ (/danni) — рекапът след всяко състезание от OpenF1, със
+    // собствени графики. Виж App\Services\RaceData.
+    'data_recap' => env('FEATURE_DATA_RECAP', false),
+
+    // „Инженерство“ (/inzhenerstvo) — обяснителната рубрика за техниката.
+    // Съдържанието е в config/engineering-content.php.
+    'engineering' => env('FEATURE_ENGINEERING', false),
 ];

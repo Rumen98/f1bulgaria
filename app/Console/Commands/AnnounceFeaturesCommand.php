@@ -114,7 +114,7 @@ class AnnounceFeaturesCommand extends Command
         }
 
         return [
-            'name' => app(RaceNameLocalizer::class)->localize($race->jolpica_id, $race->name),
+            'name' => app(RaceNameLocalizer::class)->forRace($race),
             'url' => route('races.show', $race->id),
             'deadline' => $deadline->setTimezone('Europe/Sofia')->format('d.m.Y, H:i').' ч.',
         ];
