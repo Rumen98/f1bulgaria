@@ -13,13 +13,19 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                // Inter, а не Figtree: Figtree се доставя само в latin и
+                // latin-ext, тоест на изцяло български сайт кирилицата падаше
+                // към системния шрифт, а латинските парчета (HAM, VER, числата)
+                // се хващаха от Figtree — две различни букворезби в едно
+                // изречение. Inter има кирилица и таблични цифри, каквито
+                // таблиците и графиките тук ползват.
+                sans: ['Inter', ...defaultTheme.fontFamily.sans],
                 /*
                  * Display шрифт за заглавия, stat числа и брандови елементи —
                  * Exo 2 има реални 700-900 тегла и пълна кирилица (Russo One
                  * е само 400, Oswald спира на 700 — и двата връщат faux-bold).
                  */
-                display: ['"Exo 2"', 'Figtree', ...defaultTheme.fontFamily.sans],
+                display: ['"Exo 2"', 'Inter', ...defaultTheme.fontFamily.sans],
             },
             colors: {
                 /*
