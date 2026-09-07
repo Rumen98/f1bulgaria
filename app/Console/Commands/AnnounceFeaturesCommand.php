@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Console\Commands\Concerns\SendsBulkMail;
 use App\Mail\FeatureAnnouncementMail;
 use App\Models\NewsletterSend;
+use App\Models\RaceDataRecap;
 use App\Models\Season;
 use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Predictions\PredictionLockService;
@@ -29,15 +30,26 @@ class AnnounceFeaturesCommand extends Command
         {--dry-run : Само отчита кой би получил писмо}
         {--force : Праща дори ако това съобщение вече е изпращано}';
 
-    protected $description = 'Изпраща еднократното писмо с новостите (значки, куиз точки, предстоящи награди) до всички.';
+    protected $description = 'Изпраща еднократното писмо с новостите (Данни и Инженерство) до всички.';
 
     /**
      * Уникален slug на тази вълна — държи идемпотентността в newsletter_sends.
      */
-    private const MAIL_TYPE = 'announcement-2026-09-features';
+    private const MAIL_TYPE = 'announcement-2026-09-danni-inzhenerstvo';
 
     public function handle(NewsletterAudience $audience, PredictionLockService $locks): int
     {
+        // Писмото сочи към /danni и /inzhenerstvo. При изключен флаг рутът
+        // връща 404 — а разпратено писмо не се връща обратно.
+        $off = collect(['data_recap' => 'Данни', 'engineering' => 'Инженерство'])
+            ->reject(fn (string $label, string $flag) => (bool) config("features.{$flag}"));
+
+        if ($off->isNotEmpty()) {
+            $this->error('Изключени раздели: '.$off->implode(', ').'. Писмото щеше да води към 404 — не пращам.');
+
+            return self::FAILURE;
+        }
+
         if (! $this->option('force') && $this->alreadySent()) {
             $this->info('Това съобщение вече е изпращано — пропускаме. (--force за повторно)');
 
@@ -49,6 +61,7 @@ class AnnounceFeaturesCommand extends Command
 
         if ($this->option('dry-run')) {
             $this->info("[dry-run] Биха получили писмо: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
+            $this->line('Анализирани състезания в писмото: '.RaceDataRecap::query()->ready()->count());
 
             return self::SUCCESS;
         }
@@ -61,10 +74,14 @@ class AnnounceFeaturesCommand extends Command
         ]);
 
         $nextRace = $this->nextRace($locks);
+        // Броят решава дали писмото изобщо да споменава архива — така не може
+        // да обещае история, която още не е сметната.
+        $analysed = RaceDataRecap::query()->ready()->count();
 
         foreach ($recipients as $user) {
             $this->sendMail($user, new FeatureAnnouncementMail(
                 nextRace: $nextRace,
+                analysedRaces: $analysed,
                 userUnsubscribeUrl: URL::signedRoute('newsletter.user-unsubscribe', ['user' => $user->id]),
             ));
         }
@@ -72,6 +89,7 @@ class AnnounceFeaturesCommand extends Command
         foreach ($subscribers as $subscriber) {
             $this->sendMail($subscriber->email, new FeatureAnnouncementMail(
                 nextRace: $nextRace,
+                analysedRaces: $analysed,
                 unsubscribeToken: $subscriber->unsubscribe_token,
             ));
         }

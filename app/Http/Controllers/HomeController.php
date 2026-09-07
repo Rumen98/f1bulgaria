@@ -72,7 +72,13 @@ class HomeController extends Controller
             $recap = RaceDataRecap::query()
                 ->ready()
                 ->with('race:id,round,name,jolpica_id,circuit,race_datetime_utc')
-                ->latest('generated_at')
+                // По ДАТАТА НА СЪСТЕЗАНИЕТО, не по кога е сметнат рекапът.
+                // Наваксването назад преизчислява стари кръгове и подредбата
+                // по generated_at изкара Абу Даби от миналия сезон на
+                // началната страница.
+                ->join('races', 'races.id', '=', 'race_data_recaps.race_id')
+                ->orderByDesc('races.race_datetime_utc')
+                ->select('race_data_recaps.*')
                 ->first();
 
             if ($recap?->race === null) {

@@ -6,12 +6,15 @@ use App\Mail\FeatureAnnouncementMail;
 use App\Models\NewsletterSend;
 use App\Models\NewsletterSubscriber;
 use App\Models\Race;
+use App\Models\RaceDataRecap;
 use App\Models\Season;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 
 beforeEach(function () {
     Mail::fake();
+    // Писмото сочи към двата раздела — при изключен флаг командата отказва.
+    config(['features.data_recap' => true, 'features.engineering' => true]);
 });
 
 it('праща на потребителите и на бюлетинните абонати', function () {
@@ -102,7 +105,7 @@ it('писмото на потребител рендерира с one-click uns
         $html = $mail->render();
 
         return str_contains($html, 'Спри имейлите')
-            && str_contains($html, 'награди')
+            && str_contains($html, 'Инженерство')
             && ! str_contains($html, 'Включи се в играта')
             && $mail->headers()->text['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click';
     });
@@ -118,5 +121,58 @@ it('писмото на абонат кани към регистрация', fu
 
         return str_contains($html, 'Включи се в играта')
             && str_contains($html, 'Отпиши се');
+    });
+});
+
+it('отказва да прати, ако раздел от писмото е изключен', function () {
+    User::factory()->create();
+    config(['features.engineering' => false]);
+
+    // Разпратено писмо не се връща обратно — по-добре да откаже, отколкото да
+    // прати всички към 404.
+    $this->artisan('padok:announce-features')
+        ->expectsOutputToContain('Инженерство')
+        ->assertFailed();
+
+    Mail::assertNothingQueued();
+    expect(NewsletterSend::query()->count())->toBe(0);
+});
+
+it('споменава архива само когато наистина има архив', function () {
+    User::factory()->create();
+    $season = Season::factory()->create(['year' => 2026]);
+
+    // Състезанията се създават без фабрика: тя тегли УНИКАЛЕН номер на кръг от
+    // 1 до 24 и се изчерпва на трийсетия ред. Подаването на `round` не помага —
+    // Laravel смята definition() преди да наложи подадените стойности.
+    foreach (range(1, 31) as $round) {
+        $race = Race::query()->create([
+            'season_id' => $season->id,
+            'round' => $round,
+            'name' => "Test Grand Prix {$round}",
+            'circuit' => "Circuit {$round}",
+            'country' => 'Testland',
+            'race_datetime_utc' => now()->subDays(400 - $round),
+        ]);
+
+        RaceDataRecap::factory()->create(['race_id' => $race->id]);
+    }
+
+    $this->artisan('padok:announce-features')->assertSuccessful();
+
+    Mail::assertSent(FeatureAnnouncementMail::class, function (FeatureAnnouncementMail $mail) {
+        return $mail->analysedRaces === 31
+            && str_contains($mail->render(), '31 състезания');
+    });
+});
+
+it('без архив писмото не обещава история', function () {
+    User::factory()->create();
+
+    $this->artisan('padok:announce-features')->assertSuccessful();
+
+    Mail::assertSent(FeatureAnnouncementMail::class, function (FeatureAnnouncementMail $mail) {
+        return $mail->analysedRaces === 0
+            && ! str_contains($mail->render(), 'състезания, така че всяка писта');
     });
 });

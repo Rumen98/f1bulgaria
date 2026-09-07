@@ -12,8 +12,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Еднократно писмо при по-големи новости по сайта (значки, куиз точки,
- * предстоящи награди). Пуска се ръчно с padok:announce-features — няма
+ * Еднократно писмо при по-големи новости по сайта. Пуска се ръчно с padok:announce-features — няма
  * график, защото няма редовност: праща се, когато има какво да се каже.
  */
 class FeatureAnnouncementMail extends Mailable
@@ -22,11 +21,13 @@ class FeatureAnnouncementMail extends Mailable
 
     /**
      * @param  array{name:string, url:string, deadline:?string}|null  $nextRace  следващият кръг с отворени прогнози (null скрива CTA-то към него)
+     * @param  int  $analysedRaces  брой анализирани състезания — изречението за архива се показва само ако наистина има архив
      * @param  string|null  $unsubscribeToken  токен за отписване (само за бюлетинни абонати)
      * @param  string|null  $userUnsubscribeUrl  signed линк за спиране на имейлите (само за потребители с акаунт)
      */
     public function __construct(
         public ?array $nextRace = null,
+        public int $analysedRaces = 0,
         public ?string $unsubscribeToken = null,
         public ?string $userUnsubscribeUrl = null,
     ) {}
@@ -34,7 +35,7 @@ class FeatureAnnouncementMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Падок — значки, точки от куиза и какво идва',
+            subject: 'Падок — данните зад всяко състезание и нова рубрика за техниката',
         );
     }
 

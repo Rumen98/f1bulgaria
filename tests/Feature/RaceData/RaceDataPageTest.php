@@ -173,3 +173,31 @@ it('непозната година пада към най-новия сезон
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('season', 2026)->has('races', 1));
 });
+
+it('началната показва последното състезание, а не последно сметнатия рекап', function () {
+    // Наваксването назад преизчислява стари кръгове, тоест generated_at на
+    // миналогодишен кръг става по-нов от този на вчерашния. Точно това изкара
+    // Абу Даби 2025 на началната страница.
+    $old = Season::factory()->create(['year' => 2025]);
+    $oldRace = Race::factory()->create([
+        'season_id' => $old->id,
+        'round' => 24,
+        'name' => 'Abu Dhabi Grand Prix',
+        'jolpica_id' => 'yas_marina',
+        'race_datetime_utc' => now()->subYear(),
+    ]);
+
+    $latest = raceWithRecap();
+
+    // Старият рекап е сметнат ПОСЛЕДЕН.
+    RaceDataRecap::factory()->create([
+        'race_id' => $oldRace->id,
+        'generated_at' => now()->addMinute(),
+    ]);
+
+    $this->get('/')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('dataRecap.race_id', $latest->id)
+            ->where('dataRecap.race', 'Гран при на Италия'));
+});
