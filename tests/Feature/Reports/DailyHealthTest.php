@@ -315,3 +315,21 @@ it('пази --preview режима: таблица в конзолата и н�
 
     Mail::assertNothingSent();
 });
+
+it('не алармира за пощата при план без дневен таван', function () {
+    // Планът стана платен в същия ден, в който отчетът тръгна, и таванът от 100
+    // веднага почна да лъже. Отчет, който вика вълк всеки състезателен уикенд,
+    // спира да се чете — точно провалът, срещу който е построен.
+    config(['mail.daily_cap' => 0]);
+
+    User::factory()->count(51)->create();
+    NewsletterSend::create(['mail_type' => NewsletterSend::TYPE_DIGEST, 'sent_at' => now()]);
+    NewsletterSend::create(['mail_type' => NewsletterSend::TYPE_PREDICTION_REMINDER, 'sent_at' => now()]);
+
+    $mail = runDailyReport()->stats['health']['mail'];
+
+    // Обемът пак се отчита — просто вече не е проблем.
+    expect($mail['estimate'])->toBe(102)
+        ->and($mail['problems'])->toBe([])
+        ->and($mail['line'])->toContain('Тръгнали днес');
+});

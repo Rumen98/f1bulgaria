@@ -54,12 +54,20 @@ class DailyActivityReportCommand extends Command
     private const QUEUE_STALE_MINUTES = 15;
 
     /**
-     * Дневен таван на изходящата поща (безплатният план на Resend).
+     * Дневният таван идва от `mail.daily_cap`, тоест от средата.
      *
-     * Не е в config нарочно — това е ограничение на плана, не настройка на
-     * приложението; сменя се тук, ако планът се смени.
+     * Беше константа с довода, че е ограничение на плана, а не настройка на
+     * приложението. Доводът е верен, изводът — не: планът се сменя с акаунта,
+     * а константата значи деплой при всяка смяна. На 07.09.2026 планът стана
+     * платен още същия ден, в който отчетът тръгна, и таванът от 100 веднага
+     * почна да лъже.
+     *
+     * Нула изключва проверката. Обемът пак се отчита — просто не е проблем.
      */
-    private const MAIL_DAILY_CAP = 100;
+    private function mailDailyCap(): int
+    {
+        return (int) config('mail.daily_cap', 0);
+    }
 
     /**
      * Огледало на GenerateRaceDataRecapCommand::MAX_HOURS.
@@ -275,11 +283,13 @@ class DailyActivityReportCommand extends Command
 
         $problems = [];
 
-        if ($estimate > self::MAIL_DAILY_CAP) {
+        $cap = $this->mailDailyCap();
+
+        if ($cap > 0 && $estimate > $cap) {
             $problems[] = [
                 'label' => 'дневният лимит на пощата',
                 'text' => "Масови вълни днес: {$bulkWaves}, получатели: {$recipients} — до {$estimate} писма при таван "
-                    .self::MAIL_DAILY_CAP.' на ден. Над тавана доставчикът отказва, всеки получател се проваля поотделно, а '
+                    ."{$cap} на ден. Над тавана доставчикът отказва, всеки получател се проваля поотделно, а "
                     .'командата пак излиза с успех — точно така изчезваха писма в състезателните петъци и недели.',
             ];
         }
@@ -302,7 +312,7 @@ class DailyActivityReportCommand extends Command
             'bulk_waves' => $bulkWaves,
             'recipients' => $recipients,
             'estimate' => $estimate,
-            'cap' => self::MAIL_DAILY_CAP,
+            'cap' => $cap,
             'problems' => $problems,
             'line' => $line,
         ];
