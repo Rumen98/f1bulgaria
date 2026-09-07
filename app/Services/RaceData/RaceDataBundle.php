@@ -13,8 +13,19 @@ use Illuminate\Support\Collection;
  *
  * @phpstan-type Row array<string, mixed>
  */
-final readonly class RaceDataBundle
+final class RaceDataBundle
 {
+    /**
+     * Кумулативните времена минават през всяка обиколка на всеки пилот и се
+     * искат от няколко места (позиции, изоставане, моменти), затова се пазят.
+     *
+     * Заради това свойство класът НЕ е `readonly` — readonly клас не позволява
+     * променливо поле. Самите колекции остават readonly и отвън нищо не се мени.
+     *
+     * @var array<int, array<int, float>>|null
+     */
+    private ?array $cumulative = null;
+
     /**
      * @param  Collection<int, array<string, mixed>>  $drivers
      * @param  Collection<int, array<string, mixed>>  $result
@@ -31,19 +42,19 @@ final readonly class RaceDataBundle
      * @param  Collection<int, array<string, mixed>>  $teamRadio
      */
     public function __construct(
-        public Collection $drivers,
-        public Collection $result,
-        public Collection $laps,
-        public Collection $stints,
-        public Collection $pits,
-        public Collection $raceControl,
-        public Collection $weather,
-        public Collection $grid,
-        public Collection $overtakes,
-        public Collection $championshipDrivers,
-        public Collection $championshipTeams,
-        public Collection $intervals,
-        public Collection $teamRadio,
+        public readonly Collection $drivers,
+        public readonly Collection $result,
+        public readonly Collection $laps,
+        public readonly Collection $stints,
+        public readonly Collection $pits,
+        public readonly Collection $raceControl,
+        public readonly Collection $weather,
+        public readonly Collection $grid,
+        public readonly Collection $overtakes,
+        public readonly Collection $championshipDrivers,
+        public readonly Collection $championshipTeams,
+        public readonly Collection $intervals,
+        public readonly Collection $teamRadio,
     ) {}
 
     /**
@@ -175,10 +186,75 @@ final readonly class RaceDataBundle
         return $windows;
     }
 
+    /**
+     * Кумулативно време на всеки пилот в края на всяка обиколка.
+     *
+     * Липсващо време (случва се на първата обиколка и при рестарт) се замества
+     * с МЕДИАНАТА на същата обиколка при останалите пилоти. Алтернативата е да
+     * изхвърлим целия пилот от графиката заради една дупка — по-лошо е.
+     *
+     * @return array<int, array<int, float>> [номер на пилот => [обиколка => секунди]]
+     */
+    public function cumulativeTimes(): array
+    {
+        if ($this->cumulative !== null) {
+            return $this->cumulative;
+        }
+
+        $medians = $this->medianLapTimes();
+        $byDriver = $this->laps->groupBy(fn (array $l) => (int) $l['driver_number']);
+
+        $out = [];
+
+        foreach ($byDriver as $number => $laps) {
+            $sorted = $laps->sortBy(fn (array $l) => (int) $l['lap_number'])->values();
+            $running = 0.0;
+            $series = [];
+
+            foreach ($sorted as $lap) {
+                $lapNumber = (int) $lap['lap_number'];
+                $duration = is_numeric($lap['lap_duration'] ?? null)
+                    ? (float) $lap['lap_duration']
+                    : ($medians[$lapNumber] ?? null);
+
+                if ($duration === null) {
+                    // Нито своя стойност, нито медиана — от тук нататък
+                    // сумата би била измислена, затова спираме пилота.
+                    break;
+                }
+
+                $running += $duration;
+                $series[$lapNumber] = round($running, 3);
+            }
+
+            if ($series !== []) {
+                $out[(int) $number] = $series;
+            }
+        }
+
+        return $this->cumulative = $out;
+    }
+
     /** Най-високият номер на обиколка в сесията. */
     public function totalLaps(): int
     {
         return (int) $this->laps->max('lap_number');
+    }
+
+    /**
+     * @return array<int, float> [обиколка => медиана в секунди]
+     */
+    private function medianLapTimes(): array
+    {
+        return $this->laps
+            ->filter(fn (array $l) => is_numeric($l['lap_duration'] ?? null))
+            ->groupBy(fn (array $l) => (int) $l['lap_number'])
+            ->map(function (Collection $laps): float {
+                $values = $laps->map(fn (array $l) => (float) $l['lap_duration'])->sort()->values();
+
+                return (float) $values->get((int) floor($values->count() / 2));
+            })
+            ->all();
     }
 
     /**

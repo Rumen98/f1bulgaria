@@ -1,5 +1,6 @@
 <script setup>
-import { round } from '@/utils/chart';
+import { useChartBox } from '@/composables/useChartBox';
+import { baselineShift, round } from '@/utils/chart';
 import { computed } from 'vue';
 
 /**
@@ -30,7 +31,16 @@ const props = defineProps({
 
 const RAMP = ['#5b21b6', '#a21caf', '#e02424', '#f97316', '#fbbf24', '#fde68a'];
 
-const box = { width: 800, height: 460, pad: 28 };
+// Тясната кутия пази съотношението на широката (800:460): картата се вписва по
+// по-тясната страна, така че различно съотношение би я смалило допълнително.
+// Спечеленото е в мащаба — номерата на завоите се рендират двойно по-едро.
+const { host, box, fontSize } = useChartBox(
+    { width: 800, height: 460, padding: { top: 28, right: 28, bottom: 28, left: 28 } },
+    { width: 520, height: 300, padding: { top: 16, right: 16, bottom: 16, left: 16 } },
+);
+
+/** Кръгчето на завоя следва шрифта — иначе двуцифрен номер излиза от него. */
+const turnRadius = computed(() => round(fontSize.value * 0.9));
 
 const radians = computed(() => (props.rotation * Math.PI) / 180);
 
@@ -63,13 +73,10 @@ const project = computed(() => {
     const { minX, maxX, minY, maxY } = bounds.value;
     const spanX = Math.max(1, maxX - minX);
     const spanY = Math.max(1, maxY - minY);
-    const scale = Math.min(
-        (box.width - box.pad * 2) / spanX,
-        (box.height - box.pad * 2) / spanY,
-    );
+    const scale = Math.min(box.value.innerWidth / spanX, box.value.innerHeight / spanY);
 
-    const offsetX = (box.width - spanX * scale) / 2;
-    const offsetY = (box.height - spanY * scale) / 2;
+    const offsetX = box.value.left + (box.value.innerWidth - spanX * scale) / 2;
+    const offsetY = box.value.top + (box.value.innerHeight - spanY * scale) / 2;
 
     return ([x, y]) => [
         round(offsetX + (x - minX) * scale),
@@ -134,7 +141,7 @@ const legend = computed(() => {
 </script>
 
 <template>
-    <div>
+    <div ref="host">
         <svg
             :viewBox="`0 0 ${box.width} ${box.height}`"
             class="h-auto w-full"
@@ -166,13 +173,13 @@ const legend = computed(() => {
             />
 
             <g v-for="turn in turns" :key="turn.number">
-                <circle :cx="project(turn.at)[0]" :cy="project(turn.at)[1]" r="9" fill="#0a0a0a" opacity="0.75" />
+                <circle :cx="project(turn.at)[0]" :cy="project(turn.at)[1]" :r="turnRadius" fill="#0a0a0a" opacity="0.75" />
                 <text
                     :x="project(turn.at)[0]"
-                    :y="project(turn.at)[1] + 3.5"
+                    :y="project(turn.at)[1] + baselineShift(fontSize)"
                     text-anchor="middle"
                     fill="#a1a1aa"
-                    font-size="10"
+                    :font-size="fontSize"
                     style="font-variant-numeric: tabular-nums"
                 >
                     {{ turn.number }}

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\RaceData;
 
 use App\Models\Race;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Throwable;
 
 /**
  * Превръща отговора на OpenF1 в готови за рисуване серии.
@@ -49,13 +51,14 @@ class RaceChartsBuilder
     {
         $people = $this->drivers->map($race, $bundle->drivers);
         $order = $this->finishingOrder($bundle);
-        $cumulative = $this->cumulativeTimes($bundle);
+        $cumulative = $bundle->cumulativeTimes();
 
         return array_filter([
             'total_laps' => $bundle->totalLaps(),
             'neutralisations' => $bundle->neutralisationWindows(),
             'positions' => $this->positionsPerLap($cumulative, $people, $order),
             'trace' => $this->traceToLeader($cumulative, $people, $order),
+            'laps' => $this->lapTimes($bundle, $people, $order),
             'stints' => $this->stints($bundle, $people, $order),
             'grid_vs_finish' => $this->gridVsFinish($bundle, $people),
             'championship' => $this->championship($bundle, $people),
@@ -63,6 +66,11 @@ class RaceChartsBuilder
             'weather' => $this->weather($bundle),
             'pace' => $this->pace($bundle, $people, $order),
             'tyre_degradation' => $this->tyreDegradation($bundle),
+            'overtakes' => $this->overtakes($bundle),
+            // Клиентът сам коригира времената по обиколка за гориво (двубоят
+            // и деградацията по пилот), затова стойността пътува с данните
+            // вместо да се дублира като още една готова серия.
+            'fuel_correction' => self::FUEL_SECONDS_PER_LAP,
         ], fn ($value) => $value !== null && $value !== []);
     }
 
@@ -79,67 +87,6 @@ class RaceChartsBuilder
             ->sortBy(fn (array $r) => (int) $r['position'])
             ->map(fn (array $r) => (int) $r['driver_number'])
             ->values()
-            ->all();
-    }
-
-    /**
-     * Кумулативно време на всеки пилот в края на всяка обиколка.
-     *
-     * Липсващо време (случва се на първата обиколка и при рестарт) се замества
-     * с МЕДИАНАТА на същата обиколка при останалите пилоти. Алтернативата е да
-     * изхвърлим целия пилот от графиката заради една дупка — по-лошо е.
-     *
-     * @return array<int, array<int, float>> [номер на пилот => [обиколка => секунди]]
-     */
-    private function cumulativeTimes(RaceDataBundle $bundle): array
-    {
-        $medians = $this->medianLapTimes($bundle);
-        $byDriver = $bundle->laps->groupBy(fn (array $l) => (int) $l['driver_number']);
-
-        $out = [];
-
-        foreach ($byDriver as $number => $laps) {
-            $sorted = $laps->sortBy(fn (array $l) => (int) $l['lap_number'])->values();
-            $running = 0.0;
-            $series = [];
-
-            foreach ($sorted as $lap) {
-                $lapNumber = (int) $lap['lap_number'];
-                $duration = is_numeric($lap['lap_duration'] ?? null)
-                    ? (float) $lap['lap_duration']
-                    : ($medians[$lapNumber] ?? null);
-
-                if ($duration === null) {
-                    // Нито своя стойност, нито медиана — от тук нататък
-                    // сумата би била измислена, затова спираме пилота.
-                    break;
-                }
-
-                $running += $duration;
-                $series[$lapNumber] = round($running, 3);
-            }
-
-            if ($series !== []) {
-                $out[(int) $number] = $series;
-            }
-        }
-
-        return $out;
-    }
-
-    /**
-     * @return array<int, float> [обиколка => медиана в секунди]
-     */
-    private function medianLapTimes(RaceDataBundle $bundle): array
-    {
-        return $bundle->laps
-            ->filter(fn (array $l) => is_numeric($l['lap_duration'] ?? null))
-            ->groupBy(fn (array $l) => (int) $l['lap_number'])
-            ->map(function (Collection $laps): float {
-                $values = $laps->map(fn (array $l) => (float) $l['lap_duration'])->sort()->values();
-
-                return (float) $values->get((int) floor($values->count() / 2));
-            })
             ->all();
     }
 
@@ -288,6 +235,164 @@ class RaceChartsBuilder
         }
 
         return $out;
+    }
+
+    /**
+     * Суровите времена по обиколка на всеки пилот.
+     *
+     * Носещата серия: от нея клиентът сглобява и двубоя между двама пилоти, и
+     * деградацията по пилот, вместо да пращаме готова серия за всяка от тях.
+     *
+     * Мръсните обиколки (пит, неутрализация) СЕ включват — кои са, се вижда от
+     * `stints[].pits` и `neutralisations`. Изрязването им тук би отнело на
+     * клиента избора и би направило кривата непрекъсната там, където не е.
+     *
+     * @param  array<int, array<string, mixed>>  $people
+     * @param  array<int, int>  $order
+     * @return array<int, array<string, mixed>>
+     */
+    private function lapTimes(RaceDataBundle $bundle, array $people, array $order): array
+    {
+        $series = [];
+
+        foreach ($bundle->laps as $lap) {
+            if (! is_numeric($lap['lap_duration'] ?? null)) {
+                continue;
+            }
+
+            $series[(int) $lap['driver_number']][(int) $lap['lap_number']] = round((float) $lap['lap_duration'], 3);
+        }
+
+        $out = [];
+
+        // Редът на финиширане отпред, отпадналите отзад — легендите в
+        // страницата не бива да се разминават от графика на графика.
+        foreach (array_unique([...$order, ...array_keys($series)]) as $number) {
+            if (! isset($series[$number])) {
+                continue;
+            }
+
+            $times = $series[$number];
+            ksort($times);
+
+            $points = [];
+
+            foreach ($times as $lap => $seconds) {
+                $points[] = [$lap, $seconds];
+            }
+
+            $out[] = [
+                'number' => $number,
+                'name' => $people[$number]['name'] ?? ('#'.$number),
+                'short' => $people[$number]['short'] ?? ('#'.$number),
+                'colour' => $people[$number]['colour'] ?? '#83838d',
+                'points' => $points,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Смените на позиции по обиколка.
+     *
+     * OpenF1 дава на всеки ред само време — номер на обиколка НЯМА. Затова
+     * времето се превежда през прозорците [date_start, date_start +
+     * lap_duration] на СОБСТВЕНИТЕ обиколки на изпреварващия пилот: чуждите
+     * започват в друг момент и биха местили смяната с обиколка напред-назад.
+     *
+     * Ред без съвпадащ прозорец се пропуска мълчаливо. „date_start“ е обявено
+     * за приблизително от самия OpenF1, а изпусната смяна е по-малка вреда от
+     * измислена.
+     *
+     * @return array<int, array{0:int, 1:int}>
+     */
+    private function overtakes(RaceDataBundle $bundle): array
+    {
+        if ($bundle->overtakes->isEmpty()) {
+            return [];
+        }
+
+        $windows = $this->lapWindows($bundle);
+        $counts = [];
+
+        foreach ($bundle->overtakes as $row) {
+            $driver = (int) ($row['overtaking_driver_number'] ?? 0);
+            $at = $this->milliseconds($row['date'] ?? null);
+
+            if ($at === null || ! isset($windows[$driver])) {
+                continue;
+            }
+
+            foreach ($windows[$driver] as [$from, $to, $lap]) {
+                if ($at >= $from && $at <= $to) {
+                    $counts[$lap] = ($counts[$lap] ?? 0) + 1;
+
+                    break;
+                }
+            }
+        }
+
+        ksort($counts);
+
+        $out = [];
+
+        foreach ($counts as $lap => $count) {
+            $out[] = [$lap, $count];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Прозорците на обиколките по пилот, подредени по време.
+     *
+     * @return array<int, array<int, array{0:float, 1:float, 2:int}>>
+     */
+    private function lapWindows(RaceDataBundle $bundle): array
+    {
+        $out = [];
+
+        foreach ($bundle->laps as $lap) {
+            $start = $this->milliseconds($lap['date_start'] ?? null);
+
+            if ($start === null || ! is_numeric($lap['lap_duration'] ?? null)) {
+                continue;
+            }
+
+            $out[(int) $lap['driver_number']][] = [
+                $start,
+                $start + (float) $lap['lap_duration'] * 1000,
+                (int) $lap['lap_number'],
+            ];
+        }
+
+        foreach ($out as $driver => $windows) {
+            usort($windows, fn (array $a, array $b) => $a[0] <=> $b[0]);
+            $out[$driver] = $windows;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Времето в милисекунди от щемпела.
+     *
+     * Сравнява се през getPreciseTimestamp(3), а НЕ през diff методите на
+     * Carbon: в Carbon 3 те връщат ЗНАКОВА стойност по подразбиране и
+     * сравнението тихо излиза наопаки. В този проект вече се е случвало.
+     */
+    private function milliseconds(mixed $value): ?float
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return (float) Carbon::parse($value)->getPreciseTimestamp(3);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**

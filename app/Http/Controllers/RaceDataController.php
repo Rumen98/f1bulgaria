@@ -36,7 +36,11 @@ class RaceDataController extends Controller
             ->join('seasons', 'seasons.id', '=', 'races.season_id')
             ->when($season !== null, fn ($q) => $q->where('seasons.year', $season))
             ->orderByDesc('races.race_datetime_utc')
-            ->select('race_data_recaps.*')
+            // Само колоните, които картончето ползва. `charts` е между 40 и 80 KB
+            // на ред и се кастира към масив при всяко зареждане — при пълен сезон
+            // това са мегабайт и нещо, декодирани и хвърлени, за да се покажат
+            // победителят и две точки.
+            ->select('race_data_recaps.id', 'race_data_recaps.race_id', 'race_data_recaps.facts')
             ->get();
 
         app(Seo::class)
@@ -105,7 +109,31 @@ class RaceDataController extends Controller
             'charts' => $recap->charts,
             'newsSlug' => $recap->newsItem?->slug,
             'neighbours' => $this->neighbours($race),
+            'preselect' => $this->preselectedDriver(),
         ]);
+    }
+
+    /**
+     * Номерът на любимия пилот на влезлия.
+     *
+     * Двубоят тръгва от него, а не от абстрактна двойка: човек, който е избрал
+     * пилот в профила си, идва да види точно него. Това е и единствената нишка
+     * между този раздел и профилите — иначе „Данни“ е еднакъв за всички и не
+     * дава повод да си влязъл.
+     *
+     * Гост или профил без избран пилот получава null и компонентът пада към
+     * първите двама от финала.
+     */
+    private function preselectedDriver(): ?int
+    {
+        $user = request()->user();
+
+        // Проверката на ключа спестява заявка: belongsTo с null пак пита базата.
+        if ($user === null || $user->favorite_driver_id === null) {
+            return null;
+        }
+
+        return $user->favoriteDriver?->permanent_number;
     }
 
     /**

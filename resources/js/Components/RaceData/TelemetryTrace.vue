@@ -1,5 +1,6 @@
 <script setup>
-import { bg, plot, points as polyPoints, round, scale, ticks } from '@/utils/chart';
+import { useChartBox } from '@/composables/useChartBox';
+import { baselineShift, bg, points as polyPoints, round, scale, ticks } from '@/utils/chart';
 import { computed } from 'vue';
 
 /**
@@ -17,20 +18,29 @@ const props = defineProps({
     series: { type: Array, required: true },
 });
 
-const box = plot(800, 420, { left: 44, right: 14, top: 14, bottom: 28 });
+const { host, box, isNarrow, fontSize, tickCount } = useChartBox(
+    { width: 800, height: 420, padding: { left: 44, right: 14, top: 14, bottom: 28 } },
+    // Отгоре трябва място за надписа на първия панел, а той расте с шрифта.
+    { width: 440, height: 420, padding: { left: 48, right: 12, top: 18, bottom: 30 } },
+);
+
+/** Надписите на панелите стоят под тези на осите — както в телевизионния HUD. */
+const captionSize = computed(() => Math.round(fontSize.value * 0.9));
 
 // Три панела: скорост (най-висок, там е информацията), газ, предавка.
 const panels = computed(() => {
-    const gap = 14;
-    const usable = box.innerHeight - gap * 2;
+    // Разстоянието между панелите носи надписа на долния — при едрия шрифт
+    // трябва да е по-голямо, иначе буквите лягат върху горната графика.
+    const gap = isNarrow.value ? 20 : 14;
+    const usable = box.value.innerHeight - gap * 2;
     const speed = Math.round(usable * 0.5);
     const throttle = Math.round(usable * 0.28);
     const gear = usable - speed - throttle;
 
     return {
-        speed: { top: box.top, height: speed },
-        throttle: { top: box.top + speed + gap, height: throttle },
-        gear: { top: box.top + speed + gap + throttle + gap, height: gear },
+        speed: { top: box.value.top, height: speed },
+        throttle: { top: box.value.top + speed + gap, height: throttle },
+        gear: { top: box.value.top + speed + gap + throttle + gap, height: gear },
     };
 });
 
@@ -41,7 +51,7 @@ const maxSpeed = computed(() => Math.max(...all.value.map((p) => p[1])));
 const minSpeed = computed(() => Math.min(...all.value.map((p) => p[1])));
 const maxGear = computed(() => Math.max(1, ...all.value.map((p) => p[4])));
 
-const x = computed(() => scale(0, maxDistance.value, box.left, box.left + box.innerWidth));
+const x = computed(() => scale(0, maxDistance.value, box.value.left, box.value.left + box.value.innerWidth));
 
 const ySpeed = computed(() =>
     scale(minSpeed.value, maxSpeed.value, panels.value.speed.top + panels.value.speed.height, panels.value.speed.top),
@@ -53,8 +63,10 @@ const yGear = computed(() =>
     scale(0, maxGear.value, panels.value.gear.top + panels.value.gear.height, panels.value.gear.top),
 );
 
-const speedTicks = computed(() => ticks(minSpeed.value, maxSpeed.value, 3));
-const distanceTicks = computed(() => ticks(0, maxDistance.value, 5).filter((t) => t > 0 && t < maxDistance.value));
+const speedTicks = computed(() => ticks(minSpeed.value, maxSpeed.value, Math.min(3, tickCount.value)));
+const distanceTicks = computed(() =>
+    ticks(0, maxDistance.value, tickCount.value).filter((t) => t > 0 && t < maxDistance.value),
+);
 
 const speedLine = (serie) => polyPoints(serie.points.map((p) => [p[0], p[1]]), x.value, ySpeed.value);
 const throttleLine = (serie) => polyPoints(serie.points.map((p) => [p[0], p[2]]), x.value, yThrottle.value);
@@ -107,7 +119,7 @@ const brakeZones = (serie) => {
 </script>
 
 <template>
-    <div>
+    <div ref="host">
         <svg :viewBox="`0 0 ${box.width} ${box.height}`" class="h-auto w-full" role="img" aria-label="Телеметрия на една обиколка">
             <!-- Скорост -->
             <g>
@@ -126,10 +138,10 @@ const brakeZones = (serie) => {
                     v-for="tick in speedTicks"
                     :key="`st-${tick}`"
                     :x="box.left - 8"
-                    :y="round(ySpeed(tick)) + 4"
+                    :y="round(ySpeed(tick)) + baselineShift(fontSize)"
                     text-anchor="end"
                     fill="#83838d"
-                    font-size="11"
+                    :font-size="fontSize"
                     style="font-variant-numeric: tabular-nums"
                 >
                     {{ Math.round(tick) }}
@@ -144,7 +156,7 @@ const brakeZones = (serie) => {
                     stroke-linejoin="round"
                     vector-effect="non-scaling-stroke"
                 />
-                <text :x="box.left" :y="panels.speed.top - 2" fill="#71717a" font-size="10" letter-spacing="0.08em">
+                <text :x="box.left" :y="panels.speed.top - 2" fill="#71717a" :font-size="captionSize" letter-spacing="0.08em">
                     СКОРОСТ, КМ/Ч
                 </text>
             </g>
@@ -171,7 +183,7 @@ const brakeZones = (serie) => {
                     stroke-linejoin="round"
                     vector-effect="non-scaling-stroke"
                 />
-                <text :x="box.left" :y="panels.throttle.top - 2" fill="#71717a" font-size="10" letter-spacing="0.08em">
+                <text :x="box.left" :y="panels.throttle.top - 2" fill="#71717a" :font-size="captionSize" letter-spacing="0.08em">
                     ГАЗ, % · ЧЕРВЕНОТО Е СПИРАЧКА
                 </text>
             </g>
@@ -182,10 +194,10 @@ const brakeZones = (serie) => {
                     v-for="gear in [1, maxGear]"
                     :key="`gl-${gear}`"
                     :x="box.left - 8"
-                    :y="round(yGear(gear)) + 4"
+                    :y="round(yGear(gear)) + baselineShift(fontSize)"
                     text-anchor="end"
                     fill="#83838d"
-                    font-size="11"
+                    :font-size="fontSize"
                     style="font-variant-numeric: tabular-nums"
                 >
                     {{ gear }}
@@ -200,7 +212,7 @@ const brakeZones = (serie) => {
                     stroke-linejoin="miter"
                     vector-effect="non-scaling-stroke"
                 />
-                <text :x="box.left" :y="panels.gear.top - 2" fill="#71717a" font-size="10" letter-spacing="0.08em">
+                <text :x="box.left" :y="panels.gear.top - 2" fill="#71717a" :font-size="captionSize" letter-spacing="0.08em">
                     ПРЕДАВКА
                 </text>
             </g>
@@ -212,14 +224,16 @@ const brakeZones = (serie) => {
                 :y="box.height - 8"
                 text-anchor="middle"
                 fill="#83838d"
-                font-size="11"
+                :font-size="fontSize"
                 style="font-variant-numeric: tabular-nums"
             >
                 {{ Math.round(tick / 100) / 10 }}
             </text>
         </svg>
 
-        <p class="mt-1 text-center text-[11px] uppercase tracking-wide text-zinc-600">Дистанция, км</p>
+        <p class="mt-1 text-center uppercase tracking-wide text-zinc-600" :class="isNarrow ? 'text-xs' : 'text-[11px]'">
+            Дистанция, км
+        </p>
 
         <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-zinc-800 pt-3 text-xs">
             <span v-for="serie in series" :key="serie.number" class="inline-flex items-center gap-2 text-zinc-300">

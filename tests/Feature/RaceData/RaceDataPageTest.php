@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Models\Driver;
 use App\Models\Race;
 use App\Models\RaceDataRecap;
 use App\Models\Season;
+use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -200,4 +202,44 @@ it('началната показва последното състезание,
         ->assertInertia(fn (Assert $page) => $page
             ->where('dataRecap.race_id', $latest->id)
             ->where('dataRecap.race', 'Гран при на Италия'));
+});
+
+it('картончето пази победителя и точките след стесняването на заявката', function () {
+    // Индексът вече не чете `charts`. Ако стесняването отреже и `facts`,
+    // списъкът мълчаливо олеква — затова се проверява точно това, което
+    // картончето вади оттам.
+    raceWithRecap();
+
+    $this->get('/danni')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('races.0.winner.name', 'Ландо Норис')
+            ->has('races.0.bullets', 2));
+});
+
+it('двубоят тръгва от любимия пилот на влезлия', function () {
+    $race = raceWithRecap();
+    $driver = Driver::factory()->create(['permanent_number' => 16]);
+
+    $this->actingAs(User::factory()->create(['favorite_driver_id' => $driver->id]))
+        ->get(route('racedata.show', $race->id))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('preselect', 16));
+});
+
+it('гостът няма предварително избран пилот', function () {
+    $race = raceWithRecap();
+
+    $this->get(route('racedata.show', $race->id))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('preselect', null));
+});
+
+it('профил без избран пилот също няма предварителен избор', function () {
+    $race = raceWithRecap();
+
+    $this->actingAs(User::factory()->create(['favorite_driver_id' => null]))
+        ->get(route('racedata.show', $race->id))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('preselect', null));
 });

@@ -1,6 +1,7 @@
 <script setup>
+import { useChartBox } from '@/composables/useChartBox';
 // polyPoints, а не points: пропът също се казва points и в шаблона печели той.
-import { bg, plot, points as polyPoints, round, scale, ticks } from '@/utils/chart';
+import { baselineShift, bg, points as polyPoints, round, scale, ticks } from '@/utils/chart';
 import { computed, useId } from 'vue';
 
 /**
@@ -19,7 +20,11 @@ const props = defineProps({
 });
 
 const gradientId = `track-temp-${useId()}`;
-const box = plot(800, 160, { left: 42, bottom: 24 });
+
+const { host, box, fontSize, tickCount } = useChartBox(
+    { width: 800, height: 160, padding: { left: 42, bottom: 24 } },
+    { width: 420, height: 160, padding: { left: 44, bottom: 24 } },
+);
 
 const track = computed(() => props.points.map((p) => [p[0], p[1]]));
 const air = computed(() => props.points.filter((p) => Number.isFinite(p[2])).map((p) => [p[0], p[2]]));
@@ -32,10 +37,10 @@ const xMax = computed(() => Math.max(...track.value.map((p) => p[0])));
 const yMin = computed(() => Math.floor(Math.min(...all.value) - 1));
 const yMax = computed(() => Math.ceil(Math.max(...all.value) + 1));
 
-const x = computed(() => scale(xMin.value, xMax.value, box.left, box.left + box.innerWidth));
-const y = computed(() => scale(yMax.value, yMin.value, box.top, box.top + box.innerHeight));
+const x = computed(() => scale(xMin.value, xMax.value, box.value.left, box.value.left + box.value.innerWidth));
+const y = computed(() => scale(yMax.value, yMin.value, box.value.top, box.value.top + box.value.innerHeight));
 
-const yLines = computed(() => ticks(yMin.value, yMax.value, 3));
+const yLines = computed(() => ticks(yMin.value, yMax.value, Math.min(3, tickCount.value)));
 
 const trackLine = computed(() => polyPoints(track.value, x.value, y.value));
 const airLine = computed(() => polyPoints(air.value, x.value, y.value));
@@ -46,7 +51,7 @@ const area = computed(() => {
         return '';
     }
 
-    const baseline = round(box.top + box.innerHeight);
+    const baseline = round(box.value.top + box.value.innerHeight);
     const first = round(x.value(track.value[0][0]));
     const last = round(x.value(track.value[track.value.length - 1][0]));
 
@@ -57,7 +62,7 @@ const rain = computed(() => props.points.some((p) => p[3] === 1));
 </script>
 
 <template>
-    <div>
+    <div ref="host">
         <svg :viewBox="`0 0 ${box.width} ${box.height}`" class="h-auto w-full" role="img" aria-label="Температура на асфалта през сесията">
             <defs>
                 <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
@@ -81,10 +86,10 @@ const rain = computed(() => props.points.some((p) => p[3] === 1));
                 v-for="tick in yLines"
                 :key="`t-${tick}`"
                 :x="box.left - 8"
-                :y="round(y(tick)) + 4"
+                :y="round(y(tick)) + baselineShift(fontSize)"
                 text-anchor="end"
                 fill="#83838d"
-                font-size="11"
+                :font-size="fontSize"
                 style="font-variant-numeric: tabular-nums"
             >
                 {{ Math.round(tick) }}°

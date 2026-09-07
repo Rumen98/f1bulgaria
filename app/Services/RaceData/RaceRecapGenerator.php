@@ -22,6 +22,7 @@ class RaceRecapGenerator
         private readonly RaceDataFetcher $fetcher,
         private readonly RaceFactsBuilder $factsBuilder,
         private readonly RaceChartsBuilder $chartsBuilder,
+        private readonly RaceMomentsBuilder $momentsBuilder,
         private readonly LapTelemetryBuilder $telemetryBuilder,
         private readonly DriverResolver $drivers,
         private readonly RecapComposer $composer,
@@ -52,6 +53,14 @@ class RaceRecapGenerator
             $facts['bullets'] = $composed['bullets'];
             $facts['narrative_by_llm'] = $composed['by_llm'];
 
+            // Числата по пилот се закачат СЛЕД разказа — защо, виж
+            // RaceFactsBuilder::perDriver.
+            $perDriver = $this->factsBuilder->perDriver($bundle);
+
+            if ($perDriver !== []) {
+                $facts['per_driver'] = $perDriver;
+            }
+
             // Телеметрията иска още четири заявки, затова се вади СЛЕД като е
             // ясно, че наборът е годен — счупен уикенд не бива да я плаща.
             $telemetry = $this->telemetryBuilder->build(
@@ -72,6 +81,7 @@ class RaceRecapGenerator
                     ...$this->chartsBuilder->build($race, $bundle),
                     'telemetry' => $telemetry['telemetry'],
                     'track_map' => $telemetry['track_map'],
+                    'moments' => $this->momentsBuilder->build($race, $bundle),
                 ], fn ($value) => $value !== null && $value !== []),
                 'headline' => $composed['headline'],
                 'body_bg' => implode("\n\n", $composed['body']),

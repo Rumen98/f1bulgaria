@@ -1,11 +1,14 @@
 <script setup>
 import ChampionshipSwing from '@/Components/RaceData/ChampionshipSwing.vue';
 import ChartFrame from '@/Components/RaceData/ChartFrame.vue';
+import DriverDuel from '@/Components/RaceData/DriverDuel.vue';
 import FactTile from '@/Components/RaceData/FactTile.vue';
 import LapLineChart from '@/Components/RaceData/LapLineChart.vue';
 import PaceBars from '@/Components/RaceData/PaceBars.vue';
 import PositionSwing from '@/Components/RaceData/PositionSwing.vue';
+import RaceMoments from '@/Components/RaceData/RaceMoments.vue';
 import StintBars from '@/Components/RaceData/StintBars.vue';
+import StoryTimeline from '@/Components/RaceData/StoryTimeline.vue';
 import TelemetryTrace from '@/Components/RaceData/TelemetryTrace.vue';
 import TrackSpeedMap from '@/Components/RaceData/TrackSpeedMap.vue';
 import TrackTemperature from '@/Components/RaceData/TrackTemperature.vue';
@@ -14,7 +17,7 @@ import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { bg } from '@/utils/chart';
 import { hasRoute } from '@/utils/routes';
 import { Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     race: { type: Object, required: true },
@@ -24,9 +27,25 @@ const props = defineProps({
     charts: { type: Object, default: () => ({}) },
     newsSlug: { type: String, default: null },
     neighbours: { type: Object, default: () => ({ prev: null, next: null }) },
+    /** Номерът на любимия пилот на влезлия — двубоят тръгва от него. */
+    preselect: { type: Number, default: null },
 });
 
 const bands = computed(() => props.charts.neutralisations ?? []);
+
+/**
+ * Обиколката под курсора на лентата с историята.
+ *
+ * Движи САМО трите графики с ос по обиколки. Телеметрията и картата съдържат
+ * данни за една-единствена обиколка и стоят на място — лентата го казва
+ * изрично, за да не обещава синхрон, който не съществува.
+ */
+const cursorLap = ref(null);
+
+/** Лентата има смисъл само ако има какво да движи. */
+const hasStory = computed(
+    () => !!props.charts.total_laps && (props.charts.stints?.length || props.charts.positions?.length),
+);
 
 /**
  * Плочките горе са резюмето на страницата — човек, който няма да скролне,
@@ -128,6 +147,18 @@ const tiles = computed(() => {
             <p v-for="(paragraph, i) in body" :key="i">{{ paragraph }}</p>
         </div>
 
+        <!-- Отговорът на въпроса, с който човек влиза в понеделник — затова стои
+             преди графиките, а не след тях. Заглавието е „решаваше“, не „спечели“:
+             къде се е движела разликата се смята, кое я е спечелило — не. -->
+        <section v-if="charts.moments?.length" class="mb-8">
+            <h2 class="mb-3 font-display text-lg font-black text-white">Къде се решаваше</h2>
+            <RaceMoments
+                :moments="charts.moments"
+                :total-laps="charts.total_laps"
+                @select="cursorLap = $event"
+            />
+        </section>
+
         <div class="space-y-5">
             <ChartFrame
                 v-if="charts.track_map?.points?.length"
@@ -152,12 +183,53 @@ const tiles = computed(() => {
                 <TelemetryTrace :series="charts.telemetry" />
             </ChartFrame>
 
+            <!-- Лентата и трите графики, които наистина я следват, стоят в един
+                 блок. Разпръснати из страницата, подредбата сама би внушила, че
+                 се движи всичко — а деградацията е по възраст на гумата, а
+                 телеметрията по дистанция в рамките на една обиколка. -->
+            <StoryTimeline
+                v-if="hasStory"
+                :lap="cursorLap"
+                :total-laps="charts.total_laps"
+                :stints="charts.stints"
+                :neutralisations="bands"
+                :overtakes="charts.overtakes"
+                @update:lap="cursorLap = $event"
+            />
+
             <ChartFrame
                 v-if="charts.stints?.length"
                 title="Стратегия по гуми"
                 hint="Всяка лента е един пилот от старта до финала. Цветът е съставът на гумата, тънката резка е питстоп, жълтият фон е неутрализация."
             >
-                <StintBars :stints="charts.stints" :total-laps="charts.total_laps" :neutralisations="bands" />
+                <StintBars
+                    :stints="charts.stints"
+                    :total-laps="charts.total_laps"
+                    :neutralisations="bands"
+                    :cursor="cursorLap"
+                />
+            </ChartFrame>
+
+            <ChartFrame
+                v-if="charts.positions?.length"
+                title="Позиции по обиколки"
+                hint="Кой къде е бил след всяка обиколка. Докосни име, за да откроиш един пилот."
+            >
+                <LapLineChart :series="charts.positions" :bands="bands" :y-ticks="4" :cursor="cursorLap" />
+            </ChartFrame>
+
+            <ChartFrame
+                v-if="charts.trace?.length"
+                title="Изоставане от лидера"
+                hint="Колко секунди зад водача е бил всеки от челото. Ръбовете надолу са питстопове, сближаването е неутрализация."
+            >
+                <LapLineChart
+                    :series="charts.trace"
+                    :bands="bands"
+                    y-unit=" с"
+                    :digits="0"
+                    :cursor="cursorLap"
+                />
             </ChartFrame>
 
             <ChartFrame
@@ -169,19 +241,21 @@ const tiles = computed(() => {
             </ChartFrame>
 
             <ChartFrame
-                v-if="charts.positions?.length"
-                title="Позиции по обиколки"
-                hint="Кой къде е бил след всяка обиколка. Докосни име, за да откроиш един пилот."
+                v-if="charts.laps?.length"
+                title="Двубой в кръга"
+                hint="Двама пилоти един срещу друг: времената по обиколка, разликата помежду им, гумите и колко се влошава темпото с износването. Влезлите тръгват от любимия си пилот."
             >
-                <LapLineChart :series="charts.positions" :bands="bands" :y-ticks="4" />
-            </ChartFrame>
-
-            <ChartFrame
-                v-if="charts.trace?.length"
-                title="Изоставане от лидера"
-                hint="Колко секунди зад водача е бил всеки от челото. Ръбовете надолу са питстопове, сближаването е неутрализация."
-            >
-                <LapLineChart :series="charts.trace" :bands="bands" y-unit=" с" :digits="0" />
+                <DriverDuel
+                    :laps="charts.laps"
+                    :stints="charts.stints"
+                    :pace="charts.pace"
+                    :per-driver="facts.per_driver"
+                    :positions="charts.positions"
+                    :fuel-correction="charts.fuel_correction"
+                    :total-laps="charts.total_laps"
+                    :neutralisations="bands"
+                    :preselect="preselect"
+                />
             </ChartFrame>
 
             <ChartFrame

@@ -1,5 +1,6 @@
 <script setup>
-import { bg, plot, points as polyPoints, round, scale, ticks } from '@/utils/chart';
+import { useChartBox } from '@/composables/useChartBox';
+import { baselineShift, bg, points as polyPoints, round, scale, ticks } from '@/utils/chart';
 import { tyre, tyreHex } from '@/utils/tyres';
 import { computed } from 'vue';
 
@@ -18,7 +19,12 @@ const props = defineProps({
     compounds: { type: Array, required: true },
 });
 
-const box = plot(800, 320, { left: 46, right: 14, top: 14, bottom: 30 });
+// Отляво стои цяло време на обиколка („106,4“), а на дълга писта то е пет
+// знака — при едрия шрифт това е ~45 единици и иска по-широко поле.
+const { host, box, isNarrow, fontSize, tickCount } = useChartBox(
+    { width: 800, height: 320, padding: { left: 46, right: 14, top: 14, bottom: 30 } },
+    { width: 420, height: 320, padding: { left: 58, right: 12, top: 14, bottom: 34 } },
+);
 
 const allPoints = computed(() => props.compounds.flatMap((c) => c.points));
 
@@ -40,15 +46,17 @@ const bounds = computed(() => {
     return { min: low - pad, max: high + pad };
 });
 
-const x = computed(() => scale(0, maxAge.value, box.left, box.left + box.innerWidth));
+const x = computed(() => scale(0, maxAge.value, box.value.left, box.value.left + box.value.innerWidth));
 // ОБЪРНАТА ос спрямо останалите графики: тук по-голямото време е нагоре.
 // Причината е, че това е графика на ЗАГУБА — изкачваща се крива се чете като
 // „влошава се“. При обичайната посока (бързото горе) деградацията върви надолу
 // и изглежда като подобрение.
-const y = computed(() => scale(bounds.value.min, bounds.value.max, box.top + box.innerHeight, box.top));
+const y = computed(() =>
+    scale(bounds.value.min, bounds.value.max, box.value.top + box.value.innerHeight, box.value.top),
+);
 
-const yLines = computed(() => ticks(bounds.value.min, bounds.value.max, 4));
-const xLines = computed(() => ticks(0, maxAge.value, 5).filter((t) => t > 0));
+const yLines = computed(() => ticks(bounds.value.min, bounds.value.max, Math.min(4, tickCount.value)));
+const xLines = computed(() => ticks(0, maxAge.value, tickCount.value).filter((t) => t > 0));
 
 /** Точките извън среза не се рисуват — иначе висят по ръба като артефакт. */
 const visible = (point) => point[1] >= bounds.value.min && point[1] <= bounds.value.max;
@@ -67,7 +75,7 @@ const legend = computed(() =>
 </script>
 
 <template>
-    <div>
+    <div ref="host">
         <svg :viewBox="`0 0 ${box.width} ${box.height}`" class="h-auto w-full" role="img" aria-label="Деградация на гумите по състав">
             <line
                 v-for="tick in yLines"
@@ -84,10 +92,10 @@ const legend = computed(() =>
                 v-for="tick in yLines"
                 :key="`t-${tick}`"
                 :x="box.left - 8"
-                :y="round(y(tick)) + 4"
+                :y="round(y(tick)) + baselineShift(fontSize)"
                 text-anchor="end"
                 fill="#83838d"
-                font-size="11"
+                :font-size="fontSize"
                 style="font-variant-numeric: tabular-nums"
             >
                 {{ bg(tick, 1) }}
@@ -121,14 +129,16 @@ const legend = computed(() =>
                 :y="box.height - 10"
                 text-anchor="middle"
                 fill="#83838d"
-                font-size="11"
+                :font-size="fontSize"
                 style="font-variant-numeric: tabular-nums"
             >
                 {{ Math.round(tick) }}
             </text>
         </svg>
 
-        <p class="mt-1 text-center text-[11px] uppercase tracking-wide text-zinc-600">Възраст на гумата, обиколки</p>
+        <p class="mt-1 text-center uppercase tracking-wide text-zinc-600" :class="isNarrow ? 'text-xs' : 'text-[11px]'">
+            Възраст на гумата, обиколки
+        </p>
 
         <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 border-t border-zinc-800 pt-3 text-xs text-zinc-400">
             <span v-for="item in legend" :key="item.key" class="inline-flex items-center gap-1.5">

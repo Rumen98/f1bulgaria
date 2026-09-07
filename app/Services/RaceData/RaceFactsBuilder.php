@@ -70,6 +70,74 @@ class RaceFactsBuilder
     }
 
     /**
+     * Числата на всеки пилот поотделно — гръбнакът на „Двубой в кръга“.
+     *
+     * Стои извън `build()` нарочно: пазачът за измислени числа в RecapComposer
+     * събира всяко число от фактите и го обявява за законно. Двадесет пилота по
+     * четири стойности биха му отворили толкова широка врата, че почти всяко
+     * число на модела би минало за вярно. Затова се закача СЛЕД разказа.
+     *
+     * Ключовете са цели числа в PHP, но номерата на пилотите не започват от
+     * нула, така че `json_encode` ги изнася като обект със стрингови ключове —
+     * точно каквото чака фронтендът.
+     *
+     * @return array<int, array{fastest_lap:?float, fastest_lap_display:?string, fastest_lap_number:?int, top_speed:?int}>
+     */
+    public function perDriver(RaceDataBundle $bundle): array
+    {
+        $fastest = [];
+
+        foreach ($bundle->cleanLaps() as $lap) {
+            $seconds = (float) $lap['lap_duration'];
+
+            // Същите граници като при общата най-бърза обиколка: чиста
+            // обиколка от 300 секунди е артефакт, не рекорд.
+            if ($seconds < self::MIN_LAP_SECONDS || $seconds > self::MAX_LAP_SECONDS) {
+                continue;
+            }
+
+            $number = (int) $lap['driver_number'];
+
+            if (! isset($fastest[$number]) || $seconds < $fastest[$number]['seconds']) {
+                $fastest[$number] = ['seconds' => $seconds, 'lap' => (int) $lap['lap_number']];
+            }
+        }
+
+        // Максималната скорост се търси във ВСИЧКИ обиколки: засичането е на
+        // правата и не се разваля от питстоп или неутрализация.
+        $speeds = [];
+
+        foreach ($bundle->laps as $lap) {
+            $speed = $lap['st_speed'] ?? null;
+
+            if (! is_numeric($speed) || (int) $speed < self::MIN_TOP_SPEED || (int) $speed > self::MAX_TOP_SPEED) {
+                continue;
+            }
+
+            $number = (int) $lap['driver_number'];
+            $speeds[$number] = max($speeds[$number] ?? 0, (int) $speed);
+        }
+
+        $out = [];
+
+        foreach (array_unique([...array_keys($fastest), ...array_keys($speeds)]) as $number) {
+            $best = $fastest[$number] ?? null;
+            $seconds = $best === null ? null : round($best['seconds'], 3);
+
+            $out[$number] = [
+                'fastest_lap' => $seconds,
+                'fastest_lap_display' => $seconds === null ? null : self::lapTime($seconds),
+                'fastest_lap_number' => $best === null ? null : $best['lap'],
+                'top_speed' => $speeds[$number] ?? null,
+            ];
+        }
+
+        ksort($out);
+
+        return $out;
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $people
      */
     private function passesSanityChecks(RaceDataBundle $bundle, array $people): bool

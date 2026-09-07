@@ -34,6 +34,16 @@ class CircuitGeometry
     private const TTL_DAYS = 30;
 
     /**
+     * Колко точки от очертанието стигат за рисуване.
+     *
+     * MultiViewer връща очертанието като 5–28 KB точки според пистата, а то се
+     * рисува в поле от неколкостотин пиксела — разликата не се вижда, но
+     * пътува до браузъра при всяко отваряне и стои в `charts` в базата.
+     * Останалите серии в проекта са от същия порядък.
+     */
+    private const MAX_OUTLINE_POINTS = 240;
+
+    /**
      * @return array{outline: array<int, array{0: float, 1: float}>, corners: array<int, array{number:int, x:float, y:float}>, rotation: float}|null
      */
     public function forCircuit(?int $circuitKey, ?int $year): ?array
@@ -95,10 +105,41 @@ class CircuitGeometry
         }
 
         return [
-            'outline' => $outline,
+            // Проредено ПРЕДИ кеша: иначе кешът пази пълния набор и всяко
+            // четене го вади, за да го прореди наново.
+            'outline' => $this->thin($outline),
             'corners' => $this->corners($data['corners'] ?? []),
             'rotation' => is_numeric($data['rotation'] ?? null) ? (float) $data['rotation'] : 0.0,
         ];
+    }
+
+    /**
+     * Равномерно прореждане със запазени краища: очертанието е затворена
+     * линия и ако първата или последната точка отпадне, се отваря видима
+     * дупка точно на старт-финалната права.
+     *
+     * @param  array<int, array{0: float, 1: float}>  $outline
+     * @return array<int, array{0: float, 1: float}>
+     */
+    private function thin(array $outline): array
+    {
+        $count = count($outline);
+
+        if ($count <= self::MAX_OUTLINE_POINTS) {
+            return $outline;
+        }
+
+        $last = $count - 1;
+        $steps = self::MAX_OUTLINE_POINTS - 1;
+        $out = [];
+
+        for ($i = 0; $i < $steps; $i++) {
+            $out[] = $outline[(int) round($i * $last / $steps)];
+        }
+
+        $out[] = $outline[$last];
+
+        return $out;
     }
 
     /**
