@@ -20,6 +20,12 @@ const props = defineProps({
     corners: { type: Array, default: () => [] },
     rotation: { type: Number, default: 0 },
     driver: { type: String, default: null },
+    /**
+     * Номерът на обиколката. Не е винаги най-бързата: позиционният феед къса и
+     * тогава картата се рисува от най-бързата обиколка, за която ИМА данни.
+     * Затова номерът се показва — иначе картата би твърдяла нещо невярно.
+     */
+    lap: { type: Number, default: null },
 });
 
 const RAMP = ['#5b21b6', '#a21caf', '#e02424', '#f97316', '#fbbf24', '#fde68a'];
@@ -182,7 +188,7 @@ const legend = computed(() => {
                 </span>
                 <span class="font-mono tabular-nums">{{ maxSpeed }} км/ч</span>
             </span>
-            <span v-if="driver">Обиколката на {{ driver }}</span>
+            <span v-if="driver">Обиколката на {{ driver }}<template v-if="lap"> — номер {{ lap }}</template></span>
             <span v-if="!outline" class="text-zinc-600">Очертанието на пистата е недостъпно — показана е само линията на болида.</span>
         </div>
     </div>

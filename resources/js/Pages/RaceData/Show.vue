@@ -140,6 +140,7 @@ const tiles = computed(() => {
                     :corners="charts.track_map.corners"
                     :rotation="charts.track_map.rotation"
                     :driver="charts.track_map.driver"
+                    :lap="charts.track_map.lap"
                 />
             </ChartFrame>
 

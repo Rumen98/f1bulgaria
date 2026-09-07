@@ -97,22 +97,15 @@ class LapTelemetryBuilder
                 'points' => $this->resample($samples),
             ];
 
-            $location = $this->client->getLocation($keys->race, $driver, $from, $to);
+            $path = $this->trackPath($bundle, $keys, $driver, $lap, $samples);
 
-            if ($location->count() < 20) {
-                Log::info('Телеметрия: location върна твърде малко записи — картата по скорост отпада', [
-                    'session' => $keys->race,
-                    'driver' => $driver,
-                    'records' => $location->count(),
-                ]);
-            }
-
-            if ($location->count() >= 20) {
+            if ($path !== null) {
                 $paths[] = [
                     'number' => $driver,
                     'name' => $person['name'] ?? ('#'.$driver),
                     'short' => $person['short'] ?? ('#'.$driver),
-                    'points' => $this->pathWithSpeed($location, $samples),
+                    'lap' => $path['lap'],
+                    'points' => $path['points'],
                 ];
             }
         }
@@ -121,6 +114,104 @@ class LapTelemetryBuilder
             'telemetry' => $telemetry,
             'track_map' => $this->trackMap($paths, $circuitKey, $year),
         ];
+    }
+
+    /**
+     * Линията по трасето за картата по скорост — с резервен вариант.
+     *
+     * Позиционният феед на OpenF1 къса. Проверено за Монако 2026: `location`
+     * спира в 14:00:14, а най-бързата обиколка е в 14:10:37 — десет минути
+     * след края на покритието. `car_data` за същата обиколка е налично, тоест
+     * телеметрията става, а картата не.
+     *
+     * Затова при празен отговор се пробва още веднъж — с най-бързата обиколка
+     * от ПЪРВАТА половина на състезанието, където покритието почти винаги го
+     * има. Един допълнителен опит, не повече: всяка заявка струва секунда
+     * заради разстоянието срещу лимита.
+     *
+     * @param  array<string, mixed>  $lap
+     * @param  array<int, array<string, mixed>>  $samples
+     * @return array{lap:int, points:array<int, array<int, int|float>>}|null
+     */
+    private function trackPath(RaceDataBundle $bundle, RaceSessionKeys $keys, int $driver, array $lap, array $samples): ?array
+    {
+        $candidates = [$lap];
+        $fallback = $this->earlyLap($bundle, $driver, (int) $lap['lap_number']);
+
+        if ($fallback !== null) {
+            $candidates[] = $fallback;
+        }
+
+        foreach ($candidates as $index => $candidate) {
+            $from = $this->parse($candidate['date_start']);
+
+            if ($from === null) {
+                continue;
+            }
+
+            $to = $from->copy()->addSeconds((float) $candidate['lap_duration'] + self::TAIL_SECONDS);
+            $location = $this->client->getLocation($keys->race, $driver, $from, $to);
+
+            if ($location->count() >= 20) {
+                // Резервната обиколка е различна от телеметричната, затова
+                // номерът ѝ пътува към фронтенда — иначе картата би твърдяла,
+                // че показва обиколка, която не показва.
+                return [
+                    'lap' => (int) $candidate['lap_number'],
+                    'points' => $this->pathWithSpeed($location, $index === 0 ? $samples : $this->samplesFor($keys, $driver, $candidate)),
+                ];
+            }
+
+            Log::info('Телеметрия: location няма записи за тази обиколка', [
+                'session' => $keys->race,
+                'driver' => $driver,
+                'lap' => $candidate['lap_number'] ?? null,
+                'records' => $location->count(),
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Най-бързата обиколка на пилота от първата половина на състезанието —
+     * там, където позиционният феед още не е късал.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function earlyLap(RaceDataBundle $bundle, int $driver, int $exclude): ?array
+    {
+        $half = (int) ceil($bundle->totalLaps() / 2);
+
+        return $bundle->laps
+            ->filter(fn (array $l) => (int) $l['driver_number'] === $driver
+                && (int) $l['lap_number'] !== $exclude
+                && (int) $l['lap_number'] <= $half
+                && is_numeric($l['lap_duration'] ?? null)
+                && filled($l['date_start'] ?? null)
+                && (float) $l['lap_duration'] > 50)
+            ->sortBy(fn (array $l) => (float) $l['lap_duration'])
+            ->first();
+    }
+
+    /**
+     * Скоростите за резервната обиколка — картата се оцветява по тях, не по
+     * скоростите от друга обиколка.
+     *
+     * @param  array<string, mixed>  $lap
+     * @return array<int, array<string, mixed>>
+     */
+    private function samplesFor(RaceSessionKeys $keys, int $driver, array $lap): array
+    {
+        $from = $this->parse($lap['date_start']);
+
+        if ($from === null) {
+            return [];
+        }
+
+        $to = $from->copy()->addSeconds((float) $lap['lap_duration'] + self::TAIL_SECONDS);
+
+        return $this->withDistance($this->client->getCarData($keys->race, $driver, $from, $to));
     }
 
     /**
@@ -335,6 +426,7 @@ class LapTelemetryBuilder
             // трасето не се различават, а цветът вече носи скоростта.
             'driver' => $paths[0]['name'],
             'short' => $paths[0]['short'],
+            'lap' => $paths[0]['lap'] ?? null,
             'points' => $paths[0]['points'],
             'outline' => $geometry['outline'] ?? null,
             'corners' => $geometry['corners'] ?? [],

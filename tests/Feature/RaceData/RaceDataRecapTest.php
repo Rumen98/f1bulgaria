@@ -463,3 +463,33 @@ it('--dry-run показва кръговете, без да пипа нищо',
     expect(RaceDataRecap::query()->count())->toBe(0);
     Http::assertNothingSent();
 });
+
+it('рисува картата от друга обиколка, ако позициите за най-бързата липсват', function () {
+    $race = recapRace();
+
+    // Позиционният феед къса. Точно това се случи с Монако 2026: location
+    // спря десет минути преди най-бързата обиколка, докато car_data за нея си
+    // беше налично — телеметрията стана, картата не.
+    //
+    // Във фикстурата най-бързата обиколка е първата, затова тук ѝ отнемаме
+    // позициите и очакваме картата да се нарисува от следващата най-бърза.
+    $blind = now()->subHours(5)->addSeconds(80)->utc()->format('Y-m-d\TH:i:s');
+
+    fakeRaceWeekend([
+        '*/location*' => function ($request) use ($blind) {
+            return str_contains(urldecode((string) $request->url()), "date>={$blind}")
+                ? Http::response('', 404)
+                : Http::response(locationSamples());
+        },
+    ]);
+
+    $this->artisan('padok:race-data-recap')->assertSuccessful();
+
+    $map = RaceDataRecap::query()->where('race_id', $race->id)->first()->charts['track_map'] ?? null;
+
+    expect($map)->not->toBeNull()
+        ->and($map['points'])->not->toBeEmpty()
+        // Номерът пътува към страницата: картата не бива да твърди, че показва
+        // най-бързата обиколка, когато показва друга.
+        ->and($map['lap'])->toBe(2);
+});
