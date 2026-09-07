@@ -22,6 +22,7 @@ use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\LiveTimingController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NewsletterController;
+use App\Http\Controllers\OgImageController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicProfileController;
@@ -130,6 +131,9 @@ Route::middleware('feature:engineering')->group(function () {
 Route::middleware('feature:data_recap')->group(function () {
     Route::get('/danni', [RaceDataController::class, 'index'])->name('racedata.index');
     Route::get('/danni/{race}', [RaceDataController::class, 'show'])->name('racedata.show');
+    // og:image за социалните карти — очертанието на пистата. Рисува се при
+    // първото поискване и се пази на диска.
+    Route::get('/danni/{race}/og.png', [OgImageController::class, 'circuit'])->name('racedata.og');
 });
 
 Route::middleware('feature:quiz')->group(function () {

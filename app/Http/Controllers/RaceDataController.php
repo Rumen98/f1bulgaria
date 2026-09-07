@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Race;
 use App\Models\RaceDataRecap;
+use App\Services\Og\CircuitOgImage;
 use App\Support\Seo;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -88,10 +89,18 @@ class RaceDataController extends Controller
         $race->loadMissing('season:id,year');
         $name = $race->name_bg;
 
-        app(Seo::class)
+        $seo = app(Seo::class)
             ->title("Данните от {$name}")
             ->description($this->metaDescription($recap, $name))
             ->canonical(route('racedata.show', $race->id));
+
+        // Очертанието на пистата вместо общия банер — само когато има от какво
+        // да се нарисува. Проверката е тук, а не в маршрута: рекап без карта
+        // на трасето трябва да си остане с общата картинка, а не да сочи към
+        // адрес, който връща 404.
+        if (app(CircuitOgImage::class)->hasShape($recap->charts['track_map'] ?? null)) {
+            $seo->image(route('racedata.og', $race->id), CircuitOgImage::WIDTH, CircuitOgImage::HEIGHT);
+        }
 
         return Inertia::render('RaceData/Show', [
             'race' => [
