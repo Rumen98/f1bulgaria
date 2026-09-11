@@ -103,10 +103,10 @@ const formatLap = (ms) => {
                     </p>
                 </div>
 
-                <!-- Хронометърът: покорени писти + най-силни времена -->
+                <!-- Играта: покорени писти + най-силни времена -->
                 <div v-if="game && game.tracks_played > 0" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
                     <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                        <h2 class="font-display text-lg font-bold text-white">Хронометър</h2>
+                        <h2 class="font-display text-lg font-bold text-white">Игра</h2>
                         <Link :href="route('game')" class="text-sm font-medium text-red-500 transition hover:text-red-400">
                             Карай →
                         </Link>

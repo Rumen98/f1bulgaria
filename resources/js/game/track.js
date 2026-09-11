@@ -27,6 +27,52 @@ const KERB_CURVATURE = 0.008;
 const CURVATURE_SMOOTHING_PASSES = 4;
 
 /**
+ * Изглаждане на ВЕРТИКАЛНАТА кривина (производната на наклона). Профилът
+ * идва от 30 m DEM с клампнат наклон (max_slope) — суровата производна има
+ * фалшиви „гърбици" на всеки 50–100 m дори на равната Монца. 48 паса
+ * (σ ≈ 23 m) свалят шума на Монца/Силвърстоун/Бахрейн под мъртвата зона на
+ * симулацията (sim.js), а Раидийон/Ео Руж (промяна на наклона 0.15–0.18 за
+ * ~60 m) остават над нея. Измерено с всичките 24 писти преди избора.
+ */
+const VERT_CURV_SMOOTHING_PASSES = 48;
+
+/** Таван на |вертикалната кривина|, 1/m — над него DEM-ът лъже, не релефът. */
+const VERT_CURV_MAX = 0.006;
+
+// ── Стени: разстояния от осевата линия, ТОЧНО както ги рисува decor.js ───
+// Физиката (sim.js) блъска колата в тях; всяка стойност е огледало на
+// офсета в декора, за да няма невидима стена преди видимата или обратно.
+
+/** Мантинелата на градските писти: decor.js buildStreetWalls (half + 1.45). */
+const WALL_STREET = 1.45;
+
+/** Пит стената между трасето и лентата: decor.js buildPitComplex (half + 2.1). */
+const WALL_PIT = 2.1;
+
+/** Лентата (конвейерът) пред стековете гуми: decor.js buildTyreStacks
+ *  (гумите са на half + 8.9, лентата — на half + 8.25 и е първото твърдо). */
+const WALL_TYRE_STACK = 8.25;
+
+/** Tecpro блокове (1 m дълбоки, центрирани на half + 8.9): лице на 8.4. */
+const WALL_TECPRO = 8.4;
+
+/** Run-off зона без бариера: зад 8-метровия капан (RUNOFF_WIDTH в mesh.js). */
+const WALL_RUNOFF = 10;
+
+/** Тревата: нищо нарисувано, но коридорът свършва — иначе колата преминава
+ *  през трибуни и сгради и „сяда" в тях до принудителното връщане. */
+const WALL_GRASS = 6;
+
+/** Мантинелата на градската писта заобикаля питовете по външния ръб на
+ *  лентата + този марж (decor.js buildStreetWalls pitFn). */
+const PIT_LANE_OUTER_MARGIN = 0.9;
+
+/** Максимална промяна на стената между два реда (4 m), м. Рязка стъпка
+ *  (край на пит стена, край на стекове) би телепортирала колата странично —
+ *  ограничителят я превръща във фуния под ~4°. */
+const WALL_RAMP_PER_ROW = 0.3;
+
+/**
  * @typedef {object} Track
  * @property {string} slug
  * @property {string} name
@@ -59,6 +105,21 @@ const CURVATURE_SMOOTHING_PASSES = 4;
  * @property {Float32Array} raceCurv   Кривина НА линията (не на осевата) —
  *                                     по нея ботовете мерят колко бързо се
  *                                     минава завоят.
+ * @property {Float32Array} vertCurv   Вертикална кривина d(gradient)/ds, 1/m,
+ *                                     изгладена: + = компресия (дъно), − =
+ *                                     било (връх). Физиката товари/олекотява
+ *                                     колата с v²·vertCurv/g.
+ * @property {Float32Array} wallRight  Разстояние от осевата до стената откъм
+ *                                     нормалата (+, надясно), м — мантинела,
+ *                                     пит стена, стекове гуми или краят на
+ *                                     коридора в тревата. Огледало на decor.js.
+ * @property {Float32Array} wallLeft   Същото откъм −нормалата (наляво).
+ * @property {{sign: number, from: number, to: number, taper: number,
+ *            wallFrom: number, wallTo: number, half: number,
+ *            laneInner: number, laneOuter: number}|null} pitLane
+ *                                     Разположението на пит комплекса по
+ *                                     редове (същата логика като decor.js
+ *                                     buildPitComplex); null = няма права.
  * @property {number} count
  * @property {number} elevationRange
  */
@@ -147,6 +208,11 @@ export function prepareTrack(data, style = null) {
     const raceOffset = buildRacingLineOffsets(count, xs, zs, nx, nz, halfWidths, curvature);
     const raceCurv = buildRaceCurvature(count, xs, zs, nx, nz, raceOffset);
 
+    const vertCurv = buildVerticalCurvature(count, spacing, gradient);
+
+    const pitLane = pitLaneLayout(count, curvature, halfWidths, style?.pitSide === 'left' ? -1 : 1);
+    const walls = buildWallOffsets(count, curvature, halfWidths, pitLane, style);
+
     return {
         slug: data.slug,
         name: data.name,
@@ -167,11 +233,206 @@ export function prepareTrack(data, style = null) {
         bankSlope,
         raceOffset,
         raceCurv,
+        vertCurv,
+        wallRight: walls.right,
+        wallLeft: walls.left,
+        pitLane,
         count,
         elevationRange: maxY - minY,
         // Реални контури от OpenStreetMap (ODbL) — виж game:fetch-landmarks.
         landmarks: flipLandmarks(data.landmarks ?? null),
     };
+}
+
+/**
+ * Вертикалната кривина: централна разлика на наклона, изгладена и клампната.
+ * Знак: наклонът расте (дъно на долина, Ео Руж) → +, пада (било, върхът на
+ * Раидийон) → −.
+ *
+ * @param {number} count
+ * @param {number} spacing
+ * @param {Float32Array} gradient
+ * @returns {Float32Array}
+ */
+function buildVerticalCurvature(count, spacing, gradient) {
+    let curv = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+        const prev = (i - 1 + count) % count;
+        const next = (i + 1) % count;
+        curv[i] = (gradient[next] - gradient[prev]) / (2 * spacing);
+    }
+
+    for (let pass = 0; pass < VERT_CURV_SMOOTHING_PASSES; pass++) {
+        curv = smoothCyclic(curv);
+    }
+
+    for (let i = 0; i < count; i++) {
+        curv[i] = curv[i] < -VERT_CURV_MAX ? -VERT_CURV_MAX : curv[i] > VERT_CURV_MAX ? VERT_CURV_MAX : curv[i];
+    }
+
+    return curv;
+}
+
+/**
+ * Разположението на пит комплекса по редове — същата аритметика като
+ * decor.js (findStartStraight + buildPitComplex), за да съвпадат стените на
+ * физиката с нарисуваните. Промяна там = промяна тук.
+ *
+ * @param {number} count
+ * @param {Float32Array} curvature
+ * @param {Float32Array} halfWidths
+ * @param {number} sign +1 = питовете са откъм нормалата (дясно), −1 = ляво
+ * @returns {import('./track.js').Track['pitLane']}
+ */
+function pitLaneLayout(count, curvature, halfWidths, sign) {
+    const limit = Math.min(180, Math.floor(count / 3));
+
+    let back = 0;
+    while (back < limit && Math.abs(curvature[(((-back - 1) % count) + count) % count]) < 0.006) {
+        back++;
+    }
+
+    let forward = 0;
+    while (forward < limit && Math.abs(curvature[(forward + 1) % count]) < 0.006) {
+        forward++;
+    }
+
+    const from = -back + 3;
+    const to = forward - 3;
+    const span = to - from;
+
+    if (span < 30) {
+        return null;
+    }
+
+    let half = halfWidths[0];
+    for (let r = from; r <= to; r++) {
+        half = Math.max(half, halfWidths[((r % count) + count) % count]);
+    }
+
+    const taper = Math.min(14, Math.floor(span * 0.2));
+
+    return {
+        sign,
+        from,
+        to,
+        taper,
+        wallFrom: from + taper + 2,
+        wallTo: to - taper - 2,
+        half,
+        laneInner: half + 4.2,
+        laneOuter: half + 10.6,
+    };
+}
+
+/**
+ * Външният ръб на питлейна за даден ред (decor.js buildPitComplex
+ * outerOffset, без знака): клин на входа/изхода, пълна ширина по средата.
+ *
+ * @param {NonNullable<import('./track.js').Track['pitLane']>} pit
+ * @param {number} row Ред в координатите на комплекса (може да е отрицателен)
+ * @returns {number}
+ */
+function pitLaneOuterOffset(pit, row) {
+    if (row <= pit.from || row >= pit.to) {
+        return pit.laneInner;
+    }
+
+    const open = Math.min(1, (row - pit.from) / pit.taper, (pit.to - row) / pit.taper);
+
+    return pit.laneInner + (pit.laneOuter - pit.laneInner) * smooth01(open);
+}
+
+/**
+ * Стените за всеки ред и страна: базата (мантинела на градска писта или
+ * краят на тревния коридор), run-off зоните и бариерите им отвън на
+ * завоите, пит стената и външният ръб на питлейна. Накрая ограничител на
+ * наклона, за да няма стъпала.
+ *
+ * @param {number} count
+ * @param {Float32Array} curvature
+ * @param {Float32Array} halfWidths
+ * @param {import('./track.js').Track['pitLane']} pitLane
+ * @param {{streetWalls?: boolean, runoff?: string}|null} style
+ * @returns {{left: Float32Array, right: Float32Array}}
+ */
+function buildWallOffsets(count, curvature, halfWidths, pitLane, style) {
+    const right = new Float32Array(count);
+    const left = new Float32Array(count);
+    const base = style?.streetWalls === true ? WALL_STREET : WALL_GRASS;
+
+    for (let i = 0; i < count; i++) {
+        right[i] = halfWidths[i] + base;
+        left[i] = halfWidths[i] + base;
+    }
+
+    const setRange = (from, to, side, extra) => {
+        const target = side > 0 ? right : left;
+        for (let r = from; r <= to; r++) {
+            const i = ((r % count) + count) % count;
+            target[i] = halfWidths[i] + extra;
+        }
+    };
+
+    // Run-off зоните и бариерите са от ВЪНШНАТА страна на завоя (−side на
+    // кривината) — същите диапазони като decor.js buildRunoffZones /
+    // buildTyreStacks / buildTecproBarriers.
+    const runoff = style?.runoff ?? 'gravel';
+    if (style?.streetWalls !== true && runoff !== 'none') {
+        for (const range of curvatureRangesOf(curvature, count, 0.014, 4)) {
+            setRange(range.from - 14, range.to + 6, -range.side, WALL_RUNOFF);
+        }
+        const barrier = runoff === 'asphalt' ? WALL_TECPRO : WALL_TYRE_STACK;
+        for (const range of curvatureRangesOf(curvature, count, 0.022, 4)) {
+            setRange(range.from - 6, range.to + 6, -range.side, barrier);
+        }
+    }
+
+    // Пит комплексът: стената между трасето и лентата, а в клиновете на
+    // входа/изхода — външният ръб на лентата (там лентата е отворена към
+    // трасето, както в реалността).
+    if (pitLane !== null) {
+        const target = pitLane.sign > 0 ? right : left;
+        for (let r = pitLane.from + 1; r < pitLane.to; r++) {
+            const i = ((r % count) + count) % count;
+            target[i] =
+                r >= pitLane.wallFrom && r <= pitLane.wallTo
+                    ? pitLane.half + WALL_PIT
+                    : pitLaneOuterOffset(pitLane, r) + PIT_LANE_OUTER_MARGIN;
+        }
+    }
+
+    limitWallSlope(right, count);
+    limitWallSlope(left, count);
+
+    return { left, right };
+}
+
+/**
+ * Ограничител на наклона (цикличен, в двете посоки): всеки ред е най-много
+ * WALL_RAMP_PER_ROW по-далеч от съседите си — стъпалата стават фунии.
+ *
+ * @param {Float32Array} wall
+ * @param {number} count
+ */
+function limitWallSlope(wall, count) {
+    // Два пълни обхода стигат: след първия напред+назад всяка стойност е
+    // ограничена от най-близкия минимум; вторият покрива wrap-а през 0.
+    for (let pass = 0; pass < 2; pass++) {
+        for (let i = 0; i < count; i++) {
+            const prev = (i - 1 + count) % count;
+            if (wall[i] > wall[prev] + WALL_RAMP_PER_ROW) {
+                wall[i] = wall[prev] + WALL_RAMP_PER_ROW;
+            }
+        }
+        for (let i = count - 1; i >= 0; i--) {
+            const next = (i + 1) % count;
+            if (wall[i] > wall[next] + WALL_RAMP_PER_ROW) {
+                wall[i] = wall[next] + WALL_RAMP_PER_ROW;
+            }
+        }
+    }
 }
 
 /**
@@ -555,6 +816,61 @@ export function bankAt(track, index, along) {
     const b = bankSlope[(((index + base + 1) % count) + count) % count];
 
     return a + (b - a) * t;
+}
+
+/**
+ * Диапазони с |кривина| над праг — суровината за чакъл/табели/гуми в decor,
+ * за run-off физиката и за стените. Живее тук (най-долният слой), за да
+ * няма three.js по веригата; sim.js я преизнася за decor/mesh.
+ *
+ * @param {Track} track
+ * @param {number} minCurv
+ * @param {number} minLen
+ * @returns {Array<{from: number, to: number, side: number, peak: number}>}
+ */
+export function curvatureRanges(track, minCurv, minLen) {
+    return curvatureRangesOf(track.curvature, track.count, minCurv, minLen);
+}
+
+/**
+ * @param {Float32Array} curvature
+ * @param {number} count
+ * @param {number} minCurv
+ * @param {number} minLen
+ * @returns {Array<{from: number, to: number, side: number, peak: number}>}
+ */
+function curvatureRangesOf(curvature, count, minCurv, minLen) {
+    const ranges = [];
+    let current = null;
+
+    for (let i = 0; i < count; i++) {
+        const k = curvature[i];
+        const side = k > minCurv ? 1 : k < -minCurv ? -1 : 0;
+
+        if (side === 0) {
+            if (current) {
+                ranges.push(current);
+                current = null;
+            }
+            continue;
+        }
+
+        if (current && current.side === side) {
+            current.to = i;
+            current.peak = Math.max(current.peak, Math.abs(k));
+        } else {
+            if (current) {
+                ranges.push(current);
+            }
+            current = { from: i, to: i, side, peak: Math.abs(k) };
+        }
+    }
+
+    if (current) {
+        ranges.push(current);
+    }
+
+    return ranges.filter((r) => r.to - r.from >= minLen);
 }
 
 /**

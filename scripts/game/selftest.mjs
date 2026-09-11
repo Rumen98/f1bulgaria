@@ -19,6 +19,30 @@ import { createSimFromData, decodeTrace, encodeTrace, readTraceInput } from '../
 const trackFile = process.argv[2] ?? 'public/game-tracks/monza.json';
 const trackData = JSON.parse(readFileSync(trackFile, 'utf8'));
 
+// ── Hill-hold: колата не потегля сама назад от покой върху наклон ────────
+const holdSim = createSimFromData(trackData);
+let slopeIndex = 0;
+for (let i = 1; i < holdSim.track.count; i++) {
+    if (Math.abs(holdSim.track.gradient[i]) > Math.abs(holdSim.track.gradient[slopeIndex])) {
+        slopeIndex = i;
+    }
+}
+holdSim.state.x = holdSim.track.xs[slopeIndex];
+holdSim.state.z = holdSim.track.zs[slopeIndex];
+holdSim.state.heading = Math.atan2(holdSim.track.tx[slopeIndex], holdSim.track.tz[slopeIndex]);
+holdSim.state.vForward = 0;
+holdSim.state.vLateral = 0;
+holdSim.trackIndexHint = slopeIndex;
+holdSim.tick({ steer: 0, throttle: 0, brake: 0 });
+
+if (holdSim.state.vForward !== 0 || holdSim.state.vLateral !== 0) {
+    console.error(
+        `СЕЛФТЕСТ: hill-hold пропусна движение от покой — ` +
+        `vForward=${holdSim.state.vForward}, vLateral=${holdSim.state.vLateral}`
+    );
+    process.exit(1);
+}
+
 // ── Караме до първата завършена летяща обиколка ──────────────────────────
 const sim = createSimFromData(trackData);
 const input = { steer: 0, throttle: 0, brake: 0 };

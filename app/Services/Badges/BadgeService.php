@@ -50,10 +50,10 @@ class BadgeService
             'icon' => 'heroicon-o-trophy',
         ],
 
-        // ── Хронометърът ────────────────────────────────────────────────
+        // ── Играта ──────────────────────────────────────────────────────
         'game-first-lap' => [
             'name' => 'Първа обиколка',
-            'description' => 'Записа първото си потвърдено време в Хронометъра.',
+            'description' => 'Записа първото си потвърдено време в играта.',
             'icon' => 'heroicon-o-clock',
         ],
         'game-beat-official' => [
@@ -73,7 +73,7 @@ class BadgeService
         ],
         'game-track-record' => [
             'name' => 'Лилаво',
-            'description' => 'Държа рекорда на цяла писта в Хронометъра.',
+            'description' => 'Държа рекорда на цяла писта в играта.',
             'icon' => 'heroicon-o-bolt',
         ],
         'game-week-winner' => [
@@ -126,7 +126,7 @@ class BadgeService
     }
 
     /**
-     * Значките от Хронометъра — вика се от ValidateGameLapJob СЛЕД успешна
+     * Значките от играта — вика се от ValidateGameLapJob СЛЕД успешна
      * валидация: отхвърлена от преиграването обиколка не бива да е раздала
      * значки, които няма как да се върнат.
      */
@@ -134,7 +134,11 @@ class BadgeService
     {
         $user = $record->user;
 
-        if ($user === null) {
+        if (
+            $user === null
+            || $record->sim_version !== (int) config('game.sim_version', 3)
+            || $record->verify_status === 'rejected'
+        ) {
             return 0;
         }
 

@@ -47,6 +47,8 @@ enum ChannelPostKind: string
             self::F2SprintRace => 'Спринт',
             self::F2FeatureRace => 'Главно състезание',
             self::News => 'Новина',
+            self::GameChallenge => 'Игра: предизвикателство',
+            self::GameResults => 'Игра: резултати',
         };
     }
 
@@ -60,7 +62,8 @@ enum ChannelPostKind: string
             self::F1SprintQuali, self::F1Sprint, self::F1Race => 'Формула 1',
             self::F2Practice, self::F2Qualifying,
             self::F2SprintRace, self::F2FeatureRace => 'Формула 2',
-            self::News => null,
+            // Новина и постовете на играта не принадлежат на шампионат.
+            self::News, self::GameChallenge, self::GameResults => null,
         };
     }
 

@@ -9,19 +9,28 @@ export default defineConfig(({ isSsrBuild }) => ({
     ssr: {
         noExternal: true,
     },
-    // game/device.js се дели СТАТИЧНО между страницата на играта и lazy game
-    // chunk-а (Game.js). Без собствен чънк Rollup сгъва цялата страница в
-    // споделен `_Index` чънк — тя изпада от Vite manifest-а и @vite() в
-    // blade-а гърми с 500. Само за клиентския билд (SSR не ползва manifest-а).
+    // Тези леки game модули се делят СТАТИЧНО между страницата на играта и
+    // lazy game chunk-а (Game.js). Без собствени chunks Rollup сгъва цялата
+    // страница в споделен `_Index` chunk — тя изпада от Vite manifest-а и
+    // @vite() в blade-а гърми с 500. Само за клиентския билд.
     build: isSsrBuild
         ? {}
         : {
             rollupOptions: {
                 output: {
-                    manualChunks: (id) =>
-                        id.replaceAll('\\', '/').includes('resources/js/game/device.js')
-                            ? 'game-device'
-                            : undefined,
+                    manualChunks: (id) => {
+                        const normalized = id.replaceAll('\\', '/');
+
+                        if (normalized.includes('resources/js/game/device.js')) {
+                            return 'game-device';
+                        }
+
+                        if (normalized.includes('resources/js/game/circuits.js')) {
+                            return 'game-circuits';
+                        }
+
+                        return undefined;
+                    },
                 },
             },
         },

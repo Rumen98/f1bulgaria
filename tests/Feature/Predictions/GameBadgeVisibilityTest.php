@@ -6,10 +6,10 @@ use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /**
- * Значките на Хронометъра в профила следват feature флага: при изключен
+ * Значките на играта в профила следват feature флага: при изключен
  * модул профилът не бива да рекламира заключени награди за невидима функция.
  */
-it('крие game значките при изключен Хронометър', function () {
+it('крие game значките при изключена игра', function () {
     config(['features.game' => false]);
     $user = User::factory()->create();
 
@@ -20,7 +20,7 @@ it('крие game значките при изключен Хронометър'
         );
 });
 
-it('показва game значките при включен Хронометър', function () {
+it('показва game значките при включена игра', function () {
     config(['features.game' => true]);
     $user = User::factory()->create();
 

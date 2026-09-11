@@ -1,5 +1,5 @@
 /**
- * Сървърна валидация на обиколка от Хронометъра: преиграва записания вход
+ * Сървърна валидация на обиколка от играта: преиграва записания вход
  * през СЪЩАТА симулация (resources/js/game/sim.js), която е играл клиентът,
  * и печата резултата като JSON на stdout.
  *
@@ -63,7 +63,19 @@ sim.recordEnabled = false;
 // „пълна обиколка" с 1/3 каране.
 {
     const s = trace.start;
-    const numbers = [s.x, s.z, s.heading, s.vForward, s.vLateral, s.steer, s.yawRate, s.slip, s.lastProgress];
+    const numbers = [
+        s.x,
+        s.z,
+        s.heading,
+        s.vForward,
+        s.vLateral,
+        s.steer,
+        s.throttlePedal,
+        s.brakePedal,
+        s.yawRate,
+        s.slip,
+        s.lastProgress,
+    ];
 
     if (!numbers.every((v) => Number.isFinite(v)) || !Number.isInteger(s.hint) || !Number.isInteger(s.sector)) {
         fail('bad_trace');
@@ -77,7 +89,13 @@ sim.recordEnabled = false;
     ) {
         fail('bad_trace');
     }
-    if (Math.abs(s.vForward) > 97 || Math.abs(s.vLateral) > 105 || Math.abs(s.steer) > 1) {
+    if (
+        Math.abs(s.vForward) > 97 ||
+        Math.abs(s.vLateral) > 105 ||
+        Math.abs(s.steer) > 1 ||
+        s.throttlePedal < 0 || s.throttlePedal > 1 ||
+        s.brakePedal < 0 || s.brakePedal > 1
+    ) {
         fail('bad_trace');
     }
 

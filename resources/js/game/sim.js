@@ -1,5 +1,5 @@
 /**
- * Чистата симулация на Хронометъра: повърхности, фиксирана стъпка, връщане
+ * Чистата симулация на играта: повърхности, фиксирана стъпка, връщане
  * на пистата, хронометър/сектори — И записът на входа.
  *
  * Извадена от Game.js нарочно: файлът няма three.js/DOM зависимости, така че
@@ -15,14 +15,17 @@
  */
 
 import { circuitFor } from './circuits.js';
+import { CIRCLE_RADIUS, HALF_LENGTH, resolveWallContact } from './collisions.js';
 import { CAR, FIXED_DT, createCarState, step } from './physics.js';
 import { bankAt, findKerbRanges, prepareTrack, projectOnTrack } from './track.js';
 
 /** Версия на симулацията — записва се в трейса; при промяна в физиката или
  *  повърхностите се вдига и сървърът знае, че стари трейсове не се повтарят.
  *  v2: излизането от пистата вече не пуска автоматично връщане (времето
- *  тече, обиколката се инвалидира); наказателният рестарт от старта отпадна. */
-export const SIM_VERSION = 2;
+ *  тече, обиколката се инвалидира); наказателният рестарт от старта отпадна.
+ *  v3: физиката пази изгладеното положение на педалите и новия модел на
+ *  гумите/повърхностите; snapshot-ът ги носи, за да остане replay-ят точен. */
+export const SIM_VERSION = 3;
 
 /** Брой сектори на обиколка, както в истинската Формула 1. */
 export const SECTORS = 3;
@@ -45,6 +48,26 @@ const CUT_COOLDOWN = 600; // 5 s
 
 /** Таван на точките „излизания" в HUD-а (само индикатор, без наказание). */
 export const MAX_WARNINGS = 3;
+
+/** Земно ускорение, m/s² — същата SI стойност като във physics.js. */
+const GRAVITY = 9.81;
+
+/** Под този праг изгладената DEM кривина е остатъчен шум, не осезаем релеф. */
+const VERTICAL_CURVATURE_DEAD_ZONE = 0.0012;
+
+/** Болидът остава залепен за трасето: билото не занулява, а компресията не
+ *  умножава безкрайно сцеплението при шумна височинна проба. */
+const MIN_LOAD_FACTOR = 0.25;
+const MAX_LOAD_FACTOR = 1.8;
+
+/** Период на назъбването на керба, метри — споделен с визуалния ритъм. */
+const KERB_PERIOD = 0.9;
+
+/** Под тази скорост без педал държим колата на място върху наклон. */
+const HILL_HOLD_SPEED = 0.3;
+
+/** Задържаме сигнала достатъчно за един 30 Hz render кадър при симулация 120 Hz. */
+const WALL_HIT_HOLD_TICKS = 4;
 
 /** Метри ПРЕДИ мястото на излизане, на които връщаме колата. */
 const RECOVER_LOOKBACK = 25;
@@ -151,7 +174,11 @@ class Simulation {
 
         // Преизползвани обекти — нула алокации на тик.
         this._projection = {};
+        this._wallProjections = [{}, {}];
         this._input = { steer: 0, throttle: 0, brake: 0 };
+        this._stepOptions = { onKerb: false, kerbPhase: 0, loadFactor: 1, bankAccel: 0 };
+        this._simTick = 0;
+        this._wallHitHold = 0;
 
         this.bestLapTicks = null;
         this.lastLapTicks = null;
@@ -176,6 +203,8 @@ class Simulation {
         this.trackIndexHint = null;
         this.offSurface = null;
         this.onKerb = false;
+        this._simTick = 0;
+        this._wallHitHold = 0;
 
         if (!keepRecords) {
             this.bestLapTicks = null;
@@ -202,6 +231,16 @@ class Simulation {
         input.steer = Math.round(steer * 127) / 127;
         input.throttle = rawInput.throttle > 0.5 ? 1 : 0;
         input.brake = rawInput.brake > 0.5 ? 1 : 0;
+        this._simTick++;
+
+        // wallHit е презентационен изход: задържа се четири физични тика, за
+        // да не бъде пропуснат между два render кадъра, после се изчиства.
+        if (this._wallHitHold > 1) {
+            this._wallHitHold--;
+        } else {
+            this._wallHitHold = 0;
+            this.state.out.wallHit = null;
+        }
 
         // Запис: всеки тик от летящата обиколка (вкл. броячите на връщане —
         // повторението ги възпроизвежда само, но тиковете трябва да са 1:1).
@@ -313,12 +352,144 @@ class Simulation {
         // Банкираният завой носи реално повече странична хватка.
         const bankGrip = 1 + Math.min(0.35, Math.abs(bank) * 1.1);
 
-        step(this.state, input, FIXED_DT, onTrack, projection.gradient, offRoad, bankGrip);
+        // Нормалният товар от релефа е N/(m·g) = 1 + v²·κᵥ/g. Мъртвата зона
+        // премахва остатъчния шум от DEM на равните писти; таваните държат
+        // аркадния модел стабилен при връх/компресия с висока скорост.
+        const rawVerticalCurvature = sampleCyclic(
+            this.track.vertCurv,
+            projection.index,
+            projection.along,
+            this.track.spacing,
+            this.track.count
+        );
+        const verticalCurvature =
+            Math.abs(rawVerticalCurvature) < VERTICAL_CURVATURE_DEAD_ZONE
+                ? 0
+                : rawVerticalCurvature;
+        const speedSq = this.state.vForward * this.state.vForward;
+
+        const stepOptions = this._stepOptions;
+        stepOptions.onKerb = this.onKerb;
+        const kerbTurns = projection.distance / KERB_PERIOD;
+        stepOptions.kerbPhase = kerbTurns - Math.floor(kerbTurns);
+        stepOptions.loadFactor = Math.max(
+            MIN_LOAD_FACTOR,
+            Math.min(MAX_LOAD_FACTOR, 1 + (speedSq * verticalCurvature) / GRAVITY)
+        );
+        // bank > 0 сваля +нормалата (дясно), а +vLateral е наляво: знакът е −.
+        stepOptions.bankAccel = (-GRAVITY * bank) / Math.sqrt(1 + bank * bank);
+        this.state.out.kerbSide = this.onKerb ? lateralSide : 0;
+
+        // Без отделен съединител/ръчна спирачка гравитацията би потеглила
+        // болида назад още на стартова решетка с лек наклон. Под прага за
+        // пълно спиране и без команда от педалите държим надлъжната ос.
+        const hillHold =
+            Math.abs(this.state.vForward) < HILL_HOLD_SPEED &&
+            input.throttle === 0 &&
+            input.brake === 0;
+        const longitudinalGradient = hillHold ? 0 : projection.gradient;
+
+        step(
+            this.state,
+            input,
+            FIXED_DT,
+            onTrack,
+            longitudinalGradient,
+            offRoad,
+            bankGrip,
+            stepOptions
+        );
+        if (hillHold && this.state.vForward < 0) {
+            this.state.vForward = 0;
+        }
+        this.#resolveWalls();
 
         return this.#updateLapTiming(projection);
     }
 
     // ── Вътрешни ─────────────────────────────────────────────────────────
+
+    /**
+     * Проверява двата кръга на болида срещу стените след интегрирането на
+     * позицията. Разрешава само най-дълбокото проникване за тика, за да няма
+     * два противоречиви импулса при нос/задница върху различни редове.
+     */
+    #resolveWalls() {
+        const state = this.state;
+        const sinH = Math.sin(state.heading);
+        const cosH = Math.cos(state.heading);
+        let deepest = null;
+
+        for (let c = 0; c < 2; c++) {
+            const circleSign = c === 0 ? 1 : -1;
+            const circleX = state.x + sinH * HALF_LENGTH * circleSign;
+            const circleZ = state.z + cosH * HALF_LENGTH * circleSign;
+            const projection = projectOnTrack(
+                this.track,
+                circleX,
+                circleZ,
+                this.trackIndexHint,
+                this._wallProjections[c]
+            );
+            const rightWall = sampleCyclic(
+                this.track.wallRight,
+                projection.index,
+                projection.along,
+                this.track.spacing,
+                this.track.count
+            );
+            const leftWall = sampleCyclic(
+                this.track.wallLeft,
+                projection.index,
+                projection.along,
+                this.track.spacing,
+                this.track.count
+            );
+            const rightDepth = projection.lateral + CIRCLE_RADIUS - rightWall;
+            const leftDepth = -projection.lateral + CIRCLE_RADIUS - leftWall;
+
+            if (rightDepth > 0 && (deepest === null || rightDepth > deepest.depth)) {
+                deepest = {
+                    depth: rightDepth,
+                    pushX: -this.track.nx[projection.index],
+                    pushZ: -this.track.nz[projection.index],
+                    circleSign,
+                };
+            }
+            if (leftDepth > 0 && (deepest === null || leftDepth > deepest.depth)) {
+                deepest = {
+                    depth: leftDepth,
+                    pushX: this.track.nx[projection.index],
+                    pushZ: this.track.nz[projection.index],
+                    circleSign,
+                };
+            }
+        }
+
+        if (deepest === null) {
+            return;
+        }
+
+        const impulse = resolveWallContact(
+            state,
+            sinH,
+            cosH,
+            deepest.pushX,
+            deepest.pushZ,
+            deepest.depth,
+            deepest.circleSign
+        );
+
+        if (impulse > 0) {
+            state.out.wallHit = {
+                impulse,
+                nx: deepest.pushX,
+                nz: deepest.pushZ,
+                tick: this._simTick,
+            };
+            this._wallHitHold = WALL_HIT_HOLD_TICKS;
+        }
+    }
 
     #resetLapState() {
         this.lapTicks = 0;
@@ -381,6 +552,8 @@ class Simulation {
             vForward: s.vForward,
             vLateral: s.vLateral,
             steer: s.steer,
+            throttlePedal: s.throttlePedal,
+            brakePedal: s.brakePedal,
             yawRate: s.yawRate,
             slip: s.slip,
             hint: this.trackIndexHint,
@@ -420,6 +593,8 @@ class Simulation {
             vForward: start.vForward,
             vLateral: start.vLateral,
             steer: start.steer,
+            throttlePedal: start.throttlePedal ?? 0,
+            brakePedal: start.brakePedal ?? 0,
             yawRate: start.yawRate,
             slip: start.slip,
         });
@@ -772,6 +947,17 @@ function base64ToBytes(encoded) {
         bytes[i] = binary.charCodeAt(i);
     }
     return bytes;
+}
+
+/** Линейна циклична проба от таблица по подпозицията след даден ред. */
+function sampleCyclic(values, index, along, spacing, count) {
+    const steps = along / spacing;
+    const base = Math.floor(steps);
+    const t = steps - base;
+    const a = values[(((index + base) % count) + count) % count];
+    const b = values[(((index + base + 1) % count) + count) % count];
+
+    return a + (b - a) * t;
 }
 
 /**

@@ -37,3 +37,50 @@ export function formatDelta(seconds, reference) {
 
     return `${delta >= 0 ? '+' : '−'}${Math.abs(delta).toFixed(3)}`;
 }
+
+/**
+ * Интервал/делта спрямо нулата, както в ТВ кулата: „+0.842". Три знака —
+ * тайминга на Формула 1 показва хилядни навсякъде, не стотни.
+ *
+ * @param {number|null|undefined} seconds
+ * @returns {string|null}
+ */
+export function formatGap(seconds) {
+    return formatDelta(seconds, 0);
+}
+
+/**
+ * Секунди с три знака (сектор/сплит), „—" при липса.
+ *
+ * @param {number|null|undefined} seconds
+ * @returns {string}
+ */
+export function formatSeconds(seconds) {
+    return seconds === null || seconds === undefined ? '—' : seconds.toFixed(3);
+}
+
+/**
+ * Кумулативни сплитове (време от старта до края на сектор i) → продължителност
+ * на всеки сектор. Секторът е известен само когато е известен и предишният —
+ * иначе разликата няма смисъл.
+ *
+ * @param {Array<number|null|undefined>} splits
+ * @param {number} [count]
+ * @returns {Array<number|null>}
+ */
+export function splitDurations(splits, count = 3) {
+    const durations = new Array(count).fill(null);
+    let previous = 0;
+
+    for (let i = 0; i < count; i++) {
+        const split = splits[i];
+        if (typeof split !== 'number' || previous === null) {
+            previous = null;
+            continue;
+        }
+        durations[i] = Math.max(0, split - previous);
+        previous = split;
+    }
+
+    return durations;
+}

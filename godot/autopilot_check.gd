@@ -121,7 +121,7 @@ func _drive(track: TrackData) -> Dictionary:
 		car.step(throttle, brake, steer_input, FIXED_DT, on_track, projection["gradient"])
 		max_speed_seen = maxf(max_speed_seen, absf(car.v_forward))
 
-		# ── Хронометър ────────────────────────────────────────────────
+		# ── Измерване на време ─────────────────────────────────────────
 		var progress: float = clampf(projection["distance"] / track.length, 0.0, 1.0)
 		if started:
 			lap_ticks += 1

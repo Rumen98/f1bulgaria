@@ -55,9 +55,13 @@ class GameLapRecord extends Model
      */
     public function scopeCounted(Builder $query): Builder
     {
-        return $query->where(function (Builder $inner): void {
-            $inner->whereNull('verify_status')->orWhere('verify_status', '!=', 'rejected');
-        });
+        return $query
+            ->where($query->qualifyColumn('sim_version'), (int) config('game.sim_version', 3))
+            ->where(function (Builder $inner): void {
+                $inner
+                    ->whereNull($inner->qualifyColumn('verify_status'))
+                    ->orWhere($inner->qualifyColumn('verify_status'), '!=', 'rejected');
+            });
     }
 
     /** @return BelongsTo<User, $this> */

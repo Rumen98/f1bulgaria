@@ -64,7 +64,7 @@ class PublicProfileController extends Controller
         $earned = $user->badges->keyBy('slug');
 
         return collect(BadgeService::DEFINITIONS)
-            // Значките на Хронометъра се показват само при включен модул:
+            // Значките на играта се показват само при включен модул:
             // иначе профилът рекламира заключени награди за невидима функция.
             ->filter(fn (array $definition, string $slug) => config('features.game')
                 || ! str_starts_with($slug, 'game-'))

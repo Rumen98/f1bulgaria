@@ -62,7 +62,7 @@ it('публичният профил носи статистика от игр�
             ->where('game.firsts', 2));
 });
 
-it('валидирана обиколка присъжда значките от Хронометъра', function () {
+it('валидирана обиколка присъжда значките от играта', function () {
     $this->seed(BadgeSeeder::class);
 
     $user = User::factory()->create();

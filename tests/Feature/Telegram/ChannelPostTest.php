@@ -443,3 +443,17 @@ it('праща тренировките без звук', function () {
 
     Http::assertSent(fn ($request) => $request['disable_notification'] === true);
 });
+
+it('всеки вид пост има етикет, серия и тип сесия без изключение', function () {
+    // label() и series() са match без default: нов case без ред тук хвърля
+    // UnhandledMatchError чак когато някой отвори опашката с --preview.
+    // Този тест го хваща при добавянето, а не месеци по-късно.
+    foreach (ChannelPostKind::cases() as $kind) {
+        expect($kind->label())->toBeString()->not->toBeEmpty()
+            ->and(fn () => $kind->series())->not->toThrow(Throwable::class)
+            ->and(fn () => $kind->sessionType())->not->toThrow(Throwable::class)
+            ->and($kind->requiresOpenF1Attribution())->toBeBool()
+            ->and($kind->showsLinkPreview())->toBeBool()
+            ->and($kind->isSilent())->toBeBool();
+    }
+});

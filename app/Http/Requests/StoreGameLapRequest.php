@@ -44,7 +44,11 @@ class StoreGameLapRequest extends FormRequest
             // него валидацията е по желание, т.е. никаква. Таванът покрива
             // 20-минутната обиколка (2 байта/тик × 120 Hz, base64).
             'trace' => ['required', 'string', 'max:620000'],
-            'sim_version' => ['required', 'integer', 'min:1', 'max:1000'],
+            'sim_version' => [
+                'required',
+                'integer',
+                Rule::in([(int) config('game.sim_version', 3)]),
+            ],
         ];
     }
 

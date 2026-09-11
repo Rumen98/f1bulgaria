@@ -70,6 +70,15 @@ class ValidateGameLapJob implements ShouldQueue
             return;
         }
 
+        // A deploy may leave v2 jobs in the queue. Reject them before starting
+        // Node: v3 is a deliberately fresh leaderboard and the current replay
+        // engine cannot authoritatively validate an older physics model.
+        if ($record->sim_version !== (int) config('game.sim_version', 3)) {
+            $record->update(['verify_status' => 'rejected', 'verified_lap_ms' => null]);
+
+            return;
+        }
+
         $trackFile = public_path("game-tracks/{$record->track_slug}.json");
 
         if (! file_exists($trackFile)) {

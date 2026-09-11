@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /*
 |--------------------------------------------------------------------------
-| Хронометър — данни за пистите
+| Игра — данни за пистите
 |--------------------------------------------------------------------------
 |
 | Трасетата се генерират от свободни географски данни, не се моделират:
@@ -20,6 +20,11 @@ declare(strict_types=1);
 */
 
 return [
+
+    // Bumping this value starts a fresh competitive season. Historical laps
+    // stay in the database, but only records from this simulation version are
+    // eligible for leaderboards, profiles, badges and server ghosts.
+    'sim_version' => 3,
 
     /*
     |----------------------------------------------------------------------

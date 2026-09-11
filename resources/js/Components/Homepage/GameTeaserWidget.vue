@@ -15,13 +15,13 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 </script>
 
 <template>
-    <!-- Хронометърът: пистата на уикенда + топ 3 — „Иван е дал 1:23, аз мога
+    <!-- Играта: пистата на уикенда + топ 3 — „Иван е дал 1:23, аз мога
          по-бързо" работи по-добре от всеки банер. -->
     <section class="mt-10 rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div>
                 <div class="text-[11px] font-bold uppercase tracking-widest text-[#ff5a55]">
-                    Хронометър · Пистата на уикенда
+                    Игра · Пистата на уикенда
                 </div>
                 <h2 class="mt-1 font-display text-xl font-black text-white sm:text-2xl">
                     Карай {{ teaser.name }} този уикенд

@@ -16,6 +16,14 @@ beforeEach(function () {
     Queue::fake();
 });
 
+it('пази еднаква SIM версия в браузъра и сървърната класация', function () {
+    $source = (string) file_get_contents(resource_path('js/game/sim.js'));
+    preg_match('/export const SIM_VERSION\s*=\s*(\d+)\s*;/', $source, $matches);
+
+    expect($matches[1] ?? null)->not->toBeNull()
+        ->and((int) $matches[1])->toBe((int) config('game.sim_version'));
+});
+
 it('връща 404 за класацията когато флагът е изключен', function () {
     config(['features.game' => false]);
 
@@ -34,6 +42,39 @@ it('показва празни рекорди в началото', function ()
             'top' => [],
             'authenticated' => false,
         ]);
+});
+
+it('нулира класацията, профилите и духовете при sim v3', function () {
+    $legacy = User::factory()->create(['name' => 'Стар рекорд']);
+    $current = User::factory()->create(['name' => 'SIM v3']);
+
+    GameLapRecord::factory()->for($legacy)->create([
+        'lap_ms' => 80000,
+        'sim_version' => 2,
+        'verify_status' => 'verified',
+        'ghost_frames' => 'стари-кадри',
+        'lap_ticks' => 9600,
+    ]);
+    GameLapRecord::factory()->for($current)->create([
+        'lap_ms' => 90000,
+        'verify_status' => 'verified',
+        'ghost_frames' => 'v3-кадри',
+        'lap_ticks' => 10800,
+    ]);
+
+    $this->getJson('/game/leaderboard/monza')
+        ->assertOk()
+        ->assertJsonPath('bests.lap_ms', 90000)
+        ->assertJsonPath('top.0.name', 'SIM v3')
+        ->assertJsonMissing(['name' => 'Стар рекорд']);
+
+    $this->getJson("/game/ghost/monza/{$legacy->id}")->assertNotFound();
+    $this->getJson("/game/ghost/monza/{$current->id}")
+        ->assertOk()
+        ->assertJsonPath('v', 3);
+
+    $stats = app(\App\Services\Game\LeaderboardService::class)->profileStats($legacy);
+    expect($stats['tracks_played'])->toBe(0);
 });
 
 it('иска вход за запис на обиколка', function () {
@@ -109,8 +150,8 @@ it('записва първата обиколка като лилава на п
         'track' => 'monza',
         'lap_ms' => 90000,
         'sectors' => [28000, 31000, 31000],
-        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
-        'sim_version' => 1,
+        'trace' => '{"v":3,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 3,
     ])->assertOk();
 
     $response->assertJson([
@@ -132,8 +173,8 @@ it('лилаво само за подобрените полета и пази �
         'track' => 'monza',
         'lap_ms' => 90000,
         'sectors' => [30000, 30000, 30000],
-        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
-        'sim_version' => 1,
+        'trace' => '{"v":3,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 3,
     ])->assertOk();
 
     // По-бърз S1, по-бавен S3, по-добра обиколка общо.
@@ -141,8 +182,8 @@ it('лилаво само за подобрените полета и пази �
         'track' => 'monza',
         'lap_ms' => 89000,
         'sectors' => [28000, 30000, 31000],
-        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
-        'sim_version' => 1,
+        'trace' => '{"v":3,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 3,
     ])->assertOk();
 
     $response->assertJson([
@@ -183,16 +224,16 @@ it('по-бавна обиколка не е нито лилава, нито л�
         'track' => 'monza',
         'lap_ms' => 88000,
         'sectors' => [29000, 29000, 30000],
-        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
-        'sim_version' => 1,
+        'trace' => '{"v":3,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 3,
     ])->assertOk();
 
     $response = $this->actingAs($user)->postJson('/game/lap', [
         'track' => 'monza',
         'lap_ms' => 95000,
         'sectors' => [31000, 32000, 32000],
-        'trace' => '{"v":1,"start":{},"inputs":"AAAA"}',
-        'sim_version' => 1,
+        'trace' => '{"v":3,"start":{},"inputs":"AAAA"}',
+        'sim_version' => 3,
     ])->assertOk();
 
     $response->assertJson([
@@ -227,15 +268,15 @@ it('пази трейса, маркира pending и пуска валидира
         'track' => 'monza',
         'lap_ms' => 90000,
         'sectors' => [30000, 30000, 30000],
-        'trace' => '{"v":1,"start":{},"inputs":"AAA="}',
-        'sim_version' => 1,
+        'trace' => '{"v":3,"start":{},"inputs":"AAA="}',
+        'sim_version' => 3,
     ])->assertOk();
 
     $record = GameLapRecord::query()->firstOrFail();
 
     expect($record->input_trace)->not->toBeNull()
         ->and($record->verify_status)->toBe('pending')
-        ->and($record->sim_version)->toBe(1);
+        ->and($record->sim_version)->toBe(3);
 
     Queue::assertPushed(
         ValidateGameLapJob::class,
@@ -251,6 +292,20 @@ it('отхвърля запис без трейс — валидацията н�
         'lap_ms' => 90000,
         'sectors' => [30000, 30000, 30000],
     ])->assertJsonValidationErrors(['trace', 'sim_version']);
+
+    expect(GameLapRecord::query()->count())->toBe(0);
+});
+
+it('отхвърля запис от стара версия на симулацията', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/game/lap', [
+        'track' => 'monza',
+        'lap_ms' => 90000,
+        'sectors' => [30000, 30000, 30000],
+        'trace' => '{"v":2,"start":{},"inputs":"AAA="}',
+        'sim_version' => 2,
+    ])->assertJsonValidationErrors('sim_version');
 
     expect(GameLapRecord::query()->count())->toBe(0);
 });
@@ -299,7 +354,7 @@ it('духът е най-бързата обиколка С кадри, дори
     GameLapRecord::factory()->for($user)->create(['lap_ms' => 88000, 'verify_status' => 'verified']);
     GameLapRecord::factory()->for($user)->create([
         'lap_ms' => 90000,
-        'sim_version' => 2,
+        'sim_version' => 3,
         'verify_status' => 'verified',
         'ghost_frames' => 'кадри-на-90',
         'lap_ticks' => 10800,
@@ -315,7 +370,7 @@ it('сервира духа на потребител за дуел', function (
     $user = User::factory()->create(['name' => 'Призрак']);
     GameLapRecord::factory()->for($user)->create([
         'lap_ms' => 90500,
-        'sim_version' => 2,
+        'sim_version' => 3,
         'verify_status' => 'verified',
         'ghost_frames' => 'кадри-base64',
         'lap_ticks' => 10860,
@@ -324,7 +379,7 @@ it('сервира духа на потребител за дуел', function (
     $this->getJson("/game/ghost/monza/{$user->id}")
         ->assertOk()
         ->assertJson([
-            'v' => 2,
+            'v' => 3,
             'lap_ms' => 90500,
             'lap_ticks' => 10860,
             'frames' => 'кадри-base64',

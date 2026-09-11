@@ -29,6 +29,7 @@ class GameLapRecordFactory extends Factory
             'sector1_ms' => $s1,
             'sector2_ms' => $s2,
             'sector3_ms' => $s3,
+            'sim_version' => (int) config('game.sim_version', 3),
         ];
     }
 }

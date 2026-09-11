@@ -93,7 +93,7 @@ it('счупен трейс дава rejected, а не 500', function () {
         'track_slug' => 'monza',
         'lap_ms' => 90000,
         'input_trace' => 'нещо счупено',
-        'sim_version' => 1,
+        'sim_version' => 3,
         'verify_status' => 'pending',
     ]);
 
@@ -104,3 +104,17 @@ it('счупен трейс дава rejected, а не 500', function () {
     fn (): bool => trim((string) shell_exec('node --version 2>&1')) === '',
     'Node не е наличен в тази среда.',
 );
+
+it('отхвърля чакащ job от стара симулация без да стартира валидатора', function () {
+    $record = GameLapRecord::factory()->for(User::factory()->create())->create([
+        'track_slug' => 'monza',
+        'lap_ms' => 90000,
+        'input_trace' => '{"v":2,"start":{},"inputs":"AAA="}',
+        'sim_version' => 2,
+        'verify_status' => 'pending',
+    ]);
+
+    (new ValidateGameLapJob($record->id))->handle();
+
+    expect($record->refresh()->verify_status)->toBe('rejected');
+});
