@@ -1,0 +1,23 @@
+[Unit]
+Description=Padok Laravel queue worker
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/f1bulgaria
+Environment=APP_ENV=production
+Environment=HOME=/var/www
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/php /var/www/f1bulgaria/artisan queue:work database --sleep=3 --tries=3 --timeout=120 --max-time=3600
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=150
+
+[Install]
+WantedBy=multi-user.target

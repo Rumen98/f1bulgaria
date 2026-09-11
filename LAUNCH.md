@@ -97,8 +97,16 @@ git pull, composer, `npm run build` (клиентски + SSR bundle), мигр�
 Управлява се от **systemd** (не supervisor — там е само SSR демонът):
 
 ```bash
+sudo cp docs/systemd-padok-queue.service /etc/systemd/system/padok-queue.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now padok-queue
 systemctl status padok-queue
 ```
+
+Това е еднократната инсталация на versioned unit-а. Ако `command -v php` не
+връща `/usr/bin/php`, коригирай `ExecStart` в копирания unit. Node трябва да е
+системно достъпен за `www-data`; за нестандартен път задай абсолютна стойност
+на `GAME_NODE_BINARY` в `.env` и пусни `php artisan config:cache` като `www-data`.
 
 > `ExecStart` съдържа `--max-time=3600`, тоест процесът излиза сам след час.
 > Затова unit-ът ТРЯБВА да е с `Restart=always` — при `on-failure` изходът
