@@ -603,12 +603,13 @@ export function makePaintMaterial(template, options = {}) {
 }
 
 /**
- * Гумите + джантите: един атлас на ос. roughness 0.7 / metalness 0.15 —
- * плановете дават 0.75-0.85 / 0, но при metalness 0 джантата (в същия атлас)
- * става пластмасова; малко металност ѝ връща отблясъка без да лъска гумата.
+ * Гумите + джантите делят атлас и draw call, но имат различен финиш:
+ * матов борд, сатенена контактна повърхност и метална джанта. Маската е по
+ * радиуса в локалната геометрия, така че надписите върху борда не стават
+ * метални. Без измерена ос остава общият резервен материал.
  *
  * @param {THREE.MeshStandardMaterial} source
- * @param {{environment?: THREE.Texture|null, environmentRotation?: THREE.Euler|null, maxAniso?: number}} options
+ * @param {{environment?: THREE.Texture|null, environmentRotation?: THREE.Euler|null, maxAniso?: number, radius?: number, lowPower?: boolean}} options
  * @returns {THREE.MeshStandardMaterial}
  */
 export function makeWheelMaterial(source, options = {}) {
@@ -628,6 +629,44 @@ export function makeWheelMaterial(source, options = {}) {
         material.envMapRotation.copy(options.environmentRotation);
     }
     material.envMapIntensity = 0.8;
+
+    if (Number.isFinite(options.radius) && options.radius > 0 && !options.lowPower) {
+        applyPatch(material, {
+            name: 'wheel-finish',
+            uniforms: { uWheelRadius: { value: options.radius } },
+            vertexHead: 'varying vec3 vWheelLocal;',
+            vertexMain: 'vWheelLocal = position;',
+            fragmentHead: /* glsl */ `
+                uniform float uWheelRadius;
+                varying vec3 vWheelLocal;`,
+            replace: [
+                [
+                    'color_fragment',
+                    /* glsl */ `#include <color_fragment>
+                    float wheelRadial = length(vWheelLocal.yz) / uWheelRadius;
+                    float wheelRim = 1.0 - smoothstep(${RIM_RADIUS_RATIO - 0.04}, ${RIM_RADIUS_RATIO + 0.02}, wheelRadial);
+                    float wheelTread = smoothstep(0.91, 0.98, wheelRadial);
+                    // Фини следи по слика; производните гасят детайла под пиксел.
+                    float wheelScuffPhase = vWheelLocal.x * 720.0;
+                    float wheelScuffFade = (1.0 - smoothstep(0.5, 2.0, fwidth(wheelScuffPhase)))
+                        * (1.0 - smoothstep(8.0, 24.0, length(vViewPosition)));
+                    float wheelScuff = sin(wheelScuffPhase + sin(vWheelLocal.z * 34.0)) * wheelScuffFade * wheelTread;
+                    diffuseColor.rgb *= 1.0 + 0.035 * wheelScuff;`,
+                ],
+                [
+                    'roughnessmap_fragment',
+                    /* glsl */ `#include <roughnessmap_fragment>
+                    roughnessFactor = mix(mix(0.82, 0.61, wheelTread), 0.32, wheelRim);
+                    roughnessFactor += 0.025 * wheelScuff;`,
+                ],
+                [
+                    'metalnessmap_fragment',
+                    /* glsl */ `#include <metalnessmap_fragment>
+                    metalnessFactor = 0.88 * wheelRim;`,
+                ],
+            ],
+        });
+    }
 
     return material;
 }
@@ -792,8 +831,8 @@ export function buildGlbCar(template, options = {}) {
     const wheelMaterials = shared
         ? { front: shared, rear: shared }
         : {
-              front: makeWheelMaterial(template.wheelMaterials.front, options),
-              rear: makeWheelMaterial(template.wheelMaterials.rear, options),
+              front: makeWheelMaterial(template.wheelMaterials.front, { ...options, radius: template.axles.front.radius }),
+              rear: makeWheelMaterial(template.wheelMaterials.rear, { ...options, radius: template.axles.rear.radius }),
           };
 
     const model = new THREE.Group();

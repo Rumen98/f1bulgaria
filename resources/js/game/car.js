@@ -188,76 +188,59 @@ export function buildCar() {
  *   докато GLB-то още се тегли, а хваната по-рано текстура би била мъртва.
  * @returns {Promise<void>}
  */
-export function attachCarModel(rig, isStale, onProgress = () => {}, options = {}) {
-    return new Promise((resolve) => {
-        let settled = false;
-        const done = () => {
-            if (settled) {
-                return;
-            }
-            settled = true;
-            clearTimeout(timer);
-            resolve();
-        };
-        // Тежък модел да не държи loading екрана безкрайно.
-        const timer = setTimeout(done, 15000);
+export async function attachCarModel(rig, isStale, onProgress = () => {}, options = {}) {
+    // Game.ready чака същия шаблон и за съперниците. Отделен timeout тук
+    // не ускорява старта, а оставя само играча с резервния силует при бавно
+    // изтегляне. Приключваме едва след прилагането на готовия модел.
+    const template = await loadCarTemplate(onProgress);
+    if (template === null || isStale?.()) {
+        return;
+    }
 
-        loadCarTemplate(onProgress).then((template) => {
-            // Късно (след старт) или след освобождаване — не показвай болида
-            // (би бил pop). Шаблонът е споделен и остава за следващата игра.
-            if (template === null || settled || isStale?.()) {
-                done();
-                return;
-            }
-
-            const lowPower = options.lowPower === true;
-            const car = buildGlbCar(template, {
-                environment: resolveOption(options.environment),
-                environmentRotation: resolveOption(options.environmentRotation),
-                maxAniso: options.maxAniso ?? 1,
-                lowPower,
-                castShadow: !lowPower,
-            });
-
-            // Скрий процедурните части — моделът ги замества визуално.
-            // Светлинните ефекти (userData.carLight — спирачно греене, ауспух,
-            // blur дискове) НЕ са част от силуета: при GLB, пристигнал късно,
-            // те вече висят на body-то и скриването им би ги убило.
-            for (const child of rig.body.children) {
-                if (!child.userData.carLight) {
-                    child.visible = false;
-                }
-            }
-            for (const wheel of rig.wheels) {
-                wheel.steer.visible = false;
-            }
-
-            rig.body.add(car.model);
-            for (const wheel of car.wheels) {
-                rig.unsprung.add(wheel.steer);
-            }
-            if (lowPower && !rig.shadowProxy) {
-                rig.shadowProxy = buildCarShadowProxy();
-                rig.body.add(rig.shadowProxy);
-            }
-
-            rig.model = car.model;
-            rig.glbBody = car.body;
-            rig.wheels = car.wheels;
-            rig.frontWheels = car.wheels.filter((wheel) => wheel.axle === 'front').map((wheel) => wheel.steer);
-            rig.allWheels = car.wheels.map((wheel) => wheel.spin);
-            rig.axles = car.axles;
-            rig.wheelRadius = car.wheelRadius;
-            rig.tyreWidth = car.tyreWidth;
-            rig.paintMaterials = car.paintMaterials;
-            rig.wheelMaterials = car.wheelMaterials;
-
-            rig.helmet = buildHelmet(options.helmetColor ?? ACCENT, cockpitPosition(template));
-            rig.body.add(rig.helmet);
-
-            done();
-        });
+    const lowPower = options.lowPower === true;
+    const car = buildGlbCar(template, {
+        environment: resolveOption(options.environment),
+        environmentRotation: resolveOption(options.environmentRotation),
+        maxAniso: options.maxAniso ?? 1,
+        lowPower,
+        castShadow: !lowPower,
     });
+
+    // Скрий процедурните части — моделът ги замества визуално.
+    // Светлинните ефекти (userData.carLight — спирачно греене, ауспух,
+    // blur дискове) НЕ са част от силуета: при GLB, пристигнал късно,
+    // те вече висят на body-то и скриването им би ги убило.
+    for (const child of rig.body.children) {
+        if (!child.userData.carLight) {
+            child.visible = false;
+        }
+    }
+    for (const wheel of rig.wheels) {
+        wheel.steer.visible = false;
+    }
+
+    rig.body.add(car.model);
+    for (const wheel of car.wheels) {
+        rig.unsprung.add(wheel.steer);
+    }
+    if (lowPower && !rig.shadowProxy) {
+        rig.shadowProxy = buildCarShadowProxy();
+        rig.body.add(rig.shadowProxy);
+    }
+
+    rig.model = car.model;
+    rig.glbBody = car.body;
+    rig.wheels = car.wheels;
+    rig.frontWheels = car.wheels.filter((wheel) => wheel.axle === 'front').map((wheel) => wheel.steer);
+    rig.allWheels = car.wheels.map((wheel) => wheel.spin);
+    rig.axles = car.axles;
+    rig.wheelRadius = car.wheelRadius;
+    rig.tyreWidth = car.tyreWidth;
+    rig.paintMaterials = car.paintMaterials;
+    rig.wheelMaterials = car.wheelMaterials;
+
+    rig.helmet = buildHelmet(options.helmetColor ?? ACCENT, cockpitPosition(template));
+    rig.body.add(rig.helmet);
 }
 
 /**

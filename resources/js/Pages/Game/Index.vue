@@ -1,5 +1,6 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import GameLobbyHero from '@/Components/Game/GameLobbyHero.vue';
 import LapAnalysis from '@/Pages/Game/LapAnalysis.vue';
 import { lookFor } from '@/game/circuits.js';
 import { isMobileDevice } from '@/game/device.js';
@@ -79,6 +80,7 @@ const orderedTracks = computed(() => {
     const rest = props.tracks.filter((t) => t.slug !== props.weekTrack);
     return [...week, ...rest];
 });
+const featuredTrack = computed(() => orderedTracks.value[0] ?? null);
 
 const page = usePage();
 const authUser = computed(() => page.props.auth?.user ?? null);
@@ -2102,16 +2104,21 @@ const recenterTilt = () => {
         <Head title="Игра" />
 
         <!-- ── Избор на писта ─────────────────────────────────────────── -->
-        <div v-if="!selectedTrack" class="mx-auto max-w-5xl px-4 py-10 sm:py-14">
-            <div class="mb-8">
-                <h1 class="text-3xl font-black tracking-tight text-zinc-100 sm:text-4xl">
-                    Игра<span class="text-[#e10600]">.</span>
-                </h1>
-                <p class="mt-3 max-w-2xl text-zinc-400">
-                    Избери писта и карай чиста обиколка. Трасетата са построени от
-                    реалната геометрия на пистите — всеки завой е там, където му е мястото.
-                </p>
+        <div v-if="!selectedTrack" class="mx-auto max-w-6xl px-4 py-8 sm:py-10">
+            <GameLobbyHero
+                :track="featuredTrack"
+                :track-count="tracks.length"
+                :outline="featuredTrack ? trackCatalogOutline(featuredTrack) : ''"
+                :loading="loading"
+                @drive="featuredTrack && startGame(featuredTrack)"
+            />
 
+            <div class="mb-5 mt-10 flex items-end justify-between gap-4">
+                <div>
+                    <p class="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-red-400">Следващата ти обиколка</p>
+                    <h2 class="font-display text-2xl font-bold text-zinc-100">Избери своето трасе</h2>
+                </div>
+                <span class="shrink-0 pb-1 font-display text-xs tabular-nums text-zinc-500">{{ String(tracks.length).padStart(2, '0') }} писти</span>
             </div>
 
             <div
@@ -2374,9 +2381,13 @@ const recenterTilt = () => {
                         :class="isMobile ? 'left-3 top-3' : 'left-4 top-4 sm:left-6 sm:top-6'"
                     >
                         <div
-                            class="rounded-lg border-l-2 border-[#e10600] bg-black/55 backdrop-blur-sm"
+                            class="instrument-panel timing-panel rounded-lg border-l-2 border-[#e10600]"
                             :class="isMobile ? 'px-3 py-2' : 'px-4 py-3'"
                         >
+                            <div v-if="!isMobile" class="hud-secondary mb-2 flex items-center justify-between gap-4 border-b border-white/10 pb-2">
+                                <span class="max-w-40 truncate text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-200">{{ selectedTrack.location }}</span>
+                                <span class="h-1.5 w-1.5 rounded-full" :class="telemetry.started ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                            </div>
                             <div
                                 class="text-[11px] font-semibold uppercase tracking-widest"
                                 :class="telemetry.started ? 'text-zinc-400' : 'text-amber-400'"
@@ -2523,12 +2534,12 @@ const recenterTilt = () => {
                                     L {{ Math.min(Math.max(telemetry.raceLap, 1), telemetry.raceTotalLaps) }}/{{ telemetry.raceTotalLaps }}
                                 </div>
                             </div>
-                            <div class="hud-secondary mt-1.5 rounded-lg bg-black/55 px-3 py-2 text-[11px] tabular-nums backdrop-blur-sm">
+                            <div class="instrument-panel race-tower hud-secondary mt-1.5 rounded-lg px-3 py-2 text-[11px] tabular-nums">
                                 <div
                                     v-for="(row, idx) in telemetry.tower"
                                     :key="idx"
-                                    class="flex items-baseline justify-between gap-3"
-                                    :class="row.isPlayer ? 'font-bold text-fuchsia-300' : 'text-zinc-300'"
+                                    class="flex items-baseline justify-between gap-3 py-0.5"
+                                    :class="row.isPlayer ? 'race-tower-player font-bold text-white' : 'text-zinc-300'"
                                 >
                                     <span class="flex items-baseline gap-1">
                                         <span class="w-3 text-zinc-500">{{ idx + 1 }}</span>
@@ -2556,16 +2567,16 @@ const recenterTilt = () => {
                         :class="isMobile ? 'right-3 top-[4.75rem]' : 'bottom-4 right-4 sm:bottom-6 sm:right-6'"
                     >
                         <div
-                            class="-skew-x-6 rounded-lg border-l-2 border-[#e10600] bg-black/55 backdrop-blur-sm"
+                            class="instrument-panel speed-panel rounded-lg border-t-2 border-[#e10600]"
                             :class="isMobile ? 'px-3 py-2' : 'px-5 py-3'"
                         >
-                            <div class="skew-x-6">
+                            <div>
                                 <!-- Rev бар с shift-lights (мига в червената зона) -->
-                                <div class="mb-2 flex justify-end gap-[3px]" :class="atRedline ? 'motion-safe:animate-pulse' : ''">
+                                <div class="rev-strip mb-3 flex gap-[3px]" :class="atRedline ? 'motion-safe:animate-pulse' : ''">
                                     <span
                                         v-for="(seg, i) in revSegments"
                                         :key="i"
-                                        class="rounded-[2px]"
+                                        class="flex-1 rounded-[2px]"
                                         :class="[isMobile ? 'h-1.5 w-1.5' : 'h-2 w-2', seg.on ? seg.color : 'bg-zinc-700/60']"
                                     ></span>
                                 </div>
@@ -2596,7 +2607,7 @@ const recenterTilt = () => {
                                     </div>
 
                                     <!-- Предавка (key-а рестартира pop анимацията при смяна) -->
-                                    <div class="text-center">
+                                    <div class="gear-cell text-center" :class="isMobile ? 'px-2 py-1' : 'px-3 py-2'">
                                         <div
                                             :key="gearLabel"
                                             class="gear-pop font-display font-black leading-none tabular-nums text-white"
@@ -2604,12 +2615,12 @@ const recenterTilt = () => {
                                         >
                                             {{ gearLabel }}
                                         </div>
-                                        <div class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+                                        <div class="mt-1 text-[9px] font-semibold uppercase tracking-widest text-zinc-400">
                                             предавка
                                         </div>
                                     </div>
                                     <!-- Скорост: кехлибарена при плъзгане (slip > 0.3) -->
-                                    <div class="text-right">
+                                    <div class="speed-readout text-right">
                                         <div
                                             class="font-display font-black leading-none tabular-nums transition-colors duration-150"
                                             :class="[isMobile ? 'text-3xl' : 'text-5xl sm:text-6xl', slipHot ? 'text-amber-300' : 'text-white']"
@@ -2623,9 +2634,9 @@ const recenterTilt = () => {
                                 </div>
 
                                 <!-- Обороти -->
-                                <div v-if="!isMobile" class="hud-secondary mt-1 text-right font-display text-[11px] font-bold tabular-nums text-zinc-400">
-                                    {{ (telemetry.rpm ?? 0).toLocaleString('bg-BG') }}
-                                    <span class="font-sans font-normal text-zinc-600">об/мин</span>
+                                <div v-if="!isMobile" class="hud-secondary mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[10px] font-semibold tabular-nums text-zinc-400">
+                                    <span class="uppercase tracking-widest">{{ transmission === 'manual' ? 'Ръчна' : 'Автоматична' }}</span>
+                                    <span class="font-display">{{ (telemetry.rpm ?? 0).toLocaleString('bg-BG') }} <span class="font-sans font-normal">об/мин</span></span>
                                 </div>
                             </div>
                         </div>
@@ -2635,16 +2646,20 @@ const recenterTilt = () => {
                          Телефон: 72 px горе в центъра (най-полезна е точно там,
                          където tilt играчът не вижда далеч напред). -->
                     <div
-                        class="hud-minimap pointer-events-none absolute"
+                        class="hud-minimap instrument-panel pointer-events-none absolute overflow-hidden rounded-lg"
                         :class="isMobile ? 'left-1/2 top-3 -translate-x-1/2' : 'right-4 top-[7.5rem] sm:right-6'"
                     >
                         <canvas
                             ref="minimapCanvas"
                             :width="MINIMAP_PX"
                             :height="MINIMAP_PX"
-                            class="rounded-lg bg-black/40 backdrop-blur-sm"
+                            class="block"
                             :style="{ width: `${minimapCss}px`, height: `${minimapCss}px` }"
                         ></canvas>
+                        <div v-if="!isMobile" class="hud-secondary flex justify-between gap-2 border-t border-white/10 px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+                            <span>Трасе</span>
+                            <span class="tabular-nums text-zinc-200">{{ (selectedTrack.length / 1000).toFixed(3) }} км</span>
+                        </div>
                     </div>
                 </div>
 
@@ -2902,12 +2917,12 @@ const recenterTilt = () => {
                          и модалът не трябва да остава върху активния canvas. -->
                     <template v-if="preStart">
                         <div
-                            class="game-dialog-layer fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black/80 p-2 backdrop-blur-sm sm:p-4"
+                            class="game-dialog-layer fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black/65 p-2 backdrop-blur-sm sm:p-4"
                         >
                             <div
                                 ref="preStartDialog"
                                 tabindex="-1"
-                                class="game-dialog-panel flex max-h-[calc(100dvh-1rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl outline-none sm:max-h-[calc(100dvh-2rem)]"
+                                class="game-dialog-panel prestart-panel flex max-h-[calc(100dvh-1rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl outline-none sm:max-h-[calc(100dvh-2rem)]"
                                 role="dialog"
                                 aria-modal="true"
                                 aria-labelledby="prestart-title"
@@ -2915,11 +2930,11 @@ const recenterTilt = () => {
                                 <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
                             <!-- Зареждащ екран: очертанието на пистата се дорисува с
                                  реалния прогрес (байтове), не с фалшив таймер. -->
-                            <div class="flex items-center gap-4">
+                            <div class="prestart-heading flex items-center gap-4 border-b border-white/10 pb-5">
                                 <svg
                                     v-if="outlineSvg"
                                     viewBox="-6 -6 112 112"
-                                    class="h-20 w-20 shrink-0"
+                                    class="h-20 w-20 shrink-0 sm:h-24 sm:w-24"
                                     aria-hidden="true"
                                 >
                                     <path :d="outlineSvg" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4" stroke-linejoin="round" />
@@ -2937,6 +2952,7 @@ const recenterTilt = () => {
                                     />
                                 </svg>
                                 <div class="min-w-0 flex-1">
+                                    <p class="mb-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-red-400">На стартовата решетка</p>
                                     <h2 id="prestart-title" class="font-display text-lg font-black uppercase tracking-wider text-zinc-100">
                                         {{ selectedTrack?.name }}
                                     </h2>
@@ -2959,7 +2975,7 @@ const recenterTilt = () => {
 
                             <div class="mt-5">
                                 <div class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
-                                    Пистата
+                                    Режим на каране
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button
@@ -3101,7 +3117,7 @@ const recenterTilt = () => {
                                     <span><kbd class="rounded bg-zinc-800 px-1.5 py-0.5">M</kbd> звук</span>
                                 </div>
                                 <p class="mt-2 text-[11px] text-zinc-500">
-                                    Мини стартовата линия, за да пуснеш хронометъра.
+                                    {{ rivals === 'race' ? 'Изчакай червените светлини да изгаснат и потегли.' : 'Мини стартовата линия, за да пуснеш хронометъра.' }}
                                 </p>
                             </div>
 
@@ -3678,6 +3694,68 @@ const recenterTilt = () => {
     margin-left: calc(50% - 50vw);
 }
 
+/* Плътен контраст и обща рамка върху слънце, асфалт и нощна сцена. */
+.instrument-panel {
+    background: linear-gradient(135deg, rgba(20, 24, 29, 0.96), rgba(8, 11, 15, 0.9));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 6px 24px rgba(0, 0, 0, 0.16);
+}
+
+.timing-panel {
+    min-width: 11rem;
+}
+
+.speed-panel {
+    min-width: 15rem;
+}
+
+.speed-readout {
+    min-width: 3.1ch;
+}
+
+.gear-cell {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.race-tower-player {
+    margin-inline: -0.4rem;
+    padding-inline: 0.4rem;
+    background: linear-gradient(90deg, rgba(225, 6, 0, 0.3), rgba(225, 6, 0, 0.06));
+    box-shadow: inset 2px 0 #e10600;
+}
+
+.game-toolbar > [role='group'],
+.game-toolbar > div:not([role='group']) > button {
+    background-color: rgba(12, 16, 21, 0.9);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.game-toolbar > div:not([role='group']) > button:hover {
+    background-color: rgba(35, 40, 47, 0.97);
+}
+
+.game-stage-mobile .timing-panel,
+.game-stage-mobile .speed-panel {
+    min-width: 0;
+}
+
+.prestart-panel {
+    background: linear-gradient(145deg, #1c1e22, #101216 65%);
+    border-top: 2px solid #e10600;
+}
+
+.prestart-heading svg {
+    padding: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    background: linear-gradient(145deg, rgba(225, 6, 0, 0.09), rgba(255, 255, 255, 0.02));
+}
+
+.prestart-panel button[aria-pressed='true'] {
+    box-shadow: inset 0 0 0 1px rgba(225, 6, 0, 0.35);
+}
+
 /* Каталогът използва реалния силует и авторския look preset на всяка писта. */
 .track-card {
     background:
@@ -3972,8 +4050,20 @@ const recenterTilt = () => {
 
     .fade-enter-active,
     .fade-leave-active,
-    .outline-draw {
+    .outline-draw,
+    .track-card,
+    .track-card-outline,
+    .track-card-arrow {
         transition: none;
+    }
+
+    .track-card:hover,
+    .track-card:focus-within,
+    .track-card:hover .track-card-outline,
+    .track-card:focus-within .track-card-outline,
+    .track-card:hover .track-card-arrow,
+    .track-card:focus-within .track-card-arrow {
+        transform: none;
     }
 }
 </style>
