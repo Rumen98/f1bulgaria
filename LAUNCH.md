@@ -79,7 +79,7 @@ cd /var/www/f1bulgaria && sudo bash deploy.sh
 
 Скриптът ([deploy.sh](deploy.sh)) прави всичко в правилния ред и **като `www-data`** —
 git pull, composer, `npm run build` (клиентски + SSR bundle), миграции, кешове,
-рестарт на SSR демона и проверка накрая.
+рестарт на SSR демона и queue worker-а и проверки накрая.
 
 > **Никога не пускай artisan като root.** Оставя root-owned файлове в `storage/`
 > и `bootstrap/cache/`; php-fpm не може да пише в тях и сайтът връща 500 **без
@@ -90,10 +90,9 @@ git pull, composer, `npm run build` (клиентски + SSR bundle), мигр�
 
 ## 3б. Queue worker
 
-`QUEUE_CONNECTION=database`, а всички бюлетинни писма (седмичен дайджест,
-петъчно preview, месечен пулс) пращат през `Mail::queue()`. **Без работещ
-worker тези писма седят в таблицата `jobs` завинаги — без грешка и без следа
-в лога.**
+`QUEUE_CONNECTION=database`, а `ValidateGameLapJob` преиграва подадените
+обиколки през Node. **Без работещ worker записите остават `pending`: няма
+авторитетна сървърна проверка, записан сървърен дух или значки от обиколката.**
 
 Управлява се от **systemd** (не supervisor — там е само SSR демонът):
 
@@ -210,13 +209,14 @@ for u in / /standings /teams /drivers/lewis-hamilton; do curl -s -o /dev/null "$
 
 ## 7. Опашка (queue)
 
-`QUEUE_CONNECTION=database`. Пусни worker (systemd/supervisor):
+`QUEUE_CONNECTION=database`. Пусни worker (systemd):
 
 ```bash
 php artisan queue:work --tries=3 --max-time=3600
 ```
 
-Поща (седмичен дайджест, петъчно preview, месечен пулс, имейл верификация) минава през опашката.
+Worker-ът изпълнява сървърното replay валидиране на обиколките. Node трябва
+да е достъпен през `GAME_NODE_BINARY` (по подразбиране `node`).
 
 ## 8. DNS / HTTPS
 

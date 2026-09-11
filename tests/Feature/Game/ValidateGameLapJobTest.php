@@ -22,6 +22,13 @@ beforeEach(function () {
     );
 });
 
+it('има retry прозорец над максималното време на валидатора', function () {
+    $job = new ValidateGameLapJob(1);
+
+    expect(config('queue.connections.database.retry_after'))
+        ->toBeGreaterThan($job->timeout);
+});
+
 it('потвърждава истинска обиколка чрез преиграване в Node', function () {
     $record = GameLapRecord::factory()->for(User::factory()->create())->create([
         'track_slug' => 'monza',

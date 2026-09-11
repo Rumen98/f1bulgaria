@@ -72,6 +72,16 @@ echo "→ Рестарт на SSR демона"
 $ARTISAN inertia:stop-ssr || true
 supervisorctl restart padok-ssr
 
+echo "→ Рестарт на queue worker-а"
+# ValidateGameLapJob преиграва обиколките с Node и worker-ът държи PHP кода
+# в паметта. Запомняме PID-а, за да не отчетем стария процес като успешен
+# restart, докато systemd още не е вдигнал новия.
+queue_pid_before="$(systemctl show padok-queue --property=MainPID --value 2>/dev/null || true)"
+case "$queue_pid_before" in
+    ''|*[!0-9]*) queue_pid_before=0 ;;
+esac
+$ARTISAN queue:restart || true
+
 echo "→ Проверка"
 sleep 3
 $ARTISAN inertia:check-ssr
@@ -85,18 +95,55 @@ else
     echo "  Провери: supervisorctl status padok-ssr; tail storage/logs/ssr.log"
 fi
 
-# --- Опашка: премахната -------------------------------------------------
-# Бюлетините се пращат СИНХРОННО (виж трейта SendsBulkMail). Нищо в кода
-# не подава работа на опашката — нула ->queue() извиквания, нула ShouldQueue
-# класове.
-#
-# Проверката тук стоеше заради 13-те дни мълчание през 07.2026, но след
-# синхронното пращане пазеше нещо неизползвано и крещеше на всеки деплой:
-# `queue:restart` убива worker-а, systemd го вдига след RestartSec, а
-# проверката питаше 3 секунди по-късно и виждаше дупката. Предупреждение,
-# което лъже, учи да се игнорира и следващото.
-#
-# Ако някога пак потрябва опашка: върни `queue:restart` тук И проверката,
-# но с изчакване, не с фиксиран sleep.
+# --- Queue worker -------------------------------------------------------
+# queue:restart е graceful: активният job може да довърши преди процесът да
+# излезе. Чакаме systemd да даде нов PID вместо да проверяваме във фиксирана
+# дупка по време на рестарта.
+echo "→ Проверка на queue worker-а"
+queue_healthy=false
+queue_reloaded=false
+for _ in {1..15}; do
+    queue_healthy=false
+    queue_pid_now="$(systemctl show padok-queue --property=MainPID --value 2>/dev/null || true)"
+    case "$queue_pid_now" in
+        ''|*[!0-9]*) queue_pid_now=0 ;;
+    esac
+
+    if systemctl is-active --quiet padok-queue && [ "$queue_pid_now" -gt 0 ]; then
+        queue_healthy=true
+        if [ "$queue_pid_before" -eq 0 ] || [ "$queue_pid_now" -ne "$queue_pid_before" ]; then
+            queue_reloaded=true
+            break
+        fi
+    fi
+
+    sleep 2
+done
+
+if [ "$queue_healthy" = true ]; then
+    echo "  padok-queue работи ✓"
+    if [ "$queue_reloaded" != true ]; then
+        echo "  ВНИМАНИЕ: worker-ът е активен, но нов PID не се появи до 30 секунди."
+        echo "  Провери: systemctl status padok-queue"
+    fi
+else
+    echo "  ВНИМАНИЕ: padok-queue НЕ работи — обиколките няма да се валидират!"
+    echo "  Причина:  journalctl -u padok-queue -n 50 --no-pager"
+    echo "  Вдигане:  systemctl reset-failed padok-queue && systemctl start padok-queue"
+fi
+
+# Жив процес не доказва, че опашката се дренира — показваме backlog-а при
+# всеки deploy, за да се види натрупване или повтарящи се грешки.
+pending=$($ARTISAN tinker --execute 'echo DB::table("jobs")->count();' 2>/dev/null | tr -dc '0-9' || true)
+failed=$($ARTISAN tinker --execute 'echo DB::table("failed_jobs")->count();' 2>/dev/null | tr -dc '0-9' || true)
+echo "  Опашка: ${pending:-?} чакащи, ${failed:-?} провалени"
+
+if [ "${pending:-0}" -gt 50 ]; then
+    echo "  ВНИМАНИЕ: опашката е натрупана — worker-ът вероятно не дренира."
+fi
+
+if [ "${failed:-0}" -gt 0 ]; then
+    echo "  ВНИМАНИЕ: има провалени job-ове — виж ги с: php artisan queue:failed"
+fi
 
 echo "✓ Готово"
