@@ -19,12 +19,12 @@ cd "$APP_DIR"
 # --- 0. Собственост -----------------------------------------------------
 # Ако някой е пускал git/artisan като root, файловете са root-owned и всяка
 # следваща команда като www-data гърми ("dubious ownership", Permission denied).
-# Оправяме го тук, вместо да гадаем после защо сайтът дава 500.
+# .git може вече да е на www-data, а вложени директории да са останали на
+# root. Проверяваме цялото дърво и поправяме само различните собственик/група.
+# find не следва symlink-ове; chown -h не променя външните им цели.
 echo "→ Проверка на собствеността"
-if [ "$(stat -c '%U' "$APP_DIR/.git")" != "www-data" ]; then
-    echo "  .git е на $(stat -c '%U' "$APP_DIR/.git") — прехвърлям на www-data"
-    chown -R www-data:www-data "$APP_DIR"
-fi
+find "$APP_DIR" \( ! -user www-data -o ! -group www-data \) \
+    -exec chown -h www-data:www-data {} +
 
 # Git отказва да работи в директория с чужда собственост. --system (в
 # /etc/gitconfig) важи и за root, и за www-data — --global би записал само в
