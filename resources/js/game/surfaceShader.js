@@ -36,7 +36,12 @@
  *
  * Мобилен път (lowPower): асфалтът добавя 1 шумов + 1 профилен fetch (и 1
  * облачен, ако пистата има облаци) към единствения diffuse tap — това е
- * гумираната линия, макро тонът и линиите, без хеширани тайлове.
+ * гумираната линия, макро тонът и линиите, без хеширани тайлове. Теренът
+ * там е MeshLambertMaterial (terrain.js) — без roughness изобщо, така че
+ * кръпката пропуска `roughnessmap_fragment` за него: Lambert няма този
+ * chunk и materialPatch би гръмнал при компилация (счупен кадър на всеки
+ * телефон, болидът не се рисува). Решава се по класа на материала при
+ * кърпенето, не по lowPower — същият материал може да дойде и от другаде.
  *
  * Анти-тайлинг: техниката на Quilez (два виртуални тайла с хеширани
  * отмествания, смесени по нискочестотен шум) с textureGrad, за да не
@@ -46,10 +51,13 @@
  * и roughnessMap, така че релефът съвпада с албедото.
  *
  * Тестова бележка: заменените chunk-ове са `map_fragment`,
- * `roughnessmap_fragment`, `normal_fragment_maps`, `lights_fragment_begin`
- * (последният се запазва като include и само се допълва) — имената са
- * проверени срещу node_modules/three/src/renderers/shaders/ShaderChunk за
- * 0.180; липсващ chunk гърми при компилация през materialPatch. Използвани
+ * `roughnessmap_fragment` (само Standard/Physical), `normal_fragment_maps`,
+ * `lights_fragment_begin` (последният се запазва като include и само се
+ * допълва) — имената са проверени срещу
+ * node_modules/three/src/renderers/shaders/ShaderChunk за 0.180; липсващ
+ * chunk гърми при компилация през materialPatch, което
+ * scripts/game/shader-patch-selftest.mjs проверява за всеки вид × клас
+ * материал без WebGL (кръпката се пуска върху ShaderLib текста). Използвани
  * псевдоними от префикса на three за WebGL2: texture2D → texture,
  * texture2DGradEXT → textureGrad, texture2DLodEXT → textureLod (само във
  * фрагмента). Ползвани вградени символи: `rand(vec2)` (common),
@@ -311,7 +319,11 @@ export function patchSurfaceMaterial(material, kind, features, uniforms) {
     if (!material?.isMaterial) {
         throw new TypeError(`surfaceShader: „${kind}" не е three.js Material`);
     }
-    const patch = buildPatch(kind, features);
+    // Standard/Physical (isMeshStandardMaterial е true и за Physical) имат
+    // roughness pipeline; Lambert/Basic/Phong — не, и техният шейдър няма
+    // <roughnessmap_fragment>. Определя се по материала, за да не гърми
+    // materialPatch при подмяна на липсващ chunk.
+    const patch = buildPatch(kind, features, { pbr: material.isMeshStandardMaterial === true });
     patch.uniforms = pickUniforms(uniforms, patch.uniformNames);
     delete patch.uniformNames;
     material.userData.surface = { kind, features };
@@ -447,9 +459,12 @@ export function applySurfaceShaders(materials, track, circuit, options = {}) {
  *
  * @param {string} kind
  * @param {SurfaceFeatures} f
+ * @param {{pbr?: boolean}} [target]  pbr=false: материал без roughness (Lambert) —
+ *   без подмяна на `roughnessmap_fragment`
  * @returns {import('./materialPatch.js').MaterialPatch & {uniformNames: string[]}}
  */
-function buildPatch(kind, f) {
+function buildPatch(kind, f, target = {}) {
+    const pbr = target.pbr !== false;
     const profile = f.attributes && (f.rubber || f.marbles || f.wet === 'full');
     const flatten = f.lines || f.puddles;
     const uniformNames = ['tNoise'];
@@ -671,10 +686,10 @@ function buildPatch(kind, f) {
     rough.push('roughnessFactor = clamp(roughnessFactor, 0.03, 1.0);');
 
     // ── normal_fragment_maps (само където има какво да се промени) ──
-    const replace = [
-        ['map_fragment', map.join('\n')],
-        ['roughnessmap_fragment', rough.join('\n')],
-    ];
+    const replace = [['map_fragment', map.join('\n')]];
+    if (pbr) {
+        replace.push(['roughnessmap_fragment', rough.join('\n')]);
+    }
     if (f.antiTile || f.detailNormal || flatten) {
         const normal = [
             '#ifdef USE_NORMALMAP_OBJECTSPACE',

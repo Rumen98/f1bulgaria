@@ -63,6 +63,13 @@ const ghostKey = (slug) => `padok-ghost-${slug}`;
  *  един кадър, който сам е дълъг и се самоподхранва. 0.1 = до 12 стъпки. */
 const MAX_FRAME_TIME = 0.1;
 
+/**
+ * Поредни гръмнали кадри, след които играта се смята за трайно счупена
+ * (виж Game.#frameFailed). Гръмнал шейдър гърми на всеки кадър и удря
+ * прага за 50 ms; еднократен fluke от чужд API не сваля играта.
+ */
+const FATAL_FRAME_ERRORS = 3;
+
 /** HUD телеметрия — не по-често от 30 Hz. Vue реактивността на всеки кадър
  *  (60+ Hz) е излишен diff/patch; 30 Hz е гладко за таймера, наполовина churn. */
 const TELEMETRY_INTERVAL = 1 / 30;
@@ -566,6 +573,14 @@ export class Game {
         // (R / „Рестарт" по време на реплей) чисти и Vue състоянието през това.
         this.onResultClear = () => {};
 
+        // Фатална грешка в кадъра (виж #fail): Vue сваля играта и показва
+        // съобщение. По подразбиране само логва — играта е ползваема и без Vue.
+        this.onFatalError = (error) => {
+            console.error('Game: фатална грешка в кадъра', error);
+        };
+        this.failed = false;
+        this.frameErrors = 0; // поредни гръмнали кадри (виж #frameFailed)
+
         // Дуел: духът на съперник от класацията (сървърни кадри). Докато е
         // зареден, се показва ТОЙ (фуксия), а не личният/официалният.
         this.rivalGhost = null;
@@ -633,7 +648,7 @@ export class Game {
 
     /** Стартира цикъла. */
     start() {
-        if (this.running) {
+        if (this.running || this.failed || this.disposed) {
             return;
         }
 
@@ -675,16 +690,68 @@ export class Game {
         this.lastFrame = performance.now();
 
         const loop = (now) => {
-            if (this.running || this.disposed || this.replay === null) {
+            if (this.running || this.disposed || this.failed || this.replay === null) {
                 this.attractId = null;
                 return;
             }
             this.attractId = requestAnimationFrame(loop);
             const dt = Math.min((now - this.lastFrame) / 1000, MAX_FRAME_TIME);
             this.lastFrame = now;
-            this.#replayFrame(dt);
+            try {
+                this.#replayFrame(dt);
+                this.frameErrors = 0;
+            } catch (error) {
+                this.#frameFailed(error);
+            }
         };
         this.attractId = requestAnimationFrame(loop);
+    }
+
+    /**
+     * Гръмнал кадър. Еднократна грешка (напр. haptics/звук API на екзотичен
+     * браузър) само се логва — кадърът е вече пропуснат, следващият идва.
+     * Повторение на ПОРЕДНИ кадри значи трайно счупване (гръмнал шейдър
+     * гърми на всеки кадър) → #fail.
+     *
+     * @param {unknown} error
+     */
+    #frameFailed(error) {
+        this.frameErrors++;
+        if (this.frameErrors >= FATAL_FRAME_ERRORS) {
+            this.#fail(error);
+            return;
+        }
+        console.error('Game: кадърът гръмна, продължаваме', error);
+    }
+
+    /**
+     * Изключение, избягало от кадъра (renderer.render/compile), е фатално за
+     * тази инстанция: three не може да развие renderStateStack/renderListStack
+     * след throw, а гръмнал onBeforeCompile гърми отново на всеки кадър —
+     * „продължаваме" би значело безкраен полунарисуван кадър с растяща памет
+     * (точно това виждаха телефоните при кръпка върху липсващ chunk).
+     * Спираме цикъла и сигнализираме на Vue да свали играта с съобщение.
+     *
+     * @param {unknown} error
+     */
+    #fail(error) {
+        if (this.failed || this.disposed) {
+            return;
+        }
+        this.failed = true;
+        // Спирането не бива да скрие сигнала: гръмне ли и то, Vue все пак
+        // трябва да разбере, а dispose() ще довърши чистенето.
+        try {
+            this.stop();
+            this.stopAttract();
+        } catch (stopError) {
+            console.error('Game: спирането след грешка гръмна', stopError);
+        }
+        try {
+            this.onFatalError(error);
+        } catch (callbackError) {
+            console.error('Game: onFatalError гръмна', callbackError);
+        }
     }
 
     stopAttract() {
@@ -719,7 +786,7 @@ export class Game {
 
     /** Продължава същата фиксирана симулация след pause/blur. */
     resume() {
-        if (!this.paused || this.running || this.disposed) {
+        if (!this.paused || this.running || this.disposed || this.failed) {
             return;
         }
         this.paused = false;
@@ -906,9 +973,9 @@ export class Game {
         // GLB материалите се добавят след първоначалния ready/warm-up. CSM
         // трябва да ги patch-не преди първия grid кадър, иначе всяка каскада
         // се сумира като отделно слънце до следващия периодичен scan.
-        void this.#warmup().catch((error) => {
-            console.warn('Opponent shader warm-up failed; continuing with lazy compilation.', error);
-        });
+        // Изключение от renderer.compile е програмна грешка в кръпка, не
+        // „бавна компилация" — следващият кадър би гръмнал със същото.
+        void this.#warmup().catch((error) => this.#fail(error));
     }
 
     /**
@@ -1047,9 +1114,7 @@ export class Game {
             this.resize();
         }
         if (composerChanged || shadowStructureChanged) {
-            void this.#warmup().catch((error) => {
-                console.warn('Shader warm-up failed; continuing with lazy compilation.', error);
-            });
+            void this.#warmup().catch((error) => this.#fail(error));
         }
     }
 
@@ -1085,10 +1150,15 @@ export class Game {
 
     /** Снимка на текущия кадър. */
     capturePhoto() {
-        if (this.disposed || !this.canvas?.toBlob) {
+        if (this.disposed || this.failed || !this.canvas?.toBlob) {
             return Promise.resolve(null);
         }
-        this.#render();
+        try {
+            this.#render();
+        } catch (error) {
+            this.#fail(error);
+            return Promise.resolve(null);
+        }
         return new Promise((resolve) => {
             this.canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.94);
         });
@@ -2264,6 +2334,23 @@ export class Game {
 
         this.rafId = requestAnimationFrame(this.#frame);
 
+        // Граница за изключения: rAF е презареден по-горе, така че без нея
+        // гръмнал кадър се повтаря вечно (виж #frameFailed / #fail).
+        try {
+            this.#step(now);
+            this.frameErrors = 0;
+        } catch (error) {
+            this.#frameFailed(error);
+        }
+    };
+
+    /**
+     * Един жив кадър: вход → фиксирани стъпки на симулацията → риг/камера/
+     * ефекти → рендер → телеметрия към HUD-а (30 Hz).
+     *
+     * @param {number} now performance.now() от rAF
+     */
+    #step(now) {
         const rawDt = (now - this.lastFrame) / 1000;
         const dt = Math.min(rawDt, MAX_FRAME_TIME);
         this.lastFrame = now;
@@ -2714,7 +2801,7 @@ export class Game {
                     ? ['auto-full', 'auto-balanced', 'auto-safe'][this.autoQualityStage]
                     : 'manual',
         });
-    };
+    }
 
     /**
      * Сенчестата кутия следва колата: посоката на слънцето е фиксирана, движи

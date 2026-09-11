@@ -1413,6 +1413,17 @@ const startGame = async (track, rivalUserId = null) => {
         const instance = game.value;
         detectGameApi(instance);
         lowPower.value = instance.lowPower === true;
+        // Гръмнал кадър (Game.#fail): three не се възстановява след throw в
+        // render(), а грешката се повтаря на всеки кадър — сваляме играта и
+        // казваме на играча, вместо да го оставим пред полунарисувана сцена.
+        instance.onFatalError = (cause) => {
+            if (game.value !== instance) {
+                return;
+            }
+            console.error('Играта спря заради повторяема грешка в кадъра.', cause);
+            quit();
+            error.value = 'Играта спря заради грешка на това устройство. Опитай отново или с друг браузър.';
+        };
         trackOutline.value = instance.minimap?.path ?? null;
         applyQuality(instance);
         applyWeather(instance);
@@ -1465,7 +1476,15 @@ const startGame = async (track, rivalUserId = null) => {
         // тук — стартът чака бутона „Карай" от pre-start екрана (beginLap), след
         // като играчът избере трансмисия. Ако играчът напусне през това време
         // (game.value става null/друга инстанция), не пипаме мъртвата инстанция.
-        await instance.ready?.catch(() => {});
+        // Loader-ите никога не reject-ват — reject тук значи гръмнал шейдър в
+        // warm-up-а (renderer.compile), който би гръмнал и на всеки кадър.
+        // Не го преглъщаме: catch-ът по-долу показва съобщение и сваля играта.
+        try {
+            await instance.ready;
+        } catch (cause) {
+            console.error('Warm-up на графиката се провали.', cause);
+            throw new Error('Графиката на играта не се инициализира на това устройство. Опитай с друг браузър.', { cause });
+        }
         if (game.value !== instance) {
             return;
         }
@@ -1503,7 +1522,14 @@ const requestMobileLandscape = (instance) => {
     const presentationRun = ++mobilePresentationRun;
     const stillActive = () =>
         mobileDriving.value && game.value === instance && presentationRun === mobilePresentationRun;
-    const container = canvas.value?.parentElement;
+    // Fullscreen върху КОРЕНА, не върху контейнера на играта. Резултатът и
+    // подиумът са <Teleport to="body"> (модален pattern с inert фон); елемент
+    // във fullscreen седи в top layer с непрозрачен ::backdrop и нищо извън
+    // него не се рисува — на Android диалогът след финала оставаше невидим,
+    // а страницата inert, т.е. играчът зависваше до системния „Назад".
+    // Коренът съдържа всичко, а контейнерът е fixed inset-0 и без това
+    // покрива екрана.
+    const container = document.documentElement;
     let fullscreenRequest = null;
 
     try {
@@ -1580,6 +1606,7 @@ const beginLap = () => {
 
     preStart.value = false;
     instance.start();
+    recordGameSession();
     syncMobileOrientation();
     // Камера/звук са no-op по време на attract реплея — прилагат се чак
     // след start(), който го спира.
@@ -1590,6 +1617,22 @@ const beginLap = () => {
             instance.resize();
         }
     });
+};
+
+// „Пробвал е играта" за админа: една заявка на „Карай", само с акаунт
+// (гостът няма кого да отбележим). Fire-and-forget — статистика, която не
+// бива да пречи на старта, ако мрежата е бавна или заявката се провали.
+const recordGameSession = () => {
+    if (!authUser.value || !selectedTrack.value) {
+        return;
+    }
+    window.axios
+        .post('/game/session', {
+            track: selectedTrack.value.slug,
+            device: isMobile.value ? 'mobile' : 'desktop',
+            mode: rivals.value === 'race' ? 'race' : 'solo',
+        })
+        .catch(() => {});
 };
 
 const quit = () => {

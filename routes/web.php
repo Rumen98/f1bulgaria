@@ -18,6 +18,7 @@ use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\GameLeaderboardController;
+use App\Http\Controllers\GameSessionController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
@@ -139,6 +140,11 @@ Route::middleware('feature:game')->group(function () {
     Route::post('/game/lap', [GameLeaderboardController::class, 'store'])
         ->middleware(['auth', 'throttle:30,1,game-lap'])
         ->name('game.lap.store');
+    // „Карай" на регистриран потребител — следата „пробвал е играта" за
+    // админа (Играчи). Без вход не записваме нищо: гостът няма акаунт.
+    Route::post('/game/session', [GameSessionController::class, 'store'])
+        ->middleware(['auth', 'throttle:30,1,game-session'])
+        ->name('game.session.store');
 });
 
 // „Инженерство“ — обяснителната рубрика за техниката. Съдържанието е в
