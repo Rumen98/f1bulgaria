@@ -22,10 +22,14 @@ use Illuminate\Support\Facades\DB;
 class QuizProgressService
 {
     /**
-     * Записва един изигран куиз: опитът в историята + новите покорени въпроси.
+     * Записва предадените отговори при правило „един опит на въпрос",
+     * точка: всеки отговор — верен или грешен — изразходва въпроса завинаги.
+     * Прегледът след предаване разкрива верните отговори, така че какъвто и
+     * да е повторен опит би бил преписване, не знание. Точки идват само от
+     * нови въпроси.
      *
      * @param  array<int, array{id: int, is_correct: bool}>  $review  Прегледът от QuizScoringService.
-     * @return int Брой НОВИ покорени въпроса в този опит.
+     * @return int Брой НОВИ точки от това предаване.
      */
     public function record(User $user, array $review): int
     {
@@ -42,55 +46,50 @@ class QuizProgressService
                 'total' => count($review),
             ]);
 
-            $correctIds = array_column(
-                array_filter($review, fn (array $row) => $row['is_correct']),
-                'id',
-            );
+            $now = Carbon::now();
 
-            if ($correctIds === []) {
-                return 0;
-            }
-
-            $alreadyMastered = $user->masteredQuizQuestions()
-                ->whereIn('quiz_questions.id', $correctIds)
+            $answeredIds = $user->answeredQuizQuestions()
+                ->whereIn('quiz_questions.id', array_column($review, 'id'))
                 ->pluck('quiz_questions.id')
                 ->all();
 
-            $fresh = array_values(array_diff($correctIds, $alreadyMastered));
+            $points = 0;
 
-            if ($fresh === []) {
-                return 0;
+            foreach ($review as $row) {
+                // Отговорен въпрос е отговорен ЗАВИНАГИ — верен или грешен,
+                // втори опит няма (прегледът разкрива отговорите). Повторно
+                // предаване през API-то просто се игнорира.
+                if (in_array($row['id'], $answeredIds, true)) {
+                    continue;
+                }
+
+                $user->answeredQuizQuestions()->attach($row['id'], [
+                    'answered_at' => $now,
+                    'first_correct_at' => $row['is_correct'] ? $now : null,
+                ]);
+
+                $points += $row['is_correct'] ? 1 : 0;
             }
 
-            $now = Carbon::now();
-
-            $user->masteredQuizQuestions()->attach(
-                collect($fresh)
-                    ->mapWithKeys(fn (int $id) => [$id => ['first_correct_at' => $now]])
-                    ->all(),
-            );
-
-            return count($fresh);
+            return $points;
         });
     }
 
     /**
      * Статистика за таблото на куиза. При гост връща само общия брой въпроси.
      *
-     * @return array{points:int, available:int, attempts:int, best_score:int|null, best_total:int|null}
+     * Нарочно без броене на опити и „най-добър резултат": куизът е седмичен —
+     * отговаряш, събираш точки и чакаш новите въпроси. Историята на опитите
+     * остава в quiz_attempts като данни, но не е част от играта.
+     *
+     * @return array{points:int, available:int}
      */
     public function statsFor(?User $user): array
     {
         $available = QuizQuestion::query()->active()->count();
 
         if ($user === null) {
-            return [
-                'points' => 0,
-                'available' => $available,
-                'attempts' => 0,
-                'best_score' => null,
-                'best_total' => null,
-            ];
+            return ['points' => 0, 'available' => $available];
         }
 
         // Само активни въпроси — деактивиран въпрос не бива да държи точка,
@@ -99,19 +98,27 @@ class QuizProgressService
             ->where('quiz_questions.is_active', true)
             ->count();
 
-        $best = QuizAttempt::query()
-            ->where('user_id', $user->id)
-            ->orderByDesc('score')
-            ->orderByDesc('total')
-            ->first();
+        return ['points' => $points, 'available' => $available];
+    }
 
-        return [
-            'points' => $points,
-            'available' => $available,
-            'attempts' => QuizAttempt::query()->where('user_id', $user->id)->count(),
-            'best_score' => $best?->score,
-            'best_total' => $best?->total,
-        ];
+    /**
+     * Детерминистичният седмичен набор: едни и същи въпроси за всички през
+     * дадена ISO седмица (софийско време), нови всеки понеделник. Сортов
+     * ключ md5(id|седмица) — без състояние, без крон.
+     *
+     * @return Collection<int, QuizQuestion>
+     */
+    public function weeklyQuestions(?Carbon $at = null): Collection
+    {
+        $weekKey = ($at ?? Carbon::now('Europe/Sofia'))
+            ->copy()->setTimezone('Europe/Sofia')->isoFormat('GGGG-[W]WW');
+
+        return QuizQuestion::query()
+            ->active()
+            ->get()
+            ->sortBy(fn (QuizQuestion $q) => md5($q->id.'|'.$weekKey))
+            ->take((int) config('quiz.count', 10))
+            ->values();
     }
 
     /**

@@ -21,7 +21,7 @@ const meta = computed(() => [
     { label: 'Дължина', value: props.circuit.length_km ? props.circuit.length_km + ' км' : '—' },
     { label: 'Завои', value: props.circuit.turns ?? '—' },
     { label: 'Тип', value: props.circuit.type ?? '—' },
-    { label: 'Първо Гран При', value: props.circuit.first_gp ?? '—' },
+    { label: 'Първо Гран при', value: props.circuit.first_gp ?? '—' },
     { label: 'Състезания', value: props.circuit.races_count },
 ]);
 </script>

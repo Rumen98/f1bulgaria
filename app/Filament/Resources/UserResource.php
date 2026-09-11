@@ -35,6 +35,21 @@ class UserResource extends Resource
 
     protected static ?string $pluralModelLabel = 'потребители';
 
+    /**
+     * Точният брой потребители до пункта в менюто. На телефон обобщението
+     * под таблицата („Показани 1 до 25 от 40") се свива и числото изчезва —
+     * значката се вижда винаги.
+     */
+    public static function getNavigationBadge(): ?string
+    {
+        return (string) User::count();
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Общо регистрирани потребители';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -78,6 +93,14 @@ class UserResource extends Resource
                     ->date('d.m.Y')
                     ->sortable(),
             ])
+            // Без това таблицата излизаше в реда на базата и трябваше да се
+            // цъка колона, за да се получи смислена подредба. Най-новите
+            // регистрации първи — както е в останалите ресурси.
+            ->defaultSort('created_at', 'desc')
+            // При размера на общността всички се събират на една страница,
+            // вместо да се прелиства по десет. „all" остава като опция.
+            ->paginationPageOptions([25, 50, 100, 'all'])
+            ->defaultPaginationPageOption(50)
             ->filters([
                 TernaryFilter::make('banned_at')
                     ->label('Блокирани')

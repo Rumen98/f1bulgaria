@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\NewsClassification;
-use App\Enums\NewsStatus;
 use App\Models\Comment;
 use App\Models\TeamNewsItem;
 use App\Support\Seo;
@@ -65,7 +64,7 @@ class NewsController extends Controller
      */
     public function show(Request $request, string $slug): Response
     {
-        $item = $this->visible()->where('slug', $slug)->first();
+        $item = $this->readable()->where('slug', $slug)->first();
 
         abort_if($item === null, 404);
 
@@ -209,12 +208,28 @@ class NewsController extends Controller
     }
 
     /**
+     * Списъкът и всичко около него — само Формула 1.
+     *
      * @return Builder<TeamNewsItem>
      */
     private function visible(): Builder
     {
         return TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->inMainFeed()
+            ->with('constructor');
+    }
+
+    /**
+     * Детайлната страница е по-широка от списъка: статиите за Цолов от Ф2 не
+     * се показват в главната емисия, но имат собствен URL, стоят в sitemap-а
+     * и се линкват от неговия кът. 404 върху тях би счупил и трите.
+     *
+     * @return Builder<TeamNewsItem>
+     */
+    private function readable(): Builder
+    {
+        return TeamNewsItem::query()
+            ->published()
             ->with('constructor');
     }
 

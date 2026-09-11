@@ -20,6 +20,40 @@ use Throwable;
  */
 class OpenF1Client
 {
+    /** Опити при 429. Повече от три само удължават агонията. */
+    private const MAX_ATTEMPTS = 3;
+
+    /** Изчакване след 429, умножено по номера на опита. */
+    private const RETRY_BACKOFF_MS = 1500;
+
+    /**
+     * Най-малкото разстояние между две заявки, по подразбиране.
+     *
+     * ВАЖНО: ограничението, което хапе, е това за МИНУТА, не за секунда.
+     * OpenF1 позволява 6 заявки/сек и 60/мин на платения тир (3 и 30 на
+     * безплатния). Един рекап прави шестнайсет заявки, тоест при разстояние от
+     * 220 ms се движим с 4,5 в секунда — под секундния таван, но 270 в минута,
+     * четири пъти над минутния. Точно това докара 429 на championship_drivers,
+     * championship_teams и intervals на прода, а после и на car_data.
+     *
+     * 1100 ms дава около 54 заявки в минута — под тавана с резерв. Рекапът
+     * става ~20 секунди вместо ~4, което няма значение за нещо, което върви
+     * веднъж на две седмици от крон.
+     *
+     * На безплатния тир (30/мин) сложи 2100 в services.openf1.min_interval_ms.
+     */
+    private const DEFAULT_MIN_INTERVAL_MS = 1100;
+
+    /**
+     * Кога тръгна последната заявка, за целия процес.
+     *
+     * Статично нарочно: клиентът не е singleton и в един рекап участват по
+     * няколко негови копия (fetcher, telemetry builder). Ако разстоянието се
+     * пазеше в инстанция, всяко копие щеше да брои отделно и лимитът пак щеше
+     * да се удря.
+     */
+    private static ?float $lastRequestAt = null;
+
     private string $baseUrl;
 
     private int $timeout;
@@ -211,44 +245,357 @@ class OpenF1Client
         });
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Исторически данни (приключила сесия)
+    |--------------------------------------------------------------------------
+    |
+    | OpenF1 смята данните за „живи“ от 30 минути преди началото до 30 минути
+    | след края на сесия. Извън този прозорец те са исторически: безплатни, без
+    | автентикация и НЕИЗМЕННИ. Затова методите тук ползват 24-часов кеш вместо
+    | секундите на живите — рекапът се сглобява веднъж и повторното пускане на
+    | командата не хаби лимита (3 заявки/сек, 30/мин на безплатния тир).
+    |
+    | Не ползвай тези методи по време на сесия: ще заключат стар отговор за цял
+    | ден. За живото има отделни методи по-горе.
+    |
+    */
+
+    /**
+     * Обиколките на приключила сесия — същият endpoint като getLatestLaps(),
+     * но с дълъг кеш и отделен ключ.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getFinishedLaps(int $sessionKey): Collection
+    {
+        return $this->historical('laps', $sessionKey, fn ($r) => isset($r['driver_number'], $r['lap_number']));
+    }
+
+    /**
+     * Стинтовете на приключила сесия (състав, начална и крайна обиколка,
+     * възраст на гумата при поставяне).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getFinishedStints(int $sessionKey): Collection
+    {
+        return $this->historical('stints', $sessionKey, fn ($r) => isset($r['driver_number']));
+    }
+
+    /**
+     * Пилотите в сесията — име, номер, отбор и цвят на отбора (hex без диез).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getFinishedDrivers(int $sessionKey): Collection
+    {
+        return $this->historical('drivers', $sessionKey, fn ($r) => isset($r['driver_number']));
+    }
+
+    /**
+     * Влизания в пит лейна.
+     *
+     * ВНИМАНИЕ: през сезон 2026 `stop_duration` е null навсякъде — времето на
+     * стоене не съществува в данните. `lane_duration` (цялото време в лейна) е
+     * налично, но е замърсено от червени флагове: реалните стойности са 12-35
+     * секунди, а спрелите зад червен флаг излизат с хиляди. Филтрирай.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getPitStops(int $sessionKey): Collection
+    {
+        return $this->historical('pit', $sessionKey, fn ($r) => isset($r['driver_number'], $r['lap_number']));
+    }
+
+    /**
+     * Съобщенията на дирекцията — safety car, флагове, наказания.
+     *
+     * Оттук излизат прозорците на неутрализация, които всички останали графики
+     * трябва да изрежат: обиколка зад safety car не е показател за темпо.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getRaceControl(int $sessionKey): Collection
+    {
+        return $this->historical('race_control', $sessionKey, fn ($r) => isset($r['date']));
+    }
+
+    /**
+     * Метеото над пистата — по един запис в минута, покрива и часа преди старта.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getWeather(int $sessionKey): Collection
+    {
+        return $this->historical('weather', $sessionKey, fn ($r) => isset($r['date']));
+    }
+
+    /**
+     * Стартовата решетка.
+     *
+     * ВНИМАНИЕ: пита се със session_key на КВАЛИФИКАЦИЯТА, не на състезанието —
+     * с ключа на състезанието endpoint-ът връща празно.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getStartingGrid(int $qualifyingSessionKey): Collection
+    {
+        return $this->historical('starting_grid', $qualifyingSessionKey, fn ($r) => isset($r['driver_number']));
+    }
+
+    /**
+     * Смени на позиции по време на състезанието.
+     *
+     * Наборът включва и размени от питстопове и наказания след финала, затова
+     * не го наричай „изпреварвания“ пред потребителя.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getOvertakes(int $sessionKey): Collection
+    {
+        return $this->historical('overtakes', $sessionKey, fn ($r) => isset($r['overtaking_driver_number']));
+    }
+
+    /**
+     * Шампионатът при пилотите преди и след състезанието (beta endpoint).
+     * Съществува само за състезателни сесии.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getChampionshipDrivers(int $sessionKey): Collection
+    {
+        return $this->historical('championship_drivers', $sessionKey, fn ($r) => isset($r['driver_number']));
+    }
+
+    /**
+     * Шампионатът при конструкторите преди и след състезанието (beta endpoint).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getChampionshipTeams(int $sessionKey): Collection
+    {
+        return $this->historical('championship_teams', $sessionKey, fn ($r) => isset($r['team_name']));
+    }
+
+    /**
+     * Телеметрия на болида в ТЕСЕН времеви прозорец — скорост, газ, спирачка,
+     * предавка, обороти на ~3,7 Hz.
+     *
+     * Прозорецът е задължителен и това не е удобство: цялото състезание за
+     * един пилот е ~24 000 записа, а за двадесет и двама е половин милион.
+     * Една обиколка е ~325 записа и 37 KB. Тегли обиколки, не състезания.
+     *
+     * ВНИМАНИЕ: през сезон 2026 полето `drs` е null навсякъде — регламентът
+     * махна DRS, така че от този endpoint не може да се извади DRS графика.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getCarData(int $sessionKey, int $driverNumber, Carbon $from, Carbon $to): Collection
+    {
+        return $this->window('car_data', $sessionKey, $driverNumber, $from, $to);
+    }
+
+    /**
+     * Позиция на болида по трасето (x, y, z) в тесен прозорец, ~3,7 Hz.
+     *
+     * Координатната система е същата като на очертанието от MultiViewer, така
+     * че двете се наслагват без преобразуване. Документацията предупреждава,
+     * че няма странична точност — не се вижда от коя страна на пистата е
+     * болидът, така че става за линия по трасето, не за анализ на траектория.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getLocation(int $sessionKey, int $driverNumber, Carbon $from, Carbon $to): Collection
+    {
+        return $this->window('location', $sessionKey, $driverNumber, $from, $to);
+    }
+
+    /**
+     * Изоставането от лидера и от предния на всеки ~4 секунди.
+     *
+     * Цяло състезание е ~22 000 записа и 3 MB. Дърпа се веднъж след кръга и от
+     * него се извеждат само числа (най-дългата близка битка) — суровите редове
+     * не се пазят.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getRaceIntervals(int $sessionKey): Collection
+    {
+        return $this->historical('intervals', $sessionKey, fn ($r) => isset($r['driver_number'], $r['date']));
+    }
+
+    /**
+     * Радио разговорите. Документацията предупреждава, че през 2026 покритието
+     * е рухнало и повечето събития нямат нито един запис — затова липсата тук
+     * е нормално състояние, не грешка.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getTeamRadio(int $sessionKey): Collection
+    {
+        return $this->historical('team_radio', $sessionKey, fn ($r) => isset($r['driver_number'], $r['recording_url']));
+    }
+
+    /**
+     * Заявка за един пилот в тесен времеви прозорец.
+     *
+     * OpenF1 носи оператора в ИМЕТО на параметъра („date>“), не в стойността —
+     * затова ключовете изглеждат странно, но точно така се филтрира.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function window(string $endpoint, int $sessionKey, int $driverNumber, Carbon $from, Carbon $to): Collection
+    {
+        // Query-то се сглобява РЪЧНО и се подава като низ. Причината е конкретна
+        // и струваше един тих провал на прода: операторът е част от ИМЕТО на
+        // параметъра („date>="), а http_build_query го кодира до „date%3E%3D=",
+        // тоест с още едно кодирано равно. OpenF1 не разпознава това име и
+        // връща 404 — телеметрията и картата по скорост просто липсваха.
+        //
+        // Подаден като низ, Guzzle не пипа заявката отвъд „>“ → „%3E“, което
+        // API-то декодира правилно. Часовете са в Zulu формат, за да няма „+“
+        // в стойността.
+        $stamp = fn (Carbon $at): string => $at->utc()->format('Y-m-d\TH:i:s\Z');
+        $query = sprintf(
+            'session_key=%d&driver_number=%d&date>=%s&date<=%s',
+            $sessionKey,
+            $driverNumber,
+            $stamp($from),
+            $stamp($to),
+        );
+
+        $key = "openf1:hist:{$endpoint}:{$sessionKey}:{$driverNumber}:".md5($query);
+
+        return $this->remembered($key, fn () => $this->get($endpoint, $query)
+            ->filter(fn ($r) => is_array($r) && isset($r['date']))
+            ->values());
+    }
+
+    /**
+     * Обща обвивка за исторически заявки: дълъг кеш и общ филтър за форма.
+     *
+     * @param  callable(array<string, mixed>): bool  $keep
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function historical(string $endpoint, int $sessionKey, callable $keep): Collection
+    {
+        return $this->remembered(
+            "openf1:hist:{$endpoint}:{$sessionKey}",
+            fn () => $this->get($endpoint, ['session_key' => $sessionKey])
+                ->filter(fn ($r) => is_array($r) && $keep($r))
+                ->values(),
+        );
+    }
+
+    /**
+     * Кеш за 24 часа — освен когато е изключен.
+     *
+     * Изключва се при наваксване назад: тогава всеки отговор се чете точно
+     * веднъж, а кешът по подразбиране е в базата и седемдесет уикенда биха
+     * налели стотици мегабайти в таблицата `cache` без никаква полза.
+     * Виж config/race-data.php.
+     *
+     * @param  callable(): Collection<int, mixed>  $fetch
+     * @return Collection<int, mixed>
+     */
+    private function remembered(string $key, callable $fetch): Collection
+    {
+        if (! config('race-data.cache_historical', true)) {
+            return $fetch();
+        }
+
+        return Cache::remember($key, now()->addDay(), $fetch);
+    }
+
     /**
      * Изпълнява GET заявка защитено. Връща празна колекция при всяка грешка.
      *
-     * @param  array<string, mixed>  $query
+     * `$query` може да е масив (обичайният случай) или готов НИЗ — низът се
+     * ползва там, където операторът е част от името на параметъра и не бива да
+     * минава през http_build_query. Виж window().
+     *
+     * @param  array<string, mixed>|string  $query
      * @return Collection<int, mixed>
      */
-    private function get(string $endpoint, array $query): Collection
+    private function get(string $endpoint, array|string $query): Collection
     {
         try {
-            $request = Http::acceptJson()->timeout($this->timeout);
+            for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
+                $this->throttle();
 
-            // OpenF1 изисква OAuth2 Bearer токен по време на живи сесии (иначе 401).
-            $token = $this->tokens->getToken();
-            if ($token !== null) {
-                $request = $request->withToken($token);
+                $request = Http::acceptJson()->timeout($this->timeout);
+
+                // OpenF1 изисква OAuth2 Bearer токен по време на живи сесии (иначе 401).
+                $token = $this->tokens->getToken();
+                if ($token !== null) {
+                    $request = $request->withToken($token);
+                }
+
+                $response = $request->get("{$this->baseUrl}/{$endpoint}", $query);
+
+                // 401 → токенът може да е изтекъл; изчистваме го за следващия опит.
+                if ($response->status() === 401) {
+                    $this->tokens->forget();
+                }
+
+                // 429 е единственото, което си струва да се повтори: рекапът
+                // прави шестнайсет заявки за секунди и лимитът е 6/сек.
+                // Останалите грешки няма да се оправят от само себе си.
+                if ($response->status() === 429 && $attempt < self::MAX_ATTEMPTS) {
+                    usleep(self::RETRY_BACKOFF_MS * $attempt * 1000);
+
+                    continue;
+                }
+
+                if (! $response->successful()) {
+                    Log::warning('OpenF1 заявка неуспешна', [
+                        'endpoint' => $endpoint,
+                        'status' => $response->status(),
+                        'attempts' => $attempt,
+                    ]);
+
+                    return collect();
+                }
+
+                $data = $response->json();
+
+                return is_array($data) ? collect($data) : collect();
             }
 
-            $response = $request->get("{$this->baseUrl}/{$endpoint}", $query);
-
-            // 401 → токенът може да е изтекъл; изчистваме го за следващия опит.
-            if ($response->status() === 401) {
-                $this->tokens->forget();
-            }
-
-            if (! $response->successful()) {
-                Log::warning('OpenF1 заявка неуспешна', ['endpoint' => $endpoint, 'status' => $response->status()]);
-
-                return collect();
-            }
-
-            $data = $response->json();
-
-            return is_array($data) ? collect($data) : collect();
+            return collect();
         } catch (Throwable $e) {
             Log::warning('OpenF1 заявка хвърли изключение', ['endpoint' => $endpoint, 'error' => $e->getMessage()]);
 
             return collect();
         }
+    }
+
+    /**
+     * Разрежда заявките, за да не се удря лимитът на OpenF1.
+     *
+     * Изчаква само толкова, колкото не е минало от предишната заявка — при
+     * бавен отговор изобщо не спи.
+     */
+    private function throttle(): void
+    {
+        // В тестовете заявките са фалшиви и няма кой да ни ограничи — спането
+        // там само удължава набора (наблюдавано: 5 секунди стават 70).
+        if (app()->runningUnitTests()) {
+            return;
+        }
+
+        $interval = ((int) config('services.openf1.min_interval_ms', self::DEFAULT_MIN_INTERVAL_MS)) / 1000;
+
+        if (self::$lastRequestAt !== null) {
+            $elapsed = microtime(true) - self::$lastRequestAt;
+
+            if ($elapsed < $interval) {
+                usleep((int) (($interval - $elapsed) * 1_000_000));
+            }
+        }
+
+        self::$lastRequestAt = microtime(true);
     }
 
     private function parseDate(?string $value): ?Carbon

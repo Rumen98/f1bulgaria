@@ -14,7 +14,7 @@ beforeEach(function () {
     $this->season = Season::factory()->current()->create(['year' => 2026]);
     $this->race = Race::factory()->create([
         'season_id' => $this->season->id,
-        'name' => 'Гран При на Бахрейн',
+        'name' => 'Гран при на Бахрейн',
         'circuit' => 'Bahrain International Circuit',
         'country' => 'Bahrain',
         'race_datetime_utc' => Carbon::create(2026, 3, 8, 15),

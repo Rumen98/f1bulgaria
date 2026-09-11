@@ -89,7 +89,7 @@ const countdownText = computed(() => {
             </div>
 
             <p v-if="tab === 'upcoming' && upcomingRaces.length === 0" class="mb-3 text-sm text-zinc-500">
-                Сезонът приключи — виж резултатите в „Приключени".
+                Сезонът приключи — виж резултатите в „Приключени“.
             </p>
 
             <div class="grid gap-3">

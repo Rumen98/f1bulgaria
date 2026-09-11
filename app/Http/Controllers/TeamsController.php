@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\NewsStatus;
 use App\Enums\ResultSessionType;
 use App\Models\Constructor;
 use App\Models\Driver;
@@ -132,10 +131,8 @@ class TeamsController extends Controller
      */
     private function news(Constructor $team): Collection
     {
-        $visible = collect(NewsStatus::publiclyVisible())->map->value->all();
-
         return $team->newsItems()
-            ->whereIn('status', $visible)
+            ->inMainFeed()
             ->orderByDesc('published_at')
             ->limit(5)
             ->get()
@@ -171,7 +168,7 @@ class TeamsController extends Controller
             ->limit(5)
             ->get()
             ->map(fn (Race $race) => [
-                'race' => app(RaceNameLocalizer::class)->localize($race->jolpica_id, $race->name),
+                'race' => app(RaceNameLocalizer::class)->forRace($race),
                 // id и slug пътуват, за да станат редовете линкове — иначе
                 // страницата на отбор е сляпа улица към състезания и пилоти.
                 'race_id' => $race->id,

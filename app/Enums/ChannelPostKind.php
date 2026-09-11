@@ -29,6 +29,10 @@ enum ChannelPostKind: string
 
     case News = 'news';
 
+    // Рекапът с данни след състезание — целият е от OpenF1, затова носи и
+    // задължителната атрибуция по CC BY-NC-SA.
+    case F1DataRecap = 'f1_data_recap';
+
     case GameChallenge = 'game_challenge';
     case GameResults = 'game_results';
 
@@ -49,6 +53,7 @@ enum ChannelPostKind: string
             self::News => 'Новина',
             self::GameChallenge => 'Игра: предизвикателство',
             self::GameResults => 'Игра: резултати',
+            self::F1DataRecap => 'Данните от състезанието',
         };
     }
 
@@ -64,6 +69,7 @@ enum ChannelPostKind: string
             self::F2SprintRace, self::F2FeatureRace => 'Формула 2',
             // Новина и постовете на играта не принадлежат на шампионат.
             self::News, self::GameChallenge, self::GameResults => null,
+            self::F1DataRecap => 'Формула 1',
         };
     }
 
@@ -78,6 +84,7 @@ enum ChannelPostKind: string
             self::F1Fp2,
             self::F1Fp3,
             self::F1SprintQuali,
+            self::F1DataRecap,
         ], strict: true);
     }
 

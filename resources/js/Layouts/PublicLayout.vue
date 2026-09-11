@@ -21,10 +21,16 @@ const showSurveyPrompt = computed(
 // Принцип на разделяне: „живото" (следиш сезона, играеш) е отпред; справочното
 // съдържание без времева стойност живее в „Енциклопедия".
 const primaryNav = [
-    { label: 'На живо', route: 'live', live: true, feature: 'live_timing' },
+    // liveOnly: показва се единствено докато наистина тече сесия (liveNow
+    // от сървъра) — не само при включен флаг.
+    { label: 'На живо', route: 'live', live: true, feature: 'live_timing', liveOnly: true },
     { label: 'Новини', route: 'news.index' },
     { label: 'Календар', route: 'calendar' },
     { label: 'Класиране', route: 'standings' },
+    // „Данни" стои до класирането, защото отговаря на следващия въпрос след
+    // резултата: защо е станало така. В „Енциклопедия" би се загубило —
+    // материалът има срок и се чете в дните след кръга.
+    { label: 'Данни', route: 'racedata.index', feature: 'data_recap' },
     // Prediction league-ът е ядро на общността — стои в основната лента.
     { label: 'Прогнози', route: 'leaderboard' },
     { label: 'Куиз', route: 'quiz', feature: 'quiz' },
@@ -41,6 +47,8 @@ const secondaryNav = [
     { label: 'Сравни', route: 'compare.index', feature: 'compare' },
     { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'История', route: 'history', feature: 'history' },
+    // „Инженерство" стои до „Речник": и двете обясняват, вместо да отчитат.
+    { label: 'Инженерство', route: 'engineering.index', feature: 'engineering' },
     { label: 'Речник', route: 'terminology' },
 ];
 
@@ -50,7 +58,10 @@ const moreRef = ref(null);
 
 const features = computed(() => page.props.features ?? {});
 // Показваме елемент само ако рутът съществува И (няма feature ИЛИ флагът е включен).
-const visible = (i) => hasRoute(i.route) && (!i.feature || features.value[i.feature]);
+const liveNow = computed(() => Boolean(page.props.liveNow));
+const visible = (i) => hasRoute(i.route)
+    && (!i.feature || features.value[i.feature])
+    && (!i.liveOnly || liveNow.value);
 const primary = computed(() => primaryNav.filter(visible));
 const secondary = computed(() => secondaryNav.filter(visible));
 const allItems = computed(() => [...primary.value, ...secondary.value]);
@@ -65,7 +76,8 @@ const footerColumns = computed(() => [
             { label: 'Новини', route: 'news.index' },
             { label: 'Календар', route: 'calendar' },
             { label: 'Класиране', route: 'standings' },
-            { label: 'На живо', route: 'live', feature: 'live_timing' },
+            { label: 'Данни', route: 'racedata.index', feature: 'data_recap' },
+            { label: 'На живо', route: 'live', feature: 'live_timing', liveOnly: true },
             { label: 'Формула 2', route: 'f2', feature: 'f2' },
         ].filter(visible),
     },
@@ -78,6 +90,7 @@ const footerColumns = computed(() => [
             { label: 'Сравни', route: 'compare.index', feature: 'compare' },
             { label: 'Дуели', route: 'rivalries.index', feature: 'rivalries' },
             { label: 'История', route: 'history', feature: 'history' },
+            { label: 'Инженерство', route: 'engineering.index', feature: 'engineering' },
             { label: 'Речник', route: 'terminology' },
         ].filter(visible),
     },

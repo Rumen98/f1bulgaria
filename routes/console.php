@@ -35,18 +35,24 @@ Schedule::command('f1:sync-sessions')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
-// Неделен вечерен дайджест в 20:00 софийско време.
+// Рекап на състезанието — ЕЖЕЧАСНО, не в фиксиран неделен час.
 //
-// onOneServer пази от дублиран cron (напр. и на root, и на www-data):
-// withoutOverlapping пуска mutex-а веднага щом командата приключи (секунди),
-// а onOneServer държи lock за целия график-минутен слот. Освен това
-// `newsletter_sends` маркира състезанието преди пращане — твърда
-// идемпотентност дори при повторен ръчен пуск.
+// Беше `weeklyOn(0, '20:00')` и това беше единствен изстрел: условието
+// (резултати от състезанието) идва от Jolpica, която публикува когато си
+// иска. На 06.09.2026 състезанието беше в 16:00, а в 20:00 резултати още
+// нямаше — рекапът се пропусна. По-лошото: `resolveRace` подрежда по
+// най-нов, а следващият кръг беше същата неделя четири часа по-рано, тоест
+// пропуснатият рекап щеше да бъде изяден от него и да не излезе НИКОГА.
+//
+// Сега командата се буди всеки час и праща в мига, в който резултатите се
+// появят. Вътрешните гардове не се променят: без резултати от състезанието
+// не праща нищо, а `newsletter_sends` държи по едно писмо на кръг. Сама
+// пази и приличен час (9-22 софийско), за да не буди хората.
 Schedule::command('f1:weekly-digest')
-    ->weeklyOn(0, '20:00')
+    ->hourly()
     ->timezone('Europe/Sofia')
     ->onOneServer()
-    ->withoutOverlapping(120);
+    ->withoutOverlapping(55);
 
 // Петъчен preview на състезателния уикенд в 09:00 софийско време.
 // Вътрешният guard праща само ако до 7 дни напред има кръг.
@@ -83,6 +89,30 @@ Schedule::command('f1:prediction-reminder')
     ->onOneServer()
     ->withoutOverlapping(55);
 
+// Понеделнишкият анонс на куиза (имейл + пост в канала) — 09:00 софийско.
+// Вътрешният guard (newsletter_sends по седмица) пази от дублиране.
+Schedule::command('padok:quiz-monday')
+    ->weeklyOn(1, '09:00')
+    ->timezone('Europe/Sofia')
+    ->onOneServer()
+    ->withoutOverlapping(120);
+
+// „Днес сме на живо" — проверка на 15 мин, но вътрешните пазачи (3-часов
+// прозорец преди старта + newsletter_sends по race_id + флаг + OpenF1
+// креденшъли) го пускат веднъж на състезателна неделя.
+Schedule::command('f1:live-announce')
+    ->everyFifteenMinutes()
+    ->onOneServer()
+    ->withoutOverlapping(14);
+
+// Допълване на куиз басейна: LLM чернови с двойна сляпа проверка, влизат
+// направо активни. Пуска се само при активни под quiz.pool_target.
+Schedule::command('padok:generate-quiz-questions --top-up')
+    ->weeklyOn(3, '10:00')
+    ->timezone('Europe/Sofia')
+    ->onOneServer()
+    ->withoutOverlapping(120);
+
 // „Пулс" през паузите — проверка всяка сряда 18:00 софийско време.
 // Седмично, а не месечно: закачен за 1-во число пулсът геометрично не може
 // да улучи лятната пауза (1 август/септември винаги опират в guard-овете).
@@ -110,6 +140,19 @@ Schedule::command('news:enrich --limit=25')
     ->cron('5,35 * * * *')
     ->withoutOverlapping(40)
     ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+// Машинна поправка на имена и транслитерации след обогатяването. По-малките
+// модели грешат имена по два начина: пишат едно и също име различно в
+// съседни статии, и понякога ПРЕВЕЖДАТ фамилия като нарицателно
+// („Leclerc" -> „Лекар"). Промптът го забранява, това е мрежата отдолу.
+//
+// Слотът е нарочен: news:enrich върви в :05/:35 и трае ~8 мин на партида от
+// 25, а channel:enqueue-news е в :23/:53 — поправката минава между двете, за
+// да не тръгне сгрешено име към Telegram канала. Само база, без LLM.
+Schedule::command('news:normalize-bg')
+    ->cron('15,45 * * * *')
+    ->withoutOverlapping(10)
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
 // Осигурителна мрежа: обогатени, но незавършили публикация елементи (напр.
@@ -168,6 +211,41 @@ Schedule::command('channel:enqueue-news')
 Schedule::command('channel:post')
     ->everyFiveMinutes()
     ->withoutOverlapping(10)
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+// Пази от ТИХ отказ. На 03-04.09.2026 доставчикът спря да сервира модела,
+// всяка LLM заявка връщаше 403, NewsEnricher я гълташе като warning и
+// оставяше реда pending. Командата връщаше SUCCESS, cron изглеждаше здрав,
+// sitemap-ът се обновяваше — пайплайнът мълча 24 часа и разбрахме по
+// застоялите новини на сайта.
+//
+// Проверката гледа резултата (публикува ли се още), а не конкретна грешка,
+// за да хване и причини, които още не сме виждали. Праща един имейл на
+// инцидент и един при възстановяване; изпращането е синхронно, защото
+// мъртъв queue worker е точно една от авариите, за които трябва да се обади.
+//
+// :50 — извън всички news слотове (:00/:30 fetch, :05/:35 enrich,
+// :15/:45 normalize, :20 publish-pending, :25 generate-articles).
+Schedule::command('news:health-check')
+    ->hourlyAt(50)
+    ->onOneServer()
+    ->withoutOverlapping(55)
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+// Рекапът с данни от OpenF1 след състезание.
+//
+// На всеки час, защото прозорецът в самата команда (3-36 часа след старта)
+// решава кога има работа — така пропуснат час се наваксва сам, вместо да
+// изгуби кръга. Извън състезателен уикенд заявката е една към базата и нула
+// към OpenF1.
+//
+// :47 — свободна минута: :00/:30, :05/:35, :15/:45, :20, :25, :50 и
+// :08/:23/:38/:53 са заети от новинарския конвейер и канала.
+Schedule::command('padok:race-data-recap')
+    ->hourlyAt(47)
+    ->onOneServer()
+    ->withoutOverlapping(45)
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 

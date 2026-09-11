@@ -89,7 +89,7 @@ const filtered = computed(() => {
                             <span v-if="!team.is_active" class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-400">Легенда</span>
                         </div>
                         <div class="text-sm text-zinc-500">
-                            <span class="font-semibold text-zinc-300 tabular-nums">{{ team.wins }}</span> победи · {{ team.seasons }} сезона
+                            <span class="font-semibold text-zinc-300 tabular-nums">{{ team.wins }}</span> {{ team.wins === 1 ? 'победа' : 'победи' }} · {{ team.seasons }} {{ team.seasons === 1 ? 'сезон' : 'сезона' }}
                         </div>
                     </div>
                     <span class="text-zinc-600 transition group-hover:text-red-500" aria-hidden="true">→</span>

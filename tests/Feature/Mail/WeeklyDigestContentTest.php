@@ -29,11 +29,11 @@ function digestHtml(?array $userStats = null): string
     ))->render();
 }
 
-it('пише името на Гран При-то на български', function () {
+it('пише името на Гран при-то на български', function () {
     $html = digestHtml();
 
     // Сайтът е само на български, а имейлът пращаше „Hungarian Grand Prix".
-    expect($html)->toContain('Гран При на Унгария')
+    expect($html)->toContain('Гран при на Унгария')
         ->and($html)->not->toContain('Hungarian Grand Prix');
 });
 
@@ -61,5 +61,5 @@ it('изписва заглавието на имейла на българск�
 
     $mail = new WeeklyDigestMail($race, [], []);
 
-    expect($mail->envelope()->subject)->toBe('Падок — рекап: Гран При на Унгария');
+    expect($mail->envelope()->subject)->toBe('Падок — рекап: Гран при на Унгария');
 });

@@ -20,6 +20,14 @@ class TeamNewsSourceSeeder extends Seeder
         ['name' => 'Motorsport.com F1', 'feed_url' => 'https://www.motorsport.com/rss/f1/news/'],
         ['name' => 'RacingNews365', 'feed_url' => 'https://racingnews365.com/feeds/news/f1'],
         ['name' => 'RaceFans', 'feed_url' => 'https://www.racefans.net/feed/'],
+        // Формула 2 — заради Никола Цолов. Ф1 емисиите горе не го покриват,
+        // а без източник никаква логика за разпознаване не помага.
+        //
+        // ВНИМАНИЕ при смяна: motorsport.com/rss/f2/news/ изглежда жива
+        // (HTTP 200, 13 статии), но сервира АРХИВ на закритото FIA Formula
+        // Two Championship — всичко в нея е от 2011-2017. Проверявай
+        // <pubDate>, не само дали фийдът отговаря.
+        ['name' => 'Autosport F2', 'feed_url' => 'https://www.autosport.com/rss/feed/formula-2'],
     ];
 
     public function run(): void

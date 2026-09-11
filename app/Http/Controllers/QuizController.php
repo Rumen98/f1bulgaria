@@ -9,6 +9,7 @@ use App\Models\QuizQuestion;
 use App\Services\Quiz\QuizProgressService;
 use App\Services\Quiz\QuizScoringService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,14 +17,30 @@ class QuizController extends Controller
 {
     public function index(QuizProgressService $progress): Response
     {
-        $count = (int) config('quiz.count', 10);
         $user = request()->user();
 
-        $questions = QuizQuestion::query()
-            ->active()
-            ->inRandomOrder()
-            ->limit($count)
-            ->get()
+        // Въпросите на СЕДМИЦАТА: един и същ набор за всички, нов всеки
+        // понеделник — виж QuizProgressService::weeklyQuestions().
+        $weekly = $progress->weeklyQuestions();
+
+        // Един опит на въпрос — завинаги: отговорен (вярно ИЛИ грешно)
+        // въпрос не се показва повече. Точки идват само от нови въпроси.
+        $spentIds = [];
+        $weeklyPoints = 0;
+
+        if ($user !== null) {
+            $pivots = $user->answeredQuizQuestions()
+                ->whereIn('quiz_questions.id', $weekly->pluck('id'))
+                ->get();
+
+            foreach ($pivots as $answered) {
+                $spentIds[] = $answered->id;
+                $weeklyPoints += $answered->pivot->first_correct_at !== null ? 1 : 0;
+            }
+        }
+
+        $questions = $weekly
+            ->reject(fn (QuizQuestion $q) => in_array($q->id, $spentIds, true))
             ->map(fn (QuizQuestion $q) => [
                 'id' => $q->id,
                 'question' => $q->question,
@@ -36,6 +53,10 @@ class QuizController extends Controller
             'result' => null,
             'stats' => $progress->statsFor($user),
             'leaderboard' => $progress->leaderboard(),
+            'week' => (int) Carbon::now('Europe/Sofia')->isoWeek(),
+            'weeklyTotal' => $weekly->count(),
+            'weeklyAnswered' => count($spentIds),
+            'weeklyPoints' => $weeklyPoints,
         ]);
     }
 

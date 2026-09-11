@@ -8,7 +8,19 @@ import { computed } from 'vue';
 const props = defineProps({
     profile: { type: Object, required: true },
     f2: { type: Object, default: null },
+    news: { type: Array, default: () => [] },
 });
+
+// Датата се показва в софийско време — базата пази UTC.
+const formatDate = (iso) =>
+    iso
+        ? new Date(iso).toLocaleDateString('bg-BG', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              timeZone: 'Europe/Sofia',
+          })
+        : null;
 
 const age = computed(() => {
     if (!props.profile.birth_date) {
@@ -86,7 +98,7 @@ const tsolovShare = computed(() => {
             </picture>
 
             <!-- Заглавието е запечено в дизайна на банера — h1 остава само за SEO/четци. -->
-            <h1 class="sr-only">{{ profile.name }} — Българската надежда във Формула 2</h1>
+            <h1 class="sr-only">{{ profile.name }} — българската надежда във Формула 2</h1>
         </section>
 
         <!-- Ключови факти под банера (бяха в overlay-а, сега не се бият с дизайна) -->
@@ -137,6 +149,31 @@ const tsolovShare = computed(() => {
             </div>
         </section>
 
+        <!-- Новини за него. Пълният архив, вкл. Ф2 — главната емисия на
+             сайта е само за Формула 1, така че Ф2 статиите живеят само тук. -->
+        <section v-if="news.length" class="mx-auto mt-8 max-w-3xl">
+            <h2 class="mb-4 font-display text-lg font-bold text-white">Новини за Цолов</h2>
+            <div class="space-y-3">
+                <Card v-for="item in news" :key="item.slug">
+                    <Link :href="`/news/${item.slug}`" class="block group">
+                        <div class="flex flex-wrap items-baseline gap-2">
+                            <time v-if="item.published_at" :datetime="item.published_at" class="text-xs text-zinc-500">
+                                {{ formatDate(item.published_at) }}
+                            </time>
+                            <span
+                                v-if="!item.is_f1"
+                                class="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400"
+                            >
+                                Формула 2
+                            </span>
+                        </div>
+                        <p class="mt-1 font-semibold text-zinc-100 group-hover:text-emerald-400">{{ item.title }}</p>
+                        <p v-if="item.summary" class="mt-1 line-clamp-2 text-sm text-zinc-400">{{ item.summary }}</p>
+                    </Link>
+                </Card>
+            </div>
+        </section>
+
         <!-- Сезон 2026 във F2 — класиране + челен сблъсък (източник: config/tsolov.php) -->
         <section v-if="stats" class="mx-auto mt-8 max-w-3xl rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
@@ -171,7 +208,7 @@ const tsolovShare = computed(() => {
                 </div>
                 <p class="mt-1.5 text-center text-xs text-zinc-500">
                     <template v-if="pointsGap === 0">Равни точки с {{ rivalName }}</template>
-                    <template v-else-if="tsolovLeads">Цолов води с {{ pointsGap }} точки</template>
+                    <template v-else-if="tsolovLeads">Цолов води с {{ pointsGap }} {{ pointsGap === 1 ? 'точка' : 'точки' }}</template>
                     <template v-else>Цолов изостава с {{ pointsGap }} точки от {{ rivalName }}</template>
                 </p>
             </div>

@@ -32,8 +32,7 @@
 
 @include('mail.partials.community')
 
-Успешен уикенд!<br>
-Екипът на Падок
+Успешен уикенд!<br> Екипът на Падок
 
 @if ($unsubscribeToken)
 <small>Получаваш този имейл като абонат на бюлетина на Падок. [Отпиши се]({{ route('newsletter.unsubscribe', $unsubscribeToken) }})</small>

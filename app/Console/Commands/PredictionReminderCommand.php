@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\SendsBulkMail;
 use App\Mail\PredictionReminderMail;
 use App\Models\NewsletterSend;
 use App\Models\Race;
@@ -14,7 +15,6 @@ use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -26,6 +26,8 @@ use Illuminate\Support\Facades\URL;
  */
 class PredictionReminderCommand extends Command
 {
+    use SendsBulkMail;
+
     protected $signature = 'f1:prediction-reminder
         {--race= : ID на състезание (ръчен пуск, заобикаля прозореца)}
         {--force : Праща дори ако вече е пращано за този кръг}
@@ -79,7 +81,7 @@ class PredictionReminderCommand extends Command
         $hoursLeft = $this->humanRemaining($deadline);
 
         foreach ($recipients as $user) {
-            Mail::to($user)->queue(new PredictionReminderMail(
+            $this->sendMail($user, new PredictionReminderMail(
                 $race,
                 $deadlineText,
                 $hoursLeft,
@@ -89,7 +91,9 @@ class PredictionReminderCommand extends Command
 
         $this->markSent($race);
 
-        $this->info("Подсещането е в опашката: {$recipients->count()} потребители без прогноза за „{$race->name_bg}“.");
+        $this->info("Подсещането е изпратено: {$recipients->count()} потребители без прогноза за „{$race->name_bg}“.");
+
+        $this->reportMailOutcome();
 
         return self::SUCCESS;
     }

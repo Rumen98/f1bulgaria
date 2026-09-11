@@ -51,3 +51,24 @@ it('разписва news:generate-articles ежечасно', function () {
         ->and((string) $generate->command)->toContain('--limit=10')
         ->and($generate->withoutOverlapping)->toBeTrue();
 });
+
+it('разписва news:normalize-bg между обогатяването и канала', function () {
+    $normalize = scheduledEvent('news:normalize-bg');
+
+    // enrich е на :05/:35 (~8 мин на партида), channel:enqueue-news на
+    // :23/:53 — поправката минава между двете, за да не тръгне сгрешено
+    // име към Telegram.
+    expect($normalize)->not->toBeNull()
+        ->and($normalize->expression)->toBe('15,45 * * * *')
+        ->and($normalize->withoutOverlapping)->toBeTrue();
+});
+
+it('разписва news:health-check ежечасно извън news слотовете', function () {
+    $health = scheduledEvent('news:health-check');
+
+    // :50 не се засича с :00/:30 fetch, :05/:35 enrich, :15/:45 normalize,
+    // :20 publish-pending, :25 generate-articles.
+    expect($health)->not->toBeNull()
+        ->and($health->expression)->toBe('50 * * * *')
+        ->and($health->withoutOverlapping)->toBeTrue();
+});

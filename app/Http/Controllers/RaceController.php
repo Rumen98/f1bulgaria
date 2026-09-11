@@ -76,6 +76,10 @@ class RaceController extends Controller
             // Между два кръга минават 1-3 седмици — най-дългият прозорец в
             // годината, през който страницата беше заглавие плюс разписание.
             'preview' => $rows === [] ? $this->preview($race, $circuits) : null,
+            // Само дали има какво да се покаже — самите графики живеят на
+            // /danni/{race} и не се дублират в тази страница.
+            'hasDataRecap' => config('features.data_recap')
+                && $race->dataRecap()->whereNotNull('generated_at')->exists(),
             'neighbours' => $this->neighbours($race),
             'otherPredictions' => $isLocked ? $this->otherPredictions($race) : [],
         ]);
@@ -128,13 +132,15 @@ class RaceController extends Controller
         $siblings = Race::query()
             ->where('season_id', $race->season_id)
             ->whereIn('round', [$race->round - 1, $race->round + 1])
-            ->get(['id', 'round', 'name', 'jolpica_id'])
+            // race_datetime_utc пътува заради годината: тя решава дали кръгът
+            // попада в изключение по сезон (виж RaceNameLocalizer::forRace).
+            ->get(['id', 'round', 'name', 'jolpica_id', 'race_datetime_utc'])
             ->keyBy('round');
 
         $shape = fn (?Race $r) => $r === null ? null : [
             'id' => $r->id,
             'round' => $r->round,
-            'name' => app(RaceNameLocalizer::class)->localize($r->jolpica_id, $r->name),
+            'name' => app(RaceNameLocalizer::class)->forRace($r),
         ];
 
         return [

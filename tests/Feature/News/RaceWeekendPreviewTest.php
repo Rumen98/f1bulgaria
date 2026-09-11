@@ -43,12 +43,12 @@ it('праща preview на потребители и абонати при кр
 
     $this->artisan('f1:race-preview')->assertSuccessful();
 
-    Mail::assertQueued(RaceWeekendPreviewMail::class, fn ($mail) => $mail->hasTo('igrach@example.bg')
+    Mail::assertSent(RaceWeekendPreviewMail::class, fn ($mail) => $mail->hasTo('igrach@example.bg')
         && $mail->unsubscribeToken === null
         && count($mail->program) === 2
         && $mail->program[0]['label'] === 'Квалификация'
         && $mail->deadline !== null);
-    Mail::assertQueued(RaceWeekendPreviewMail::class, fn ($mail) => $mail->hasTo('abonat@example.bg')
+    Mail::assertSent(RaceWeekendPreviewMail::class, fn ($mail) => $mail->hasTo('abonat@example.bg')
         && $mail->unsubscribeToken === 'tok-prev');
 });
 
@@ -79,7 +79,7 @@ it('пада към часовете на състезанието без син
 
     $this->artisan('f1:race-preview')->assertSuccessful();
 
-    Mail::assertQueued(RaceWeekendPreviewMail::class, fn ($mail) => count($mail->program) === 2
+    Mail::assertSent(RaceWeekendPreviewMail::class, fn ($mail) => count($mail->program) === 2
         && $mail->program[0]['label'] === 'Квалификация'
         && $mail->program[1]['label'] === 'Състезание');
 });
@@ -106,7 +106,7 @@ it('пропуска вече минали сесии в програмата', 
 
     $this->artisan('f1:race-preview')->assertSuccessful();
 
-    Mail::assertQueued(RaceWeekendPreviewMail::class, fn ($mail) => count($mail->program) === 1
+    Mail::assertSent(RaceWeekendPreviewMail::class, fn ($mail) => count($mail->program) === 1
         && $mail->program[0]['label'] === 'Състезание');
 });
 
@@ -124,7 +124,7 @@ it('fallback програмата включва спринта при спри�
 
     $this->artisan('f1:race-preview')->assertSuccessful();
 
-    Mail::assertQueued(RaceWeekendPreviewMail::class, fn ($mail) => count($mail->program) === 3
+    Mail::assertSent(RaceWeekendPreviewMail::class, fn ($mail) => count($mail->program) === 3
         && $mail->program[1]['label'] === 'Спринт');
 });
 
@@ -140,7 +140,7 @@ it('опцията --race заобикаля 7-дневния прозорец',
 
     $this->artisan('f1:race-preview', ['--race' => $race->id])->assertSuccessful();
 
-    Mail::assertQueuedCount(1);
+    Mail::assertSentCount(1);
 });
 
 it('рендерира програмата и CTA за прогноза (потребителска версия)', function () {

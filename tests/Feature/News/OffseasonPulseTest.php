@@ -42,12 +42,12 @@ it('праща пулса през пауза с новини и отброяв�
 
     $this->artisan('f1:offseason-pulse')->assertSuccessful();
 
-    Mail::assertQueued(OffseasonPulseMail::class, fn ($mail) => $mail->hasTo('igrach@example.bg')
+    Mail::assertSent(OffseasonPulseMail::class, fn ($mail) => $mail->hasTo('igrach@example.bg')
         && $mail->countdown !== null
         && $mail->countdown['days'] === 15
         && count($mail->news) === 1
         && $mail->news[0]['title'] === 'Лятна сага');
-    Mail::assertQueued(OffseasonPulseMail::class, fn ($mail) => $mail->hasTo('abonat@example.bg')
+    Mail::assertSent(OffseasonPulseMail::class, fn ($mail) => $mail->hasTo('abonat@example.bg')
         && $mail->unsubscribeToken === 'tok-pulse');
 });
 
@@ -123,13 +123,13 @@ it('опцията --force заобикаля guard-овете', function () {
 
     $this->artisan('f1:offseason-pulse', ['--force' => true])->assertSuccessful();
 
-    Mail::assertQueuedCount(1);
+    Mail::assertSentCount(1);
 });
 
 it('рендерира отброяването, новините и отписването', function () {
     $mail = new OffseasonPulseMail(
         [['title' => 'Лятна сага', 'url' => 'https://padok.bg/news/lyatna-saga']],
-        countdown: ['race' => 'Гран При на Нидерландия', 'when' => 'Нд, 23.08 — 16:00 ч.', 'days' => 14],
+        countdown: ['race' => 'Гран при на Нидерландия', 'when' => 'Нд, 23.08 — 16:00 ч.', 'days' => 14],
         standings: [['position' => 1, 'driver' => 'Ландо Норис', 'points' => 250.0]],
         unsubscribeToken: 'tok-pr',
     );

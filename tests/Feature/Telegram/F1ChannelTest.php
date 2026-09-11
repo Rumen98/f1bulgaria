@@ -69,8 +69,8 @@ it('поставя квалификацията в опашката от session
     $post = ChannelPost::query()->first();
 
     expect($post->kind)->toBe(ChannelPostKind::F1Qualifying)
-        // Име на Гран При-то и на пилота — и двете на български.
-        ->and($post->body)->toContain('Гран При на Унгария · кръг 9')
+        // Име на Гран при-то и на пилота — и двете на български.
+        ->and($post->body)->toContain('Гран при на Унгария · кръг 9')
         ->and($post->body)->toContain('Люис Хамилтън')
         ->and($post->body)->toContain('1:15.096');
 });

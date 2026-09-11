@@ -116,7 +116,7 @@ class AnthropicClient implements LlmClient
         $config = config('services.anthropic');
 
         if (blank($config['key'])) {
-            throw new LlmException('Липсва ANTHROPIC_API_KEY в конфигурацията.');
+            throw new LlmUnavailableException('Липсва ANTHROPIC_API_KEY в конфигурацията.');
         }
 
         try {
@@ -134,13 +134,48 @@ class AnthropicClient implements LlmClient
             // low") — без ключа/хедърите. Иначе 400 е неразгадаем от лога.
             $apiMessage = (string) data_get($e->response->json(), 'error.message', '');
             $detail = $apiMessage !== '' ? ' '.Str::limit($apiMessage, 200) : '';
+            $status = $e->response->status();
+            $message = "Anthropic API върна {$status}.{$detail}";
 
-            throw new LlmException("Anthropic API върна {$e->response->status()}.{$detail}", previous: $e);
+            if ($this->isPermanentlyUnavailable($status, $apiMessage)) {
+                throw new LlmUnavailableException($message, previous: $e);
+            }
+
+            // 429 след изчерпани опити и 5xx са временни — падаме за тази
+            // заявка, но не отписваме доставчика за цялата партида.
+            if ($status === 429 || $e->response->serverError()) {
+                throw new LlmUnavailableException($message, permanent: false, previous: $e);
+            }
+
+            throw new LlmException($message, previous: $e);
         } catch (ConnectionException) {
-            throw new LlmException('Мрежова грешка при връзка с Anthropic API.');
+            throw new LlmUnavailableException('Мрежова грешка при връзка с Anthropic API.', permanent: false);
         }
 
         return (array) $response->json();
+    }
+
+    /**
+     * Провали, при които доставчикът няма да се оправи сам в рамките на това
+     * пускане: отхвърлена автентикация, липсващи права, спрян/непознат модел
+     * и изчерпан кредит.
+     *
+     * 402 е тук изрично — това е „платеният акаунт остана без пари", тоест
+     * точно случаят, заради който fallback-ът съществува. Anthropic обаче
+     * подава изчерпан баланс и като 400 с текст в error.message, затова 400
+     * се пуска нататък САМО ако съобщението говори за пари; иначе 400 е наша
+     * грешка в заявката и смяната на доставчик не помага.
+     */
+    private function isPermanentlyUnavailable(int $status, string $apiMessage): bool
+    {
+        if (in_array($status, [401, 402, 403, 404], strict: true)) {
+            return true;
+        }
+
+        return $status === 400 && Str::contains(
+            Str::lower($apiMessage),
+            ['credit balance', 'billing', 'quota', 'insufficient'],
+        );
     }
 
     /**

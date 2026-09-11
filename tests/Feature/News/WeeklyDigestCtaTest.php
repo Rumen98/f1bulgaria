@@ -26,7 +26,7 @@ function digestMail(?array $userStats, ?array $nextRace = null, ?string $token =
 function nextRaceData(): array
 {
     return [
-        'name' => 'Гран При на Нидерландия',
+        'name' => 'Гран при на Нидерландия',
         'url' => 'https://padok.bg/races/gp-na-nidrlandiya',
         'deadline' => 'Сб, 22.08 — 15:55 ч.',
     ];
@@ -40,7 +40,7 @@ it('кани към прогноза вместо да показва табли
 
     expect($html)->toContain('Още не си играл този сезон')
         ->and($html)->not->toContain('Твоята статистика този сезон')
-        ->and($html)->toContain('Дай прогноза за Гран При на Нидерландия');
+        ->and($html)->toContain('Дай прогноза за Гран при на Нидерландия');
 });
 
 it('показва статистиката на човек, който вече е прогнозирал', function () {
@@ -57,7 +57,7 @@ it('показва статистиката на човек, който вече
 it('обявява следващия кръг и срока за заключване', function () {
     $html = digestMail(['points' => 0, 'predictions' => 0, 'best' => 0, 'average' => 0.0], nextRaceData());
 
-    expect($html)->toContain('Следващ кръг: Гран При на Нидерландия')
+    expect($html)->toContain('Следващ кръг: Гран при на Нидерландия')
         ->and($html)->toContain('Сб, 22.08 — 15:55 ч.');
 });
 

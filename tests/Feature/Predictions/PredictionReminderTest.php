@@ -35,8 +35,8 @@ it('пише само на потребители без прогноза', func
 
     $this->artisan('f1:prediction-reminder')->assertSuccessful();
 
-    Mail::assertQueued(PredictionReminderMail::class, 1);
-    Mail::assertQueued(PredictionReminderMail::class, fn ($mail) => $mail->hasTo($without->email));
+    Mail::assertSent(PredictionReminderMail::class, 1);
+    Mail::assertSent(PredictionReminderMail::class, fn ($mail) => $mail->hasTo($without->email));
 });
 
 it('прескача потребители, спрели имейлите', function () {
@@ -78,7 +78,7 @@ it('не праща втори път за същия кръг', function () {
     $this->artisan('f1:prediction-reminder')->assertSuccessful();
     $this->artisan('f1:prediction-reminder')->assertSuccessful();
 
-    Mail::assertQueued(PredictionReminderMail::class, 1);
+    Mail::assertSent(PredictionReminderMail::class, 1);
 });
 
 it('маркира изпращането в журнала', function () {

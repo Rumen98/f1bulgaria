@@ -27,6 +27,16 @@ it('urls() включва статични и динамични страниц�
         ->and($urls->count())->toBe($urls->unique()->count()); // без дубликати
 });
 
+it('включва играта само когато feature флагът е включен', function () {
+    config(['features.game' => false]);
+
+    expect(app(GenerateSitemapCommand::class)->urls())->not->toContain(route('game'));
+
+    config(['features.game' => true]);
+
+    expect(app(GenerateSitemapCommand::class)->urls())->toContain(route('game'));
+});
+
 it('командата записва sitemap index + под-sitemap-и', function () {
     $this->artisan('sitemap:generate')->assertSuccessful();
 

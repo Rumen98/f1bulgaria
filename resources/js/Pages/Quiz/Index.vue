@@ -12,9 +12,17 @@ import { computed, reactive, ref, watch } from 'vue';
 const props = defineProps({
     questions: { type: Array, default: () => [] },
     result: { type: Object, default: null }, // != null => режим резултат/ревю
-    stats: { type: Object, default: () => ({ points: 0, available: 0, attempts: 0, best_score: null, best_total: null }) },
+    stats: { type: Object, default: () => ({ points: 0, available: 0 }) },
     leaderboard: { type: Array, default: () => [] },
+    // ISO номерът на седмицата — наборът въпроси е един за всички и се сменя
+    // всеки понеделник.
+    week: { type: Number, default: null },
+    weeklyTotal: { type: Number, default: 0 },
+    weeklyAnswered: { type: Number, default: 0 },
+    weeklyPoints: { type: Number, default: 0 },
 });
+
+const weeklyDone = computed(() => props.weeklyTotal > 0 && props.weeklyAnswered >= props.weeklyTotal);
 
 const currentUser = computed(() => usePage().props.auth?.user ?? null);
 
@@ -32,7 +40,7 @@ const submit = () => {
 };
 const restart = () => router.visit(route('quiz'));
 
-// ── Режим резултат: превръщаме резултата в „класация от Гран При" ───────────
+// ── Режим резултат: превръщаме резултата в „класация от Гран при" ───────────
 // Позиция P1..P20 по процент верни. Прагове вместо линейна формула: линейната
 // правеше P3 недостижим при 10 въпроса. Точки по F1 схемата.
 const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
@@ -64,7 +72,7 @@ const tier = computed(() => {
     if (p <= 10) {
         return { label: 'В ТОЧКИТЕ', sub: 'Солиден резултат', ring: 'ring-emerald-500/40', glow: 'from-emerald-500/15', text: 'text-emerald-300', emoji: '✅' };
     }
-    return { label: 'ИЗВЪН ТОЧКИТЕ', sub: 'Има какво да наваксаш до следващия кръг', ring: 'ring-zinc-700', glow: 'from-zinc-700/20', text: 'text-zinc-400', emoji: '🏁' };
+    return { label: 'ИЗВЪН ТОЧКИТЕ', sub: 'Новите въпроси идват в понеделник', ring: 'ring-zinc-700', glow: 'from-zinc-700/20', text: 'text-zinc-400', emoji: '🏁' };
 });
 
 // Подиумни стъпала (P2 · P1 · P3) — „ТИ" се показва на своето, ако е топ 3.
@@ -226,14 +234,8 @@ watch(
 
             <div class="mt-6 flex flex-wrap justify-center gap-3">
                 <button type="button" class="rounded-lg bg-red-600 px-6 py-2.5 font-bold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500" @click="restart">
-                    🏁 Нов кръг
+                    Към въпросите на седмицата
                 </button>
-            </div>
-
-            <!-- Постоянният прогрес живее ПОД кръга: показва, че резултатът е
-                 оставил следа, вместо да изчезне с напускането на страницата. -->
-            <div class="mt-8">
-                <QuizProgress :stats="stats" :new-points="result.new_points ?? 0" :authenticated="!!currentUser" />
             </div>
 
             <div class="mt-8">
@@ -243,16 +245,40 @@ watch(
 
         <!-- ═══════════════ РЕЖИМ КУИЗ ═══════════════ -->
         <template v-else>
-            <div class="mb-6 flex items-center gap-2.5">
+            <div class="mb-2 flex items-center gap-2.5">
                 <span class="flag-chip h-6 w-6 rounded" />
                 <h1 class="font-display text-2xl font-black sm:text-3xl">Куизът на Падок<span class="text-red-600">.</span></h1>
             </div>
+            <p v-if="week" class="mb-6 text-sm text-zinc-500">
+                Въпросите на седмица <span class="font-semibold text-zinc-300">{{ week }}</span> — еднакви за всички, нови всеки понеделник.
 
-            <div class="mb-6">
-                <QuizProgress :stats="stats" :authenticated="!!currentUser" />
+            </p>
+            <div v-else class="mb-4" />
+
+            <!-- За влезлия: просто въпроси. Точките се виждат в класацията
+                 отдолу и в профила. Гостът получава поканата за регистрация. -->
+            <div v-if="!currentUser" class="mb-6">
+                <QuizProgress :stats="stats" :authenticated="false" />
             </div>
 
-            <EmptyState v-if="questions.length === 0">Все още няма въпроси. Върни се скоро!</EmptyState>
+            <!-- Отговорил на всичко за седмицата (вярно или грешно) — един
+                 опит на въпрос, КРАЙ до понеделник. -->
+            <section
+                v-if="weeklyDone"
+                class="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center"
+            >
+                <p class="text-3xl" aria-hidden="true">{{ weeklyPoints === weeklyTotal ? '🏆' : '🏁' }}</p>
+                <h2 class="mt-2 font-display text-xl font-black text-white">
+                    Това беше за тази седмица
+                </h2>
+                <p class="mx-auto mt-1 max-w-md text-sm text-zinc-400">
+                    Взе <span class="font-bold text-emerald-400">{{ weeklyPoints }}</span> от
+                    {{ weeklyTotal }} възможни точки от въпросите на седмица {{ week }}.
+                    Новите идват в понеделник — дотогава виж класацията отдолу.
+                </p>
+            </section>
+
+            <EmptyState v-else-if="questions.length === 0">Все още няма въпроси. Върни се скоро!</EmptyState>
 
             <template v-else>
                 <!-- Прогрес (стартова решетка) -->

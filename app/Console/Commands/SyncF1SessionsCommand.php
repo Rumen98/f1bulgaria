@@ -31,7 +31,7 @@ class SyncF1SessionsCommand extends Command
         $stats = $sync->syncSeason($year);
 
         $this->table(
-            ['Сесии', 'Резултати', 'Несъпоставени кръга'],
+            ['Сесии', 'Резултати', 'Несъпоставени кръгове'],
             [[$stats['sessions'], $stats['results'], $stats['skipped']]],
         );
 

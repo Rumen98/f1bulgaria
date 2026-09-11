@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\NewsStatus;
+use App\Console\Commands\Concerns\SendsBulkMail;
 use App\Mail\WeeklyDigestMail;
 use App\Models\F2Driver;
 use App\Models\F2Result;
@@ -21,13 +21,17 @@ use App\Services\Quiz\QuizProgressService;
 use App\Support\DriverName;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
 class WeeklyDigestCommand extends Command
 {
-    protected $signature = 'f1:weekly-digest {--race= : ID на състезание (по подразбиране — последното изминало; заобикаля 7-дневния прозорец за ръчен re-send)}';
+    use SendsBulkMail;
+
+    protected $signature = 'f1:weekly-digest
+        {--race= : ID на състезание (по подразбиране — последното изминало; заобикаля 7-дневния прозорец за ръчен re-send)}
+        {--any-hour : Праща и извън приличния часови прозорец (за ръчно пускане)}';
 
     protected $description = 'Изпраща неделен рекап на състезанието + класиране на prediction league-а.';
 
@@ -39,11 +43,24 @@ class WeeklyDigestCommand extends Command
 
     /**
      * Колко назад търсим неизпратено състезание. По-широк от седмица
-     * нарочно: кръг, стартирал минути преди неделния час, няма резултати
-     * при първия пуск и се наваксва следващата неделя. Дедупликацията е
-     * в `newsletter_sends`, не в прозореца.
+     * нарочно: кръг, чиито резултати са закъснели, се наваксва по-късно.
+     * Дедупликацията е в `newsletter_sends`, не в прозореца.
      */
     private const WINDOW_DAYS = 14;
+
+    /**
+     * Приличен час за писмо (софийско време), включително границите.
+     *
+     * Командата върви ЕЖЕЧАСНО и праща в мига, в който резултатите се
+     * появят — Jolpica публикува когато си иска и фиксираният неделен час
+     * в 20:00 беше единствен изстрел: пропуснеше ли го, рекапът чакаше
+     * цяла седмица и рискуваше да бъде изяден от следващия кръг (при
+     * подредба по най-нов). Единственото, което пазим от денонощието, е
+     * писмо в 3 през нощта.
+     */
+    private const EARLIEST_HOUR = 9;
+
+    private const LATEST_HOUR = 22;
 
     /** Slug на Цолов в `f2_drivers` — Ф2 секцията следи неговия уикенд. */
     private const TSOLOV_SLUG = 'nikola-tsolov';
@@ -61,6 +78,15 @@ class WeeklyDigestCommand extends Command
 
         if ($season === null) {
             $this->warn('Няма текущ сезон.');
+
+            return self::SUCCESS;
+        }
+
+        // Ежечасният пуск не бива да буди хората. Ръчното пускане и изричният
+        // --race заобикалят прозореца — тогава решението е на човек.
+        if (! $this->withinCivilHours()) {
+            $this->line('Извън приличния часови прозорец ('
+                .self::EARLIEST_HOUR.':00-'.self::LATEST_HOUR.':00) — изчакваме.');
 
             return self::SUCCESS;
         }
@@ -102,7 +128,7 @@ class WeeklyDigestCommand extends Command
         foreach ($recipients as $user) {
             $stats = $this->decorateStats($leaderboard->userStats($user, $season), $user, $fullBoard);
 
-            Mail::to($user)->queue(new WeeklyDigestMail(
+            $this->sendMail($user, new WeeklyDigestMail(
                 $race,
                 $recap,
                 $board,
@@ -120,7 +146,7 @@ class WeeklyDigestCommand extends Command
         $subscribers = $audience->subscribersWithoutAccount($recipients);
 
         foreach ($subscribers as $subscriber) {
-            Mail::to($subscriber->email)->queue(new WeeklyDigestMail(
+            $this->sendMail($subscriber->email, new WeeklyDigestMail(
                 $race,
                 $recap,
                 $board,
@@ -132,7 +158,9 @@ class WeeklyDigestCommand extends Command
             ));
         }
 
-        $this->info("Дайджестът е поставен в опашката: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
+        $this->info("Дайджестът е изпратен: {$recipients->count()} потребители + {$subscribers->count()} бюлетинни абонати.");
+
+        $this->reportMailOutcome();
 
         return self::SUCCESS;
     }
@@ -173,6 +201,24 @@ class WeeklyDigestCommand extends Command
         $sofia = $utc->copy()->setTimezone('Europe/Sofia');
 
         return self::WEEKDAYS[(int) $sofia->dayOfWeek].', '.$sofia->format('d.m').' — '.$sofia->format('H:i').' ч.';
+    }
+
+    /**
+     * Часът в София е приличен за писмо.
+     *
+     * Резултатите на Jolpica идват когато си искат, включително посред нощ.
+     * Пращането е закачено за появата им, не за фиксиран час — прозорецът е
+     * единственото, което пази получателя от известие в 3 сутринта.
+     */
+    private function withinCivilHours(): bool
+    {
+        if ($this->option('any-hour') || $this->option('race')) {
+            return true;
+        }
+
+        $hour = (int) Carbon::now('Europe/Sofia')->hour;
+
+        return $hour >= self::EARLIEST_HOUR && $hour <= self::LATEST_HOUR;
     }
 
     private function resolveRace(Season $season): ?Race
@@ -242,11 +288,11 @@ class WeeklyDigestCommand extends Command
     /**
      * Прогресът в куиза за секцията в дайджеста.
      *
-     * Куизът се подсеща оттук, а не с отделно писмо: при 40 потребители всяко
-     * ново масово писмо е по-скоро причина за отписване, отколкото за връщане.
-     * Дайджестът вече пристига всяка неделя и хората го отварят.
+     * Куизът се подсеща оттук, а не с отделно писмо: при този мащаб всяко
+     * ново масово писмо е по-скоро причина за отписване, отколкото за
+     * връщане. Само точките — броят въпроси в базата е подвижна цел.
      *
-     * @return array{points:int, available:int, remaining:int}|null
+     * @return array{points:int}|null
      */
     private function quizProgress(QuizProgressService $progress, User $user): ?array
     {
@@ -256,11 +302,7 @@ class WeeklyDigestCommand extends Command
             return null; // няма въпроси в базата — няма какво да рекламираме
         }
 
-        return [
-            'points' => $stats['points'],
-            'available' => $stats['available'],
-            'remaining' => max(0, $stats['available'] - $stats['points']),
-        ];
+        return ['points' => $stats['points']];
     }
 
     /**
@@ -334,7 +376,7 @@ class WeeklyDigestCommand extends Command
     private function buildTopNews(): array
     {
         return TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->inMainFeed()
             ->where('published_at', '>=', now()->subDays(self::FRESHNESS_DAYS))
             ->orderByDesc('importance_score')
             ->orderByDesc('published_at')

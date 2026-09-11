@@ -1,5 +1,6 @@
 <script setup>
 import HeroSection from '@/Components/Hero/HeroSection.vue';
+import DataRecapCard from '@/Components/Homepage/DataRecapCard.vue';
 import ThisDayWidget from '@/Components/Homepage/ThisDayWidget.vue';
 import LiveSessionBanner from '@/Components/LiveSessionBanner.vue';
 import GameTeaserWidget from '@/Components/Homepage/GameTeaserWidget.vue';
@@ -15,6 +16,8 @@ const props = defineProps({
     hero: { type: Object, required: true },
     liveSession: { type: Object, default: null },
     thisDay: { type: Array, default: () => [] },
+    // Последният рекап с данни; null при изключен флаг или преди първия кръг.
+    dataRecap: { type: Object, default: null },
     topNews: { type: Array, default: () => [] },
     // null, ако човекът е гост, вече е прогнозирал или срокът е минал.
     predictionCta: { type: Object, default: null },
@@ -36,6 +39,8 @@ const allLinks = [
     { label: 'Дуели', desc: 'Великите съперничества в историята', route: 'rivalries.index', feature: 'rivalries' },
     { label: 'Прогнози', desc: 'Познай подиума и събирай точки', route: 'leaderboard' },
     { label: 'Куиз', desc: 'Провери познанията си за Формула 1.', route: 'quiz', feature: 'quiz' },
+    { label: 'Данни', desc: 'Какво показват данните след всеки кръг', route: 'racedata.index', feature: 'data_recap' },
+    { label: 'Инженерство', desc: 'Как работи болидът, обяснено на български', route: 'engineering.index', feature: 'engineering' },
 ];
 
 const links = computed(() => allLinks.filter((l) => hasRoute(l.route) && (!l.feature || features.value[l.feature])));
@@ -79,7 +84,7 @@ const restNews = computed(() => props.topNews.slice(1));
                     </template>
                     <template v-else>
                         <template v-if="predictionCta.deadline">
-                            Заключва се {{ predictionCta.deadline }}<template v-if="predictionCta.days > 0"> — остават {{ predictionCta.days }} дни</template>.
+                            Заключва се {{ predictionCta.deadline }}<template v-if="predictionCta.days > 0"> — {{ predictionCta.days === 1 ? 'остава 1 ден' : `остават ${predictionCta.days} дни` }}</template>.
                         </template>
                         Стигат ти три имена за подиума.
                     </template>
@@ -135,6 +140,10 @@ const restNews = computed(() => props.topNews.slice(1));
         <ThisDayWidget v-if="features.this_day" :events="thisDay" />
 
         <GameTeaserWidget v-if="gameTeaser" :teaser="gameTeaser" />
+
+        <!-- Данните от последния кръг. Над новините нарочно: материалът има
+             срок и се чете точно в дните след състезанието. -->
+        <DataRecapCard v-if="dataRecap" :recap="dataRecap" />
 
         <!-- Топ новини -->
         <section v-if="topNews.length" class="mt-10">

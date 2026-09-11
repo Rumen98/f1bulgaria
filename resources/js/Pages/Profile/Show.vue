@@ -2,6 +2,7 @@
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import StatTile from '@/Components/UI/StatTile.vue';
 import BadgeCard from '@/Components/Profile/BadgeCard.vue';
+import PredictionBreakdown from '@/Components/Predictions/PredictionBreakdown.vue';
 import { hasRoute } from '@/utils/routes';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
@@ -9,7 +10,10 @@ import { computed } from 'vue';
 const props = defineProps({
     profile: Object,
     stats: Object,
-    quiz: { type: Object, default: () => ({ points: 0, available: 0, attempts: 0 }) },
+    quiz: { type: Object, default: () => ({ points: 0, available: 0 }) },
+    streak: { type: Number, default: 0 },
+    // Само заключени кръгове — отворена прогноза никога не излиза публично.
+    predictionHistory: { type: Array, default: () => [] },
     game: { type: Object, default: null },
     season: Number,
 });
@@ -81,6 +85,47 @@ const formatLap = (ms) => {
                     </StatTile>
                 </div>
 
+                <p v-if="streak >= 2" class="flex items-center gap-1.5 text-sm text-zinc-400">
+                    <span aria-hidden="true">🔥</span>
+                    Серия: <span class="font-bold text-orange-400">{{ streak }}</span> поредни кръга с прогноза
+                </p>
+
+                <!-- История на прогнозите: чуждите решения са социалното
+                     съдържание на лигата при този брой играчи. -->
+                <div v-if="predictionHistory.length" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
+                    <h2 class="mb-4 font-display text-lg font-bold text-white">Прогнози по кръгове</h2>
+                    <ul class="space-y-3">
+                        <li
+                            v-for="entry in predictionHistory"
+                            :key="entry.round"
+                            class="rounded-lg border border-zinc-800 bg-black/30 p-3"
+                        >
+                            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                                <span class="font-semibold text-white">
+                                    <span class="text-zinc-500">Кръг {{ entry.round }} ·</span> {{ entry.race }}
+                                </span>
+                                <span
+                                    v-if="entry.points !== null"
+                                    class="shrink-0 font-bold tabular-nums text-red-500"
+                                >{{ entry.points }} т.</span>
+                                <span v-else class="shrink-0 text-xs text-zinc-500">чака резултати</span>
+                            </div>
+                            <ol class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm text-zinc-400">
+                                <li v-for="(name, i) in entry.podium" :key="i" class="flex items-baseline gap-1">
+                                    <span class="text-xs">{{ ['🥇', '🥈', '🥉'][i] }}</span>
+                                    <span>{{ name ?? '—' }}</span>
+                                </li>
+                            </ol>
+                            <details v-if="entry.breakdown" class="mt-2">
+                                <summary class="cursor-pointer text-xs font-medium text-zinc-500 transition hover:text-zinc-300">
+                                    Разбивка на точките
+                                </summary>
+                                <PredictionBreakdown class="mt-2" :breakdown="entry.breakdown" :total="entry.points ?? 0" />
+                            </details>
+                        </li>
+                    </ul>
+                </div>
+
                 <div v-if="quiz.available" class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6">
                     <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
                         <h2 class="font-display text-lg font-bold text-white">Куиз</h2>
@@ -88,19 +133,14 @@ const formatLap = (ms) => {
                             Играй →
                         </Link>
                     </div>
+                    <!-- Само точките: знаменателят „/ N въпроса" беше текущият
+                         брой в базата — расте с всеки добавен въпрос и правеше
+                         целта подвижна, а лентата — безсмислена. -->
                     <div class="flex items-end gap-2">
                         <span class="font-display text-3xl font-black leading-none tabular-nums text-white">{{ quiz.points }}</span>
-                        <span class="pb-0.5 text-sm text-zinc-500">/ {{ quiz.available }} покорени въпроса</span>
+                        <span class="pb-0.5 text-sm text-zinc-500">{{ quiz.points === 1 ? 'точка' : 'точки' }}</span>
                     </div>
-                    <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                        <div
-                            class="h-full bg-gradient-to-r from-red-600 to-amber-400"
-                            :style="{ width: (quiz.available ? (quiz.points / quiz.available) * 100 : 0) + '%' }"
-                        />
-                    </div>
-                    <p v-if="quiz.attempts" class="mt-2 text-xs text-zinc-500">
-                        {{ quiz.attempts }} изиграни кръга<template v-if="quiz.best_score !== null">, най-добър {{ quiz.best_score }}/{{ quiz.best_total }}</template>.
-                    </p>
+                    <p class="mt-2 text-xs text-zinc-500">Нови въпроси всеки понеделник.</p>
                 </div>
 
                 <!-- Играта: покорени писти + най-силни времена -->

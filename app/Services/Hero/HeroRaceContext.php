@@ -30,5 +30,9 @@ final readonly class HeroRaceContext
         public ?RaceSession $nextSession,
         public Collection $sessions,
         public ?Driver $winner,
+        /** Стартът е минал (по часовник, не по резултати). */
+        public bool $raceStarted = false,
+        /** Минали са 3 часа от старта — регламентният таван, значи сигурно е свършило. */
+        public bool $raceFinished = false,
     ) {}
 }

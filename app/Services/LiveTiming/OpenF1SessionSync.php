@@ -141,7 +141,7 @@ class OpenF1SessionSync
      * Съпоставя събитие от OpenF1 с наш кръг по датата на състезанието.
      *
      * По дата, а не по име на пистата: имената се пишат различно в двата
-     * източника („Autodromo Nazionale Monza" срещу „monza"), а два Гран При
+     * източника („Autodromo Nazionale Monza" срещу „monza"), а два Гран при
      * в един и същи ден не съществуват.
      *
      * @param  Collection<int, array<string, mixed>>  $sessions

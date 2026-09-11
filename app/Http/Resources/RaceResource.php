@@ -25,7 +25,7 @@ class RaceResource extends JsonResource
             'id' => $this->id,
             'round' => $this->round,
             'name' => $this->name,
-            'name_bg' => app(RaceNameLocalizer::class)->localize($this->jolpica_id, $this->name),
+            'name_bg' => app(RaceNameLocalizer::class)->forRace($this->resource),
             'circuit' => $this->circuit,
             'country' => $this->country,
             'has_sprint' => $this->has_sprint,

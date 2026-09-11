@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\NewsStatus;
+use App\Models\RaceDataRecap;
 use App\Models\RaceSession;
 use App\Models\Season;
 use App\Models\TeamNewsItem;
@@ -12,6 +12,7 @@ use App\Services\Game\LeaderboardService as GameLeaderboardService;
 use App\Services\Game\WeekTrackResolver;
 use App\Services\Hero\HeroRaceContext;
 use App\Services\Hero\NextRaceResolver;
+use App\Services\Hero\PostRaceWinnerResolver;
 use App\Services\Homepage\ThisDayInF1Service;
 use App\Services\LiveTiming\OpenF1Client;
 use App\Services\LiveTiming\OpenF1TokenManager;
@@ -21,6 +22,7 @@ use App\Services\Races\RaceNameLocalizer;
 use App\Support\DriverName;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,9 +39,10 @@ class HomeController extends Controller
         $hero = $resolver->resolve();
 
         return Inertia::render('Home', [
-            'hero' => $this->heroProp($hero),
+            'hero' => $this->heroProp($hero, $locks),
             'liveSession' => $this->liveSession($openF1, $tokens),
             'thisDay' => $thisDay->forDate(Carbon::now('Europe/Sofia')),
+            'dataRecap' => $this->latestDataRecap(),
             'topNews' => $this->topNews(),
             'predictionCta' => $this->predictionCta($hero, $locks),
             'gameTeaser' => $this->gameTeaser(),
@@ -84,6 +87,55 @@ class HomeController extends Controller
             'name' => (string) $name,
             'top' => $top->values()->all(),
         ];
+    }
+
+    /**
+     * Последният рекап с данни — блокът с числата над новините.
+     *
+     * Стои на началната, а не само в /danni, по проста причина: разделът е нов
+     * и никой не го знае, а материалът има срок. Дните след кръга са единствените,
+     * в които го търсят.
+     *
+     * Кешът е кратък: рекапът се сменя веднъж на две седмици, но началната е
+     * най-натоварената страница и не бива да прави още една заявка на посещение.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function latestDataRecap(): ?array
+    {
+        if (! config('features.data_recap')) {
+            return null;
+        }
+
+        return Cache::remember('home:data-recap', now()->addMinutes(10), function (): ?array {
+            $recap = RaceDataRecap::query()
+                ->ready()
+                ->with('race:id,round,name,jolpica_id,circuit,race_datetime_utc')
+                // По ДАТАТА НА СЪСТЕЗАНИЕТО, не по кога е сметнат рекапът.
+                // Наваксването назад преизчислява стари кръгове и подредбата
+                // по generated_at изкара Абу Даби от миналия сезон на
+                // началната страница.
+                ->join('races', 'races.id', '=', 'race_data_recaps.race_id')
+                ->orderByDesc('races.race_datetime_utc')
+                ->select('race_data_recaps.*')
+                ->first();
+
+            if ($recap?->race === null) {
+                return null;
+            }
+
+            return [
+                'race_id' => $recap->race->id,
+                'race' => $recap->race->name_bg,
+                'round' => $recap->race->round,
+                'headline' => $recap->headline,
+                // Три точки: колкото се четат, преди човек да реши дали да влезе.
+                'bullets' => array_slice((array) ($recap->facts['bullets'] ?? []), 0, 3),
+                'winner' => $recap->facts['winner'] ?? null,
+                'top_speed' => $recap->facts['top_speed'] ?? null,
+                'fastest_lap' => $recap->facts['fastest_lap'] ?? null,
+            ];
+        });
     }
 
     /**
@@ -198,7 +250,7 @@ class HomeController extends Controller
     private function topNews()
     {
         return TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map->value->all())
+            ->inMainFeed()
             ->whereNotNull('title_bg')
             ->with('constructor')
             // Най-важната първо: началната я показва като голяма карта,
@@ -225,9 +277,36 @@ class HomeController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function heroProp(HeroRaceContext $ctx): array
+    /**
+     * Име на победителя: от нашите резултати, иначе от OpenF1 след финала.
+     */
+    private function winnerName(HeroRaceContext $ctx): ?array
     {
+        if ($ctx->winner !== null) {
+            return ['name' => DriverName::display($ctx->winner->slug, $ctx->winner->fullName())];
+        }
+
+        // Питаме OpenF1 само след като часовникът каже, че е свършило —
+        // иначе бихме дърпали класиране на още течащо състезание.
+        if (! $ctx->raceFinished || $ctx->race === null) {
+            return null;
+        }
+
+        $name = app(PostRaceWinnerResolver::class)->displayName($ctx->race);
+
+        return $name !== null ? ['name' => $name] : null;
+    }
+
+    private function heroProp(HeroRaceContext $ctx, PredictionLockService $locks): array
+    {
+        // Флаговете идват от ЧАСОВНИКА, не от резултатите. Победителят се
+        // появява чак когато Jolpica публикува, а тя закъснява с часове —
+        // дотогава hero-то твърдеше „Състезанието тече" за кръг, изкаран
+        // отдавна, и канеше хората да прогнозират нещо заключено.
         return [
+            'race_started' => $ctx->raceStarted,
+            'race_finished' => $ctx->raceFinished,
+            'predictions_locked' => $ctx->race !== null && $locks->isLocked($ctx->race),
             'state' => $ctx->state->value,
             'circuit_slug' => $ctx->circuitSlug,
             'countdown_to' => $ctx->countdownTo?->toIso8601String(),
@@ -238,7 +317,7 @@ class HomeController extends Controller
             'race' => $ctx->race ? [
                 'id' => $ctx->race->id,
                 'round' => $ctx->race->round,
-                'name' => app(RaceNameLocalizer::class)->localize($ctx->race->jolpica_id, $ctx->race->name),
+                'name' => app(RaceNameLocalizer::class)->forRace($ctx->race),
                 'circuit' => $ctx->race->circuit,
                 'country' => $ctx->race->country,
                 'race_at_sofia' => $ctx->race->race_datetime_utc
@@ -250,9 +329,10 @@ class HomeController extends Controller
                 'at_sofia' => $s->scheduled_at_utc
                     ?->copy()->setTimezone('Europe/Sofia')->format('d.m H:i'),
             ])->values(),
-            'winner' => $ctx->winner
-                ? ['name' => DriverName::display($ctx->winner->slug, $ctx->winner->fullName())]
-                : null,
+            // Jolpica първо (авторитетна), OpenF1 само за да не чакаме часове
+            // с празно hero. И двете са само за показване — точките се
+            // начисляват единствено от синхрона с Jolpica.
+            'winner' => $this->winnerName($ctx),
         ];
     }
 }

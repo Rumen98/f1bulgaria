@@ -55,7 +55,7 @@ const betterResult = (a, b) => {
         <Link :href="route('compare.index')" class="text-sm text-zinc-500 transition hover:text-zinc-300">← Ново сравнение</Link>
 
         <!-- Hero split: на телефон картите се стекват (дългите имена искат ширина),
-             от md нагоре — класическото „едан срещу друг" с VS по средата. -->
+             от md нагоре — класическото „един срещу друг“ с VS по средата. -->
         <section class="mt-3 grid grid-cols-1 items-stretch gap-2 md:grid-cols-[1fr_auto_1fr] md:gap-4">
             <div
                 v-for="(d, i) in [a, b]"

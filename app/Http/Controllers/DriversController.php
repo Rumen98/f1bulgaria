@@ -71,7 +71,7 @@ class DriversController extends Controller
 
         app(Seo::class)
             ->title($displayName)
-            ->description("Статистика и кариера на {$displayName} във Формула 1 — победи, подиуми, поул позиции, класиране по сезони и резултати. ".DriverName::both($canonical->slug, $latin).'.')
+            ->description("Статистика и кариера на {$displayName} във Формула 1 — победи, подиуми, пол позиции, класиране по сезони и резултати. ".DriverName::both($canonical->slug, $latin).'.')
             ->image(filled($canonical->photo_url) ? $canonical->photo_url : null)
             ->canonical(route('drivers.show', $slug))
             ->schema([
@@ -121,7 +121,7 @@ class DriversController extends Controller
                     // Българското име и id-то на кръга: дотук таблицата
                     // показваше английско име и не водеше никъде.
                     'race' => $r->race
-                        ? app(RaceNameLocalizer::class)->localize($r->race->jolpica_id, $r->race->name)
+                        ? app(RaceNameLocalizer::class)->forRace($r->race)
                         : null,
                     'race_id' => $r->race?->id,
                     'position' => $r->position,

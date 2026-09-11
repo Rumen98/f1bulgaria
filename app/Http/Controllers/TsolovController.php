@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\F2Driver;
 use App\Models\F2Result;
 use App\Models\F2Season;
+use App\Models\TeamNewsItem;
 use App\Support\DriverName;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -21,7 +22,34 @@ class TsolovController extends Controller
     {
         return Inertia::render('Tsolov', [
             'profile' => $this->profile(),
+            'news' => $this->news(),
         ]);
+    }
+
+    /**
+     * Новините за него — пълният архив, включително Формула 2.
+     *
+     * Главната емисия на сайта е само за Формула 1, така че статиите му от Ф2
+     * се виждат единствено тук. Тези, които са И Ф1 новина (тест с болид на
+     * Ф1 отбор), излизат и на двете места — това е нарочно.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function news(): array
+    {
+        return TeamNewsItem::query()
+            ->aboutTsolov()
+            ->orderByDesc('published_at')
+            ->limit(8)
+            ->get(['slug', 'title_bg', 'title_original', 'summary_bg', 'published_at', 'is_f1_related'])
+            ->map(fn (TeamNewsItem $item): array => [
+                'slug' => $item->slug,
+                'title' => $item->title_bg ?: $item->title_original,
+                'summary' => $item->summary_bg,
+                'published_at' => $item->published_at?->toIso8601String(),
+                'is_f1' => (bool) $item->is_f1_related,
+            ])
+            ->all();
     }
 
     /**

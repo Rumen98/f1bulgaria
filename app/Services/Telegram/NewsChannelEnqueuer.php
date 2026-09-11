@@ -6,7 +6,6 @@ namespace App\Services\Telegram;
 
 use App\Enums\ChannelPostKind;
 use App\Enums\ChannelQueueOutcome;
-use App\Enums\NewsStatus;
 use App\Models\TeamNewsItem;
 use App\Services\Telegram\Formatters\NewsFormatter;
 use Illuminate\Support\Facades\Log;
@@ -39,7 +38,7 @@ class NewsChannelEnqueuer
         $cutoff = now()->subHours((int) config('channel.max_backfill_hours', 24));
 
         $items = TeamNewsItem::query()
-            ->whereIn('status', collect(NewsStatus::publiclyVisible())->map(fn (NewsStatus $s) => $s->value))
+            ->inMainFeed()
             ->where('importance_score', '>=', $threshold)
             ->whereNotNull('title_bg')
             // Датата на публикуване е тази на ИЗТОЧНИКА и може да е стара дори
