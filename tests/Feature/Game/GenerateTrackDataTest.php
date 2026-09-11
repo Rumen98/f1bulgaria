@@ -138,6 +138,48 @@ it('пише каталог, който страницата може да че�
     unlink($fixture['path']);
 });
 
+it('при --only обновява избраната писта, без да губи останалите от каталога', function () {
+    $fixture = circleFixture(500.0, 60);
+    $existingIndex = [
+        [
+            'slug' => 'monza',
+            'name' => 'Стара Монца',
+            'location' => 'Италия',
+            'length' => 1,
+            'elevation' => 0,
+        ],
+        [
+            'slug' => 'spa',
+            'name' => 'Спа-Франкоршан',
+            'location' => 'Белгия',
+            'length' => 7004,
+            'elevation' => 104.2,
+        ],
+    ];
+
+    File::ensureDirectoryExists($this->output);
+    file_put_contents(
+        "{$this->output}/index.json",
+        json_encode($existingIndex, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+    );
+
+    $this->artisan('game:generate-tracks', [
+        '--source' => $fixture['path'],
+        '--output' => $this->output,
+        '--only' => 'monza',
+    ])->assertSuccessful();
+
+    $index = json_decode(file_get_contents("{$this->output}/index.json"), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($index)->toHaveCount(2)
+        ->and($index[0]['slug'])->toBe('monza')
+        ->and($index[0]['name'])->toBe('Тестов кръг')
+        ->and($index[0]['length'])->toBeGreaterThan(3000)
+        ->and($index[1])->toBe($existingIndex[1]);
+
+    unlink($fixture['path']);
+});
+
 it('се проваля разбираемо при непознат slug', function () {
     $fixture = circleFixture(500.0, 60);
 

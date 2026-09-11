@@ -124,12 +124,56 @@ class GenerateTrackDataCommand extends Command
             ));
         }
 
+        $generatedCount = count($index);
+        $indexPath = "{$output}/index.json";
+
+        if ($only !== null && is_file($indexPath)) {
+            try {
+                $existingIndex = json_decode(
+                    (string) file_get_contents($indexPath),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR,
+                );
+            } catch (\JsonException $e) {
+                $this->error("Невалиден каталог {$indexPath}: {$e->getMessage()}");
+
+                return self::FAILURE;
+            }
+
+            if (! is_array($existingIndex) || ! array_is_list($existingIndex)) {
+                $this->error("Невалиден каталог {$indexPath}: очаква се списък с писти.");
+
+                return self::FAILURE;
+            }
+
+            foreach ($index as $generatedEntry) {
+                $replaced = false;
+
+                foreach ($existingIndex as $position => $existingEntry) {
+                    if (($existingEntry['slug'] ?? null) !== $generatedEntry['slug']) {
+                        continue;
+                    }
+
+                    $existingIndex[$position] = $generatedEntry;
+                    $replaced = true;
+                    break;
+                }
+
+                if (! $replaced) {
+                    $existingIndex[] = $generatedEntry;
+                }
+            }
+
+            $index = $existingIndex;
+        }
+
         file_put_contents(
-            "{$output}/index.json",
+            $indexPath,
             json_encode($index, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
         );
 
-        $this->info(count($index).' писти генерирани в '.$output);
+        $this->info($generatedCount.' писти генерирани в '.$output);
 
         return self::SUCCESS;
     }
