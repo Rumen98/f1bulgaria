@@ -99,6 +99,7 @@ class GenerateSitemapCommand extends Command
             'f2' => ['f2'],
             'live_timing' => ['live'],
             'quiz' => ['quiz'],
+            'game' => ['game'],
             'data_recap' => ['racedata.index'],
             'engineering' => ['engineering.index'],
         ];

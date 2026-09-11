@@ -2,3 +2,8 @@
 !private/
 !public/
 !.gitignore
+# Кешовете на пистовия pipeline влизат в git нарочно: game:generate-tracks
+# е офлайн и възпроизводим само ако elevation/landmarks/GeoJSON са в репото.
+!bacinger-circuits.geojson
+!game/
+!game/**

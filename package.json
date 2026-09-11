@@ -20,6 +20,7 @@
         "vue": "^3.4.0"
     },
     "dependencies": {
-        "flag-icons": "^7.5.0"
+        "flag-icons": "^7.5.0",
+        "three": "^0.180.0"
     }
 }

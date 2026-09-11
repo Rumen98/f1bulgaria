@@ -24,6 +24,7 @@ return [
     'live_timing' => env('FEATURE_LIVE_TIMING', false),
     'this_day' => env('FEATURE_THIS_DAY', false),
     'quiz' => env('FEATURE_QUIZ', false),
+    'game' => env('FEATURE_GAME', false),
 
     // „Данни“ (/danni) — рекапът след всяко състезание от OpenF1, със
     // собствени графики. Виж App\Services\RaceData.

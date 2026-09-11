@@ -10,6 +10,7 @@ use App\Models\Driver;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Badges\BadgeService;
+use App\Services\Game\LeaderboardService as GameLeaderboardService;
 use App\Services\Predictions\LeaderboardService;
 use App\Services\Predictions\PredictionLockService;
 use App\Services\Quiz\QuizProgressService;
@@ -21,8 +22,12 @@ use Inertia\Response;
 
 class PublicProfileController extends Controller
 {
-    public function show(User $user, LeaderboardService $leaderboard, QuizProgressService $quiz): Response
-    {
+    public function show(
+        User $user,
+        LeaderboardService $leaderboard,
+        QuizProgressService $quiz,
+        GameLeaderboardService $game,
+    ): Response {
         $season = Season::current();
 
         $stats = $season
@@ -50,6 +55,7 @@ class PublicProfileController extends Controller
             'streak' => $season !== null ? $this->streak($user, $season) : 0,
             'predictionHistory' => $this->predictionHistory($user),
             'quiz' => $quiz->statsFor($user),
+            'game' => config('features.game') ? $game->profileStats($user) : null,
             'season' => $season?->year,
         ]);
     }
@@ -121,6 +127,10 @@ class PublicProfileController extends Controller
         $earned = $user->badges->keyBy('slug');
 
         return collect(BadgeService::DEFINITIONS)
+            // Значките на играта се показват само при включен модул:
+            // иначе профилът рекламира заключени награди за невидима функция.
+            ->filter(fn (array $definition, string $slug) => config('features.game')
+                || ! str_starts_with($slug, 'game-'))
             ->map(fn (array $definition, string $slug) => [
                 'slug' => $slug,
                 'name' => $definition['name'],

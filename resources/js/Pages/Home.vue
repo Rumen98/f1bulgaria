@@ -3,6 +3,7 @@ import HeroSection from '@/Components/Hero/HeroSection.vue';
 import DataRecapCard from '@/Components/Homepage/DataRecapCard.vue';
 import ThisDayWidget from '@/Components/Homepage/ThisDayWidget.vue';
 import LiveSessionBanner from '@/Components/LiveSessionBanner.vue';
+import GameTeaserWidget from '@/Components/Homepage/GameTeaserWidget.vue';
 import FeaturedNewsCard from '@/Components/News/FeaturedNewsCard.vue';
 import NewsCard from '@/Components/News/NewsCard.vue';
 import MyLeagueStanding from '@/Components/Predictions/MyLeagueStanding.vue';
@@ -22,6 +23,7 @@ const props = defineProps({
     predictionCta: { type: Object, default: null },
     // Огледалото му: позицията в лигата на вече прогнозиралия. null за гост.
     me: { type: Object, default: null },
+    gameTeaser: { type: Object, default: null },
 });
 
 const page = usePage();
@@ -136,6 +138,8 @@ const restNews = computed(() => props.topNews.slice(1));
 
         <!-- На този ден във Формула 1 (V2) -->
         <ThisDayWidget v-if="features.this_day" :events="thisDay" />
+
+        <GameTeaserWidget v-if="gameTeaser" :teaser="gameTeaser" />
 
         <!-- Данните от последния кръг. Над новините нарочно: материалът има
              срок и се чете точно в дните след състезанието. -->

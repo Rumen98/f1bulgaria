@@ -86,6 +86,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Prediction::class);
     }
 
+    /** @return HasMany<GameLapRecord, $this> */
+    public function gameLapRecords(): HasMany
+    {
+        return $this->hasMany(GameLapRecord::class);
+    }
+
     /** @return BelongsToMany<Badge, $this> */
     public function badges(): BelongsToMany
     {
