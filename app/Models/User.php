@@ -98,6 +98,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(GameSession::class);
     }
 
+    /** @return HasMany<GameFeedback, $this> */
+    public function gameFeedback(): HasMany
+    {
+        return $this->hasMany(GameFeedback::class);
+    }
+
     /** @return BelongsToMany<Badge, $this> */
     public function badges(): BelongsToMany
     {

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\GamePlayers\Tables;
 
+use App\Filament\Resources\GameFeedback\GameFeedbackResource;
+use App\Filament\Resources\GameSessions\GameSessionResource;
 use App\Models\GameSession;
 use App\Models\User;
+use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Tables\Columns\TextColumn;
@@ -34,8 +37,14 @@ class GamePlayersTable
                     ->dateTimeTooltip('d.m.Y H:i', 'Europe/Sofia')
                     ->sortable(),
                 TextColumn::make('game_sessions_count')
-                    ->label('Стартове')
+                    ->label('Опити')
+                    ->tooltip('Всяко „Карай", рестарт (R) и „Нова обиколка" е отделен опит.')
                     ->counts('gameSessions')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('tracked_sessions_count')
+                    ->label('Подробно отчетени')
+                    ->description(fn (User $record): string => ((int) $record->legacy_sessions_count).' стари старта без история')
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('mobile_sessions_count')
@@ -46,13 +55,25 @@ class GamePlayersTable
                     ])
                     ->formatStateUsing(fn (User $record): string => self::deviceSummary($record)),
                 TextColumn::make('game_lap_records_count')
-                    ->label('Обиколки')
+                    ->label('Изпратени за класацията')
                     ->counts('gameLapRecords')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('tracks_count')
-                    ->label('Писти')
+                TextColumn::make('completed_laps')
+                    ->label('Отчетени финали')
+                    ->formatStateUsing(fn (User $record): string => (int) $record->tracked_sessions_count === 0 ? 'Няма подробни данни' : ((int) $record->completed_laps).' общо')
+                    ->description(fn (User $record): ?string => (int) $record->tracked_sessions_count === 0 ? null : ((int) $record->valid_laps).' чисти · '.((int) $record->invalid_laps).' невалидни')
+                    ->placeholder('Няма подробни данни')
+                    ->sortable(),
+                TextColumn::make('game_feedback_count')
+                    ->label('Мнения за играта')
                     ->numeric()
+                    ->sortable()
+                    ->url(fn (User $record): string => GameFeedbackResource::getUrl('index', ['filters' => ['user_id' => ['value' => $record->id]]])),
+                TextColumn::make('tracks_count')
+                    ->label('Писти с изпратено време')
+                    ->numeric()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->sortable(),
                 TextColumn::make('game_lap_records_min_lap_ms')
                     ->label('Най-добра')
@@ -64,17 +85,29 @@ class GamePlayersTable
             ->defaultSort('last_played_at', 'desc')
             ->filters([
                 Filter::make('with_laps')
-                    ->label('Със записана обиколка')
+                    ->label('С изпратено време за класацията')
                     ->query(fn (Builder $query): Builder => $query->whereHas('gameLapRecords')),
                 Filter::make('without_laps')
-                    ->label('Стартирали, без завършена обиколка')
+                    ->label('Без изпратено време за класацията')
                     ->query(fn (Builder $query): Builder => $query->whereDoesntHave('gameLapRecords')),
+                Filter::make('with_completed_laps')
+                    ->label('С отчетен финал в играта')
+                    ->query(fn (Builder $query): Builder => $query->whereHas('gameSessions', fn (Builder $sessions): Builder => $sessions->where('lap_count', '>', 0))),
+                Filter::make('with_feedback')
+                    ->label('С мнение за играта')
+                    ->query(fn (Builder $query): Builder => $query->whereHas('gameFeedback')),
                 Filter::make('mobile')
                     ->label('Карали на телефон')
                     ->query(fn (Builder $query): Builder => $query->whereHas(
                         'gameSessions',
                         fn (Builder $sessions): Builder => $sessions->where('device', GameSession::DEVICE_MOBILE)
                     )),
+            ])
+            ->recordActions([
+                Action::make('sessions')->label('Карания')->icon('heroicon-o-chart-bar')
+                    ->url(fn (User $record): string => GameSessionResource::getUrl('index', ['filters' => ['user_id' => ['value' => $record->id]]])),
+                Action::make('feedback')->label('Мнения')
+                    ->url(fn (User $record): string => GameFeedbackResource::getUrl('index', ['filters' => ['user_id' => ['value' => $record->id]]])),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -104,7 +137,15 @@ class GamePlayersTable
             ->select('users.*')
             ->selectRaw(self::playedAtExpression('MIN').' AS first_played_at')
             ->selectRaw(self::playedAtExpression('MAX').' AS last_played_at')
-            ->selectRaw("{$tracks} AS tracks_count");
+            ->selectRaw("{$tracks} AS tracks_count")
+            ->withCount([
+                'gameSessions as tracked_sessions_count' => fn (Builder $sessions): Builder => $sessions->where('status', '!=', 'legacy'),
+                'gameSessions as legacy_sessions_count' => fn (Builder $sessions): Builder => $sessions->where('status', 'legacy'),
+                'gameFeedback',
+            ])
+            ->withSum('gameSessions as completed_laps', 'lap_count')
+            ->withSum('gameSessions as valid_laps', 'valid_lap_count')
+            ->withSum('gameSessions as invalid_laps', 'invalid_lap_count');
     }
 
     /**
@@ -155,7 +196,8 @@ class GamePlayersTable
     {
         $value = (string) $value;
 
-        return preg_match('/^[=+\-@	]/', $value) === 1 ? "'".$value : $value;
+        return preg_match('/^[=+\-@	
+]/', $value) === 1 ? "'".$value : $value;
     }
 
     /**
@@ -174,7 +216,7 @@ class GamePlayersTable
 
         return response()->streamDownload(function () use ($players): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['name', 'email', 'first_played_at', 'last_played_at', 'starts', 'laps', 'tracks', 'best_lap']);
+            fputcsv($out, ['name', 'email', 'first_played_at', 'last_played_at', 'attempts', 'leaderboard_submissions', 'tracks_with_submissions', 'best_lap', 'tracked_starts', 'legacy_starts', 'reported_lap_finishes', 'reported_clean_laps', 'reported_invalid_laps', 'game_feedback_count']);
 
             foreach ($players as $player) {
                 $best = $player->game_lap_records_min_lap_ms;
@@ -187,6 +229,12 @@ class GamePlayersTable
                     $player->game_lap_records_count,
                     $player->tracks_count,
                     $best === null ? '' : self::formatLap((int) $best),
+                    $player->tracked_sessions_count,
+                    $player->legacy_sessions_count,
+                    (int) $player->tracked_sessions_count === 0 ? '' : (int) $player->completed_laps,
+                    (int) $player->tracked_sessions_count === 0 ? '' : (int) $player->valid_laps,
+                    (int) $player->tracked_sessions_count === 0 ? '' : (int) $player->invalid_laps,
+                    $player->game_feedback_count,
                 ]);
             }
 

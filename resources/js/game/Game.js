@@ -234,6 +234,7 @@ export class Game {
         this.canvas = canvas;
         this.onTelemetry = onTelemetry;
         this.onFinish = onFinish;
+        this.simVersion = SIM_VERSION;
         this.onProgress = options.onProgress ?? (() => {});
         // Една преценка за слабо устройство — ползва се на 5+ места.
         this.lowPower = isLowPowerDevice();
@@ -664,6 +665,7 @@ export class Game {
         this.playerRace = { laps: 0, lastProgress: this.sim.lastProgress };
         this.sound.start();
         this.onLaunch(this.launch ? 0 : null);
+        this.#notify(this.onAttemptStart);
         this.rafId = requestAnimationFrame(this.#frame);
     }
 
@@ -725,6 +727,26 @@ export class Game {
     }
 
     /**
+     * Наблюдателските callback-и (телеметрия на сесията във Vue) са странични:
+     * гръмнат ли, старт/обиколка/пауза продължават, а грешката отива в
+     * конзолата. Иначе throw от статистиката би замразил играта преди първия
+     * кадър или би загубил резултата на обиколката.
+     *
+     * @param {Function|undefined|null} callback
+     * @param {unknown} [payload]
+     */
+    #notify(callback, payload) {
+        if (typeof callback !== 'function') {
+            return;
+        }
+        try {
+            callback(payload);
+        } catch (error) {
+            console.error('Game: наблюдател гръмна', error);
+        }
+    }
+
+    /**
      * Изключение, избягало от кадъра (renderer.render/compile), е фатално за
      * тази инстанция: three не може да развие renderStateStack/renderListStack
      * след throw, а гръмнал onBeforeCompile гърми отново на всеки кадър —
@@ -781,6 +803,7 @@ export class Game {
             return;
         }
         this.paused = true;
+        this.#notify(this.onPauseChange, true);
         this.stop();
     }
 
@@ -790,6 +813,7 @@ export class Game {
             return;
         }
         this.paused = false;
+        this.#notify(this.onPauseChange, false);
         this.running = true;
         this.lastFrame = performance.now();
         if (this.replay) {
@@ -821,6 +845,9 @@ export class Game {
         this.#armLaunch();
         this.playerRace = { laps: 0, lastProgress: this.sim.lastProgress };
         this.#placeCameraBehindCar();
+        if (this.started) {
+            this.#notify(this.onAttemptStart);
+        }
     }
 
     /**
@@ -2282,6 +2309,7 @@ export class Game {
      * @param {object} event Събитието от sim.tick
      */
     #onLapFinished(event) {
+        this.#notify(this.onLapCompleted, { lapMs: event.lapMs, valid: event.valid, untimed: false });
         // Състезание: няма резултатен екран по средата — следващата обиколка
         // се въоръжава ВЕДНАГА (не през 'formation', иначе се хронометрира
         // само всяка втора). Кадрите на ПОСЛЕДНАТА обиколка хранят ТВ реплея
@@ -2384,6 +2412,10 @@ export class Game {
         let prevZ = state.z;
         let prevHeading = state.heading;
 
+        // За бойната обиколка на състезанието (виж под цикъла).
+        const lapsBefore = this.playerRace.laps;
+        let timedLapFinished = false;
+
         while (this.accumulator >= FIXED_DT) {
             prevX = state.x;
             prevZ = state.z;
@@ -2398,6 +2430,7 @@ export class Game {
                 this.lapAnalysis.record(sim.lastProgress, state, this.input);
             }
             if (event?.type === 'finished') {
+                timedLapFinished = true;
                 const reference = this.rivalGhost ?? this.ghost;
                 this.lastLapAnalysis = this.lapAnalysis.finish(reference?.frames ?? null);
                 this.#onLapFinished(event);
@@ -2459,6 +2492,25 @@ export class Game {
         trackWrap(this.playerRace, sim.lastProgress);
         for (const opp of this.opponents) {
             trackWrap(opp, opp.sim.lastProgress);
+        }
+
+        // Първата обиколка на състезанието е бойна (симът я не хронометрира —
+        // виж #gridPlayer), но за играча тя е обиколка 1/3 и телеметрията я
+        // брои като завършена без време. Пресичане №1 е потеглянето от
+        // решетката, №2 е краят ѝ. Флагът пази срещу повторно броене при
+        // връщане назад през линията; ако симът все пак е хронометрирал
+        // тази обиколка (recovery преди линията), тя вече мина през
+        // #onLapFinished и не се брои втори път.
+        if (
+            this.opponents.length > 0 &&
+            !this.playerRace.outLapReported &&
+            lapsBefore === 1 &&
+            this.playerRace.laps === 2
+        ) {
+            this.playerRace.outLapReported = true;
+            if (!timedLapFinished) {
+                this.#notify(this.onLapCompleted, { lapMs: null, valid: true, untimed: true });
+            }
         }
 
         // Финал на състезанието: пресичане № RACE_TOTAL_LAPS+1 (първото е
@@ -2783,6 +2835,7 @@ export class Game {
             sector: sim.currentSector + 1,
             sectors: sim.lastSectors.map((t) => (t === null ? null : t * FIXED_DT)),
             lapValid: sim.lapValid,
+            trackProgress: sim.lastProgress,
             started: sim.phase === 'flying',
             phase: sim.phase,
             recovering: sim.recovering,

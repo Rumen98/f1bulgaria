@@ -17,8 +17,10 @@ use App\Http\Controllers\F2TeamsController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\GameController;
+use App\Http\Controllers\GameFeedbackController;
 use App\Http\Controllers\GameLeaderboardController;
 use App\Http\Controllers\GameSessionController;
+use App\Http\Controllers\GameVisitController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
@@ -145,6 +147,17 @@ Route::middleware('feature:game')->group(function () {
     Route::post('/game/session', [GameSessionController::class, 'store'])
         ->middleware(['auth', 'throttle:30,1,game-session'])
         ->name('game.session.store');
+    Route::post('/game/session/{session}/events', [GameSessionController::class, 'events'])
+        ->whereNumber('session')
+        ->middleware(['auth', 'throttle:120,1,game-session-events'])
+        ->name('game.session.events');
+    // Гост-„Карай" — без вход; регистрираните минават през /game/session.
+    Route::post('/game/visit', [GameVisitController::class, 'store'])
+        ->middleware('throttle:30,1,game-visit')
+        ->name('game.visit.store');
+    Route::post('/game/feedback', [GameFeedbackController::class, 'store'])
+        ->middleware(['auth', 'throttle:5,1,game-feedback'])
+        ->name('game.feedback.store');
 });
 
 // „Инженерство“ — обяснителната рубрика за техниката. Съдържанието е в

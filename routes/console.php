@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\GameSessionEvent;
+use App\Models\GameVisit;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -9,6 +11,13 @@ use Illuminate\Support\Facades\Schedule;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+// Суровите събития от играта живеят RETENTION_DAYS (виж GameSessionEvent),
+// посещенията — година (GameVisit); агрегатите в game_sessions остават.
+Schedule::command('model:prune', ['--model' => [GameSessionEvent::class, GameVisit::class]])
+    ->dailyAt('04:10')
+    ->timezone('Europe/Sofia')
+    ->onOneServer();
 
 // Заключва прогнозите 5 мин преди квалификацията — върви всяка минута.
 Schedule::command('f1:lock-predictions')

@@ -31,6 +31,11 @@ class GameSessionFactory extends Factory
         return $this->state(['device' => GameSession::DEVICE_MOBILE]);
     }
 
+    public function tracked(): static
+    {
+        return $this->state(fn () => ['client_id' => fake()->uuid(), 'status' => 'active', 'last_seen_at' => now()]);
+    }
+
     public function race(): static
     {
         return $this->state(['mode' => GameSession::MODE_RACE]);

@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\GameFeedback\GameFeedbackResource;
 use App\Filament\Resources\GamePlayers\GamePlayerResource;
 use App\Filament\Resources\GamePlayers\Pages\ListGamePlayers;
 use App\Filament\Resources\GamePlayers\Tables\GamePlayersTable;
+use App\Filament\Resources\GameSessions\GameSessionResource;
+use App\Models\GameFeedback;
 use App\Models\GameLapRecord;
 use App\Models\GameSession;
 use App\Models\User;
@@ -56,7 +59,7 @@ it('слива стартовете и обиколките в първо/пос
         ->and((int) $row->game_lap_records_min_lap_ms)->toBe(91000);
 });
 
-it('филтрира стартиралите без завършена обиколка и каралите на телефон', function () {
+it('филтрира стартиралите без изпратено време за класацията и каралите на телефон', function () {
     $quitter = User::factory()->create(['name' => 'Отказал се']);
     GameSession::factory()->for($quitter)->mobile()->create();
 
@@ -76,6 +79,38 @@ it('филтрира стартиралите без завършена обик
         ->filterTable('with_laps')
         ->assertCanSeeTableRecords([$finisher])
         ->assertCanNotSeeTableRecords([$quitter]);
+});
+
+it('показва финалите в състезание отделно от изпратените времена и свързва мненията', function () {
+    $player = User::factory()->create();
+    $session = GameSession::factory()->for($player)->tracked()->race()->create([
+        'status' => 'completed', 'lap_count' => 3, 'valid_lap_count' => 2, 'invalid_lap_count' => 1,
+    ]);
+    GameSession::factory()->for($player)->create();
+    GameFeedback::factory()->forSession($session)->create();
+    $oldPlayer = User::factory()->create();
+    GameSession::factory()->for($oldPlayer)->create();
+
+    $table = Livewire::test(ListGamePlayers::class)->assertOk()
+        ->assertSee('Без изпратено време за класацията')
+        ->assertDontSee('без завършена обиколка')
+        ->assertTableActionHasUrl('sessions', GameSessionResource::getUrl('index', ['filters' => ['user_id' => ['value' => $player->id]]]), $player)
+        ->assertTableActionHasUrl('feedback', GameFeedbackResource::getUrl('index', ['filters' => ['user_id' => ['value' => $player->id]]]), $player)
+        ->filterTable('without_laps')->assertCanSeeTableRecords([$player, $oldPlayer]);
+    $row = $table->instance()->getTableRecords()->firstWhere('id', $player->id);
+
+    expect((int) $row->game_lap_records_count)->toBe(0)
+        ->and((int) $row->completed_laps)->toBe(3)
+        ->and((int) $row->valid_laps)->toBe(2)
+        ->and((int) $row->invalid_laps)->toBe(1)
+        ->and((int) $row->tracked_sessions_count)->toBe(1)
+        ->and((int) $row->legacy_sessions_count)->toBe(1)
+        ->and((int) $row->game_feedback_count)->toBe(1);
+
+    $table->resetTableFilters()->filterTable('with_completed_laps')
+        ->assertCanSeeTableRecords([$player])->assertCanNotSeeTableRecords([$oldPlayer])
+        ->resetTableFilters()->filterTable('with_feedback')
+        ->assertCanSeeTableRecords([$player])->assertCanNotSeeTableRecords([$oldPlayer]);
 });
 
 it('сортира по последно каране и търси по име', function () {

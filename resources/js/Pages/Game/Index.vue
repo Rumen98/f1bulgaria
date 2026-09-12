@@ -1,9 +1,11 @@
 <script setup>
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import GameLobbyHero from '@/Components/Game/GameLobbyHero.vue';
+import GameFeedbackForm from '@/Components/Game/GameFeedbackForm.vue';
 import LapAnalysis from '@/Pages/Game/LapAnalysis.vue';
 import { lookFor } from '@/game/circuits.js';
 import { isMobileDevice } from '@/game/device.js';
+import { createSessionTracker, sendSessionEvents, sessionDeviceContext } from '@/game/sessionTracker.js';
 import { formatDelta, formatGap, formatLapTime, formatSeconds, splitDurations } from '@/game/format.js';
 import { Head, usePage } from '@inertiajs/vue3';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
@@ -12,6 +14,7 @@ const props = defineProps({
     tracks: { type: Array, default: () => [] },
     // Slug на „пистата на уикенда" — там, където Ф1 кара в момента.
     weekTrack: { type: String, default: null },
+    gameFeedback: { type: Object, default: () => ({ eligible: false, last_session_id: null, submitted: false }) },
 });
 
 // Опростени контури за каталога, извлечени от същите GPS точки в
@@ -84,6 +87,83 @@ const featuredTrack = computed(() => orderedTracks.value[0] ?? null);
 
 const page = usePage();
 const authUser = computed(() => page.props.auth?.user ?? null);
+const hasPlayed = ref(props.gameFeedback.eligible);
+const feedbackSessionId = ref(props.gameFeedback.last_session_id);
+// Формата се отваря сама само веднъж: докато играчът не е дал мнение (никога)
+// и не я е затворил с „Не сега" в този престой. Бутонът остава винаги — може
+// да остави ново мнение, но не го врънкаме на всеки изход от пистата.
+const feedbackAutoOpen = ref(props.gameFeedback.eligible && !props.gameFeedback.submitted);
+const feedbackVisible = ref(feedbackAutoOpen.value);
+const feedbackExpanded = ref(false);
+const feedbackSaved = ref(false);
+const onFeedbackSubmitted = () => {
+    feedbackSaved.value = true;
+    feedbackVisible.value = false;
+    feedbackAutoOpen.value = false;
+};
+const onFeedbackDismissed = () => {
+    feedbackVisible.value = false;
+    feedbackAutoOpen.value = false;
+};
+const sessionTracker = createSessionTracker({
+    createSession: async (payload) => (await window.axios.post('/game/session', payload)).data,
+    sendEvents: sendSessionEvents,
+    onSession: (id, latest) => {
+        if (latest) feedbackSessionId.value = id;
+    },
+});
+
+// Посещения (вкл. гости): отваряне при mount и гост-опит при всеки старт.
+// Регистрираните опити минават през телеметрията; отварянето се брои от
+// клиента, защото hover prefetch-ът на менюто е неразличим на сървъра.
+const recordVisit = (kind) => {
+    // Директно от детектора: при mount isMobile още не е попълнен (по-късен hook).
+    const payload = { kind, device: isMobileDevice() ? 'mobile' : 'desktop' };
+    if (kind === 'start') {
+        if (!selectedTrack.value) return;
+        payload.track = selectedTrack.value.slug;
+    }
+    window.axios.post('/game/visit', payload).catch(() => {});
+};
+
+const beginTrackingAttempt = () => {
+    if (!selectedTrack.value) return;
+    if (!authUser.value) {
+        recordVisit('start');
+        return;
+    }
+    hasPlayed.value = true;
+    feedbackSaved.value = false;
+    feedbackSessionId.value = null;
+    sessionTracker.start({
+        track: selectedTrack.value.slug, device: isMobile.value ? 'mobile' : 'desktop',
+        mode: rivals.value === 'race' ? 'race' : 'solo',
+        context: { ...sessionDeviceContext(), controls: isMobile.value ? controlMode.value : 'keyboard', graphics: settings.value.quality, transmission: transmission.value, sim_version: game.value.simVersion },
+    });
+    sessionTracker.pause(game.value.paused || document.hidden);
+};
+
+const openGameFeedback = () => {
+    quit();
+    feedbackExpanded.value = true;
+    feedbackVisible.value = true;
+    nextTick(() => document.getElementById('game-feedback-area')?.scrollIntoView({ block: 'start' }));
+};
+
+let sessionHeartbeat = null;
+const onSessionVisibility = () => {
+    if (document.hidden) sessionTracker.pause(true, 'page_hidden');
+};
+const onSessionPageHide = (event) => {
+    if (event.persisted) sessionTracker.pause(true, 'page_hidden');
+    else sessionTracker.end('page_left', {}, true);
+};
+onMounted(() => {
+    recordVisit('view');
+    sessionHeartbeat = window.setInterval(() => sessionTracker.heartbeat(), 20_000);
+    document.addEventListener('visibilitychange', onSessionVisibility);
+    window.addEventListener('pagehide', onSessionPageHide);
+});
 
 const canvas = ref(null);
 const gameStage = ref(null);
@@ -529,6 +609,7 @@ const syncFromTelemetry = (values) => {
 };
 
 const onTelemetry = (values) => {
+    if (!replaying.value && !preStart.value) sessionTracker.observe(values);
     telemetry.value = values;
     syncFromTelemetry(values);
     drawMinimap(values);
@@ -853,6 +934,7 @@ const submitLap = async (res) => {
     // Пистата може да се смени, докато заявката лети — тогава отговорът се
     // изхвърля, вместо да пренапише класацията на НОВАТА писта.
     const submittedSlug = selectedTrack.value.slug;
+    const recordedAttempt = sessionTracker.current;
 
     submitting.value = true;
     submitError.value = null;
@@ -866,6 +948,7 @@ const submitLap = async (res) => {
             trace: res.trace,
             sim_version: res.simVersion,
         });
+        sessionTracker.record('lap_submitted', { save_status: 'pending' }, recordedAttempt);
 
         if (selectedTrack.value?.slug !== submittedSlug) {
             return;
@@ -876,6 +959,7 @@ const submitLap = async (res) => {
         userBests.value = data.user_bests ?? userBests.value;
         leaderboard.value = data.top ?? leaderboard.value;
     } catch (e) {
+        sessionTracker.record('lap_save_failed', { save_status: 'failure', error_code: e?.response?.status === 422 ? 'validation_failed' : 'request_failed' }, recordedAttempt);
         if (selectedTrack.value?.slug === submittedSlug) {
             submitError.value =
                 e?.response?.data?.message ?? 'Времето не се записа. Опитай пак.';
@@ -1411,6 +1495,9 @@ const startGame = async (track, rivalUserId = null) => {
         });
 
         const instance = game.value;
+        instance.onAttemptStart = beginTrackingAttempt;
+        instance.onLapCompleted = (lap) => sessionTracker.lapCompleted(lap);
+        instance.onPauseChange = (paused) => sessionTracker.pause(paused);
         detectGameApi(instance);
         lowPower.value = instance.lowPower === true;
         // Гръмнал кадър (Game.#fail): three не се възстановява след throw в
@@ -1421,6 +1508,7 @@ const startGame = async (track, rivalUserId = null) => {
                 return;
             }
             console.error('Играта спря заради повторяема грешка в кадъра.', cause);
+            sessionTracker.end('error', { error_code: 'render_failed' });
             quit();
             error.value = 'Играта спря заради грешка на това устройство. Опитай отново или с друг браузър.';
         };
@@ -1448,6 +1536,7 @@ const startGame = async (track, rivalUserId = null) => {
         // Карираният флаг на състезанието → подиумът.
         instance.onRaceFinish = (raceOutcome) => {
             raceResult.value = raceOutcome;
+            if (raceOutcome) sessionTracker.end('race_completed', { race_position: raceOutcome.position, progress: 1 });
         };
 
         // Вътрешен reset (R / „Рестарт" по време на реплей) сваля и соло
@@ -1606,7 +1695,6 @@ const beginLap = () => {
 
     preStart.value = false;
     instance.start();
-    recordGameSession();
     syncMobileOrientation();
     // Камера/звук са no-op по време на attract реплея — прилагат се чак
     // след start(), който го спира.
@@ -1619,23 +1707,9 @@ const beginLap = () => {
     });
 };
 
-// „Пробвал е играта" за админа: една заявка на „Карай", само с акаунт
-// (гостът няма кого да отбележим). Fire-and-forget — статистика, която не
-// бива да пречи на старта, ако мрежата е бавна или заявката се провали.
-const recordGameSession = () => {
-    if (!authUser.value || !selectedTrack.value) {
-        return;
-    }
-    window.axios
-        .post('/game/session', {
-            track: selectedTrack.value.slug,
-            device: isMobile.value ? 'mobile' : 'desktop',
-            mode: rivals.value === 'race' ? 'race' : 'solo',
-        })
-        .catch(() => {});
-};
-
 const quit = () => {
+    sessionTracker.end('quit');
+    if (hasPlayed.value && feedbackAutoOpen.value && !feedbackSaved.value) feedbackVisible.value = true;
     // Освобождава каталога веднага и обезсилва стария async finally. Така
     // играчът може да избере друга писта, докато предишните ресурси приключват.
     gameLoadRun += 1;
@@ -1705,6 +1779,10 @@ const teardown = () => {
 // Без това всяка навигация из сайта оставя жив WebGL контекст — браузърите
 // пазят шепа такива и после отказват да създават нови.
 onBeforeUnmount(() => {
+    sessionTracker.end('page_left', {}, true);
+    window.clearInterval(sessionHeartbeat);
+    document.removeEventListener('visibilitychange', onSessionVisibility);
+    window.removeEventListener('pagehide', onSessionPageHide);
     gameLoadRun += 1;
     teardown();
 });
@@ -2155,6 +2233,18 @@ const recenterTilt = () => {
                 :loading="loading"
                 @drive="featuredTrack && startGame(featuredTrack)"
             />
+
+            <section v-if="authUser && hasPlayed" id="game-feedback-area" class="mt-6 scroll-mt-6" aria-label="Обратна връзка за играта">
+                <GameFeedbackForm
+                    v-if="feedbackVisible && !feedbackSaved"
+                    :session-id="feedbackSessionId"
+                    :initial-open="feedbackExpanded"
+                    @submitted="onFeedbackSubmitted"
+                    @dismiss="onFeedbackDismissed"
+                />
+                <p v-else-if="feedbackSaved" role="status" class="rounded-xl border border-emerald-900/60 bg-emerald-950/30 p-4 text-sm text-emerald-200">Благодарим! Мнението ти за играта е записано.</p>
+                <button v-else type="button" class="rounded-xl border border-zinc-700 px-4 py-3 text-sm font-semibold text-zinc-200 hover:border-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500" @click="feedbackVisible = true; feedbackExpanded = true">{{ gameFeedback.submitted ? 'Остави ново мнение за играта' : 'Как беше карането? Остави мнение за играта' }}</button>
+            </section>
 
             <div class="mb-5 mt-10 flex items-end justify-between gap-4">
                 <div>
@@ -3452,6 +3542,7 @@ const recenterTilt = () => {
                                 >
                                     Смени пистата
                                 </button>
+                                <button v-if="authUser && hasPlayed && !feedbackSaved" type="button" class="col-span-full min-h-11 rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800" @click="openGameFeedback">Мнение за играта</button>
                             </div>
                                 </div>
                             </div>
@@ -3719,6 +3810,7 @@ const recenterTilt = () => {
                                 >
                                     Смени пистата
                                 </button>
+                                <button v-if="authUser && hasPlayed && !feedbackSaved" type="button" class="col-span-full min-h-11 rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800" @click="openGameFeedback">Мнение за играта</button>
                                 </div>
                             </div>
                         </div>

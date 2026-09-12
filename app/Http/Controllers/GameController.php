@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Services\Game\GameFeedbackService;
 use App\Services\Game\WeekTrackResolver;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,11 +22,14 @@ class GameController extends Controller
      * килобайта и клиентът ги тегли директно от public/, само за избраната
      * писта.
      */
-    public function index(): Response
+    public function index(Request $request, GameFeedbackService $feedback): Response
     {
+        // Кой влиза (вкл. гости) се брои от клиента — POST /game/visit при
+        // mount; тук hover prefetch-ът на менюто е неразличим от истинско влизане.
         return Inertia::render('Game/Index', [
             'tracks' => $this->tracks(),
             'weekTrack' => $this->weekTrack->slug(),
+            'gameFeedback' => $feedback->prompt($request->user()),
         ]);
     }
 

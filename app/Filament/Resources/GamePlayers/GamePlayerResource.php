@@ -13,6 +13,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Кой е пробвал играта: потребителите с поне едно натискане на „Карай"
@@ -43,6 +44,31 @@ class GamePlayerResource extends Resource
 
     /** Няма view/edit страница — глобалното търсене няма къде да води. */
     protected static bool $isGloballySearchable = false;
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->is_admin === true;
+    }
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
 
     /** Броят на пробвалите играта — видим и без да се отваря списъкът. */
     public static function getNavigationBadge(): ?string

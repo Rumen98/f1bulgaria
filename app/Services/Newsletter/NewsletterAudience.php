@@ -6,6 +6,7 @@ namespace App\Services\Newsletter;
 
 use App\Models\NewsletterSubscriber;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -23,6 +24,23 @@ class NewsletterAudience
         return User::query()
             ->whereNull('banned_at')
             ->whereNull('email_opt_out_at')
+            ->get();
+    }
+
+    /**
+     * Само пробвалите играта (старт или записана обиколка) — за писма,
+     * които нямат смисъл за останалите. Същите изключения като users().
+     *
+     * @return Collection<int, User>
+     */
+    public function players(): Collection
+    {
+        return User::query()
+            ->whereNull('banned_at')
+            ->whereNull('email_opt_out_at')
+            ->where(function (Builder $query): void {
+                $query->whereHas('gameSessions')->orWhereHas('gameLapRecords');
+            })
             ->get();
     }
 
